@@ -1,6 +1,9 @@
 """Tests for scripts/build_dashboard.py (standard library + pytest only).
 
-The builder is a script, not a package module, so it is loaded by path.
+The builder is a script, not a package module, so it is loaded by path. The
+repo is found by walking up from this file, so the tests also run from a copy
+of tests/ inside the repo, such as mutmut's mutants/tests/ (mutmut copies
+tests/ but not scripts/ or dashboard/). Without a builder above them, they skip.
 Every test works in pytest's tmp_path; nothing is written into the repo.
 """
 
@@ -14,7 +17,24 @@ from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parent.parent
+
+def find_repo(start: Path):
+    """The nearest folder at or above `start` holding the builder and its template."""
+    for folder in (start, *start.parents):
+        if (folder / "scripts" / "build_dashboard.py").is_file() and (
+            folder / "dashboard" / "template.html"
+        ).is_file():
+            return folder
+    return None
+
+
+REPO = find_repo(Path(__file__).resolve().parent)
+if REPO is None:
+    pytest.skip(
+        "scripts/build_dashboard.py and dashboard/template.html not found in any folder above this test "
+        "file (a copy of tests/ without the repo around it); the dashboard tests need the builder",
+        allow_module_level=True,
+    )
 BUILDER = REPO / "scripts" / "build_dashboard.py"
 TEMPLATE_FILE = REPO / "dashboard" / "template.html"
 
@@ -127,6 +147,7 @@ def test_sample_build_exercises_every_state_and_stays_out_of_the_repo(tmp_path, 
     assert "SAMPLE dashboard" in capsys.readouterr().out
     after = sorted(p.relative_to(REPO).as_posix() for p in (REPO / "dashboard").rglob("*"))
     assert before == after, "--sample wrote into the repo"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["sample.html"], "the synthetic tree was left behind"
 
     html = out.read_text(encoding="utf-8")
     assert re.search(r"<title>SAMPLE", html)
@@ -142,6 +163,32 @@ def test_sample_build_exercises_every_state_and_stays_out_of_the_repo(tmp_path, 
     assert data["data"]["snapshot"]["series"] and data["data"]["quality_reports"]
     assert len(data["studies"]) >= 2 and data["exports"] and data["reports"]
     assert any(s["latest"] and s["latest"]["equity"] for s in data["strategies"])
+    assert data["link_root"] is None  # the synthetic tree is gone, so nothing is linked
+    momentum = next(s for s in data["strategies"] if s["name"] == "momentum-bold")
+    assert [h["state"] for h in momentum["history"]] == [bd.UNREADABLE, bd.FAIL]  # older broken file
+
+
+def test_sample_without_out_goes_to_the_temp_folder_never_the_repo(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(bd.tempfile, "tempdir", str(tmp_path))
+    before = sorted(p.relative_to(REPO).as_posix() for p in (REPO / "dashboard").rglob("*"))
+    assert bd.main(["--sample"]) == 0
+    assert (tmp_path / "osprey-dashboard-sample.html").is_file()
+    assert str(tmp_path / "osprey-dashboard-sample.html") in capsys.readouterr().out
+    assert sorted(p.relative_to(REPO).as_posix() for p in (REPO / "dashboard").rglob("*")) == before
+
+
+def test_sample_refuses_to_write_inside_a_git_checkout(tmp_path, capsys):
+    (tmp_path / "other-repo" / ".git").mkdir(parents=True)
+    out = tmp_path / "other-repo" / "dashboard" / "index.html"
+    assert bd.main(["--sample", "--out", str(out)]) == 2
+    assert "never be committed" in capsys.readouterr().err
+    assert not out.exists()
+    inside = REPO / "dashboard" / "sample-refusal-test.html"  # this checkout, with or without .git
+    try:
+        assert bd.main(["--sample", "--out", str(inside)]) == 2
+        assert not inside.exists()
+    finally:
+        inside.unlink(missing_ok=True)
 
 
 def test_sample_tree_is_deterministic(tmp_path):
@@ -237,6 +284,7 @@ TESTING_FIXTURE = """# TESTING.md
 | 1 | a | b | c |
 | 2 | a | b | c |
 | 3 | a | b | c |
+| - | a note row, not a numbered bug | | |
 
 ## 5. Open work, in order
 
@@ -325,14 +373,16 @@ def test_status_json_unknown_value_is_shown_with_a_warning(tmp_path):
         ({}, ("regime_max_profit_share",), bd.INCOMPLETE),  # missing gate is never a pass
         ({}, ("final_test",), bd.INCOMPLETE),  # missing final test is not "awaiting"
         ({"final_test": "pending", "pbo": "pending"}, (), bd.INCOMPLETE),
+        ({"final_test": "pending"}, ("pbo",), bd.INCOMPLETE),  # a missing gate is never "awaiting"
+        ({"final_test": "pending"}, ("beats_benchmarks", "dsr"), bd.INCOMPLETE),
     ],
 )
 def test_gate_state_derivation(states, drop, expected):
     state, reason = bd.derive_state(gates_from_states(states, drop))
     assert state == expected
-    if expected == bd.INCOMPLETE:
-        for key in drop:
-            assert f"missing: {key}" in reason
+    if expected == bd.INCOMPLETE and drop:
+        missing = reason.split("missing: ", 1)[1].split(";")[0].split(", ")
+        assert sorted(missing) == sorted(drop)
 
 
 def test_gate_with_bad_pass_flag_counts_as_pending():
@@ -402,6 +452,7 @@ def test_latest_audit_is_chosen_by_file_date_not_mtime(tmp_path):
         ("dashboard/status.json", '{"milestones": [1, 2]}', "should be an object"),
         ("results/tests/junit.xml", "<testsuites><testsuite", "invalid XML"),
         ("results/tests/junit.xml", "<report/>", "no <testsuite>"),
+        ("results/tests/junit.xml", '<testsuite tests="1e400" failures="nan" time="1e400"/>', "not a count"),
         ("results/tests/coverage.json", '{"totals": {"percent_covered": NaN}}', "percent_covered"),
         ("results/tests/coverage.json", '{"totals": "x"}', "percent_covered"),
         ("results/tests/mutation/data.json", '{"killed": "many", "survived": -1}', "skipped"),
@@ -545,6 +596,35 @@ def test_mutation_file_is_read_and_compared_with_its_target(tmp_path):
     assert areas["runner"]["present"] is False
 
 
+def test_meets_target_uses_the_score_without_equivalent_mutants(tmp_path):
+    # raw score 85/100 misses 90%; without the 10 equivalent survivors it is 85/90 = 94%
+    write(tmp_path, "results/tests/mutation/runner.json", {"killed": 85, "survived": 15, "equivalent": 10})
+    runner = {a["area"]: a for a in bd.collect(tmp_path)["testing"]["mutation"]}["runner"]
+    assert runner["score"] == pytest.approx(0.85)
+    assert runner["score_excluding_equivalent"] == pytest.approx(85 / 90)
+    assert runner["meets_target"] is True
+
+
+def test_real_mutmut_stats_file_is_read(tmp_path):
+    # the key set mutmut 3.8 writes with `export-cicd-stats`
+    stats = {
+        "killed": 492,
+        "survived": 123,
+        "total": 640,
+        "no_tests": 12,
+        "skipped": 0,
+        "suspicious": 0,
+        "timeout": 3,
+        "check_was_interrupted_by_user": 4,
+        "segfault": 2,
+    }
+    write(tmp_path, "results/tests/mutation/validation.json", stats)
+    data = bd.collect(tmp_path)
+    area = data["testing"]["mutation"][0]
+    assert area["counts"]["segfault"] == 2 and area["score"] == pytest.approx(495 / 618)
+    assert any("interrupted" in m for m in warnings_for(data, "mutation/validation.json"))
+
+
 def test_junit_counts(tmp_path):
     write(
         tmp_path,
@@ -602,7 +682,7 @@ def test_coverage_without_branch_flag_warns(tmp_path):
 
 
 def test_hostile_strings_cannot_break_out_of_the_data_block(tmp_path):
-    evil = '</script><img src=x onerror="alert(1)"><!--   &amp;'
+    evil = '</script><img src=x onerror="alert(1)"><!-- \u2028 &amp; a&b>c \u2029'
     doc = audit_doc(
         "s1",
         "2026-11-19",
@@ -617,6 +697,9 @@ def test_hostile_strings_cannot_break_out_of_the_data_block(tmp_path):
     assert html.count("</script>") == TEMPLATE.count("</script>")
     assert "<img" not in html and "<!--  " not in html and " " not in html
     assert html.upper().count("</SCRIPT") == TEMPLATE.upper().count("</SCRIPT")
+    block = DATA_BLOCK.search(html).group(1)
+    for raw in ("<", ">", "&", "\u2028", "\u2029"):
+        assert raw not in block, f"{raw!r} must be escaped inside the data block"
     latest = page_data(html)["strategies"][0]["latest"]
     assert latest["report_md"] == {"text": evil, "path": None}  # shown as text, never linked
     assert latest["metrics"][0][0] == evil
@@ -735,3 +818,158 @@ def test_git_falls_back_to_head_file(tmp_path):
 def test_link_root_points_from_the_page_to_the_repo(tmp_path):
     assert bd.link_root(tmp_path, tmp_path / "dashboard" / "index.html") == ".."
     assert bd.link_root(tmp_path / "repo", tmp_path / "out.html") == "repo"
+
+
+# --------------------------------------------------------------------------- review regressions
+
+
+def test_repo_is_found_from_a_copy_of_tests_inside_it(tmp_path):
+    # mutmut runs a copy of tests/ from mutants/tests/; the builder is two levels up
+    write(tmp_path, "scripts/build_dashboard.py", "")
+    write(tmp_path, "dashboard/template.html", "")
+    copy = tmp_path / "mutants" / "tests"
+    copy.mkdir(parents=True)
+    assert find_repo(copy) == tmp_path
+    write(tmp_path, "mutants/scripts/build_dashboard.py", "")  # a builder without its template is skipped
+    assert find_repo(copy) == tmp_path
+    assert find_repo(tmp_path / "mutants" / "elsewhere") == tmp_path
+    lonely = tmp_path.parent / (tmp_path.name + "-lonely") / "tests"
+    lonely.mkdir(parents=True)
+    assert find_repo(lonely) is None
+
+
+def test_lone_surrogate_in_json_is_repaired_with_a_warning(tmp_path):
+    write(
+        tmp_path,
+        "dashboard/status.json",
+        '{"note": "bad \\ud800 surrogate", "milestones": {"\\udcff": "done"}}',
+    )
+    write_audit(tmp_path, audit_doc("s1", "2026-11-19", "PASS", risk_level="x\udc80y"))
+    data = bd.collect(tmp_path)
+    assert data["status"]["note"] == "bad � surrogate"
+    assert any("invalid Unicode" in m for m in warnings_for(data, "dashboard/status.json"))
+    html = bd.render(data, TEMPLATE)
+    html.encode("utf-8")  # must not raise
+    out = tmp_path / "out.html"
+    assert bd.main(["--root", str(tmp_path), "--out", str(out), "--json", str(tmp_path / "d.json")]) == 0
+    assert page_data(out.read_text(encoding="utf-8"))["status"]["note"] == "bad � surrogate"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="needs a file system that accepts non-UTF-8 names")
+def test_file_names_that_are_not_utf8_do_not_stop_the_build(tmp_path):
+    reports = os.fsencode(str(tmp_path / "reports"))
+    os.makedirs(reports + b"/s\xff", exist_ok=True)
+    with open(reports + b"/bad\xffname.md", "wb") as f:
+        f.write(b"# report\n")
+    os.makedirs(os.fsencode(str(tmp_path / "strategies")) + b"/t\xfe", exist_ok=True)
+    out = tmp_path / "out.html"
+    assert bd.main(["--root", str(tmp_path), "--out", str(out)]) == 0
+    data = page_data(out.read_text(encoding="utf-8"))
+    assert "reports/bad�name.md" in [r["path"] for r in data["reports"]]
+    assert "t�" in [s["name"] for s in data["strategies"]]
+    assert any("not valid UTF-8" in w["message"] for w in data["warnings"])
+
+
+def test_a_failed_write_never_truncates_the_previous_page(tmp_path, monkeypatch, capsys):
+    out = tmp_path / "dashboard" / "index.html"
+    write(tmp_path, "dashboard/index.html", "PREVIOUS GOOD PAGE")
+    with pytest.raises(UnicodeEncodeError):
+        bd.write_atomic(out, "half a page \ud800")
+    assert out.read_text(encoding="utf-8") == "PREVIOUS GOOD PAGE"
+    monkeypatch.setattr(bd, "render", lambda data, template: "broken \ud800 page")
+    assert bd.main(["--root", str(tmp_path)]) == 2
+    assert "cannot write output" in capsys.readouterr().err
+    assert out.read_text(encoding="utf-8") == "PREVIOUS GOOD PAGE"
+    assert sorted(p.name for p in out.parent.iterdir()) == ["index.html"]  # no temp file left
+
+
+@pytest.mark.parametrize(
+    "newest",
+    [
+        '{"schema": "osprey.audit/1", "verdict": "FAIL", ',  # truncated
+        '{"schema": "osprey.audit/2", "verdict": "FAIL"}',  # unknown schema
+        '{"schema": "osprey.audit/1", "seed": ' + "9" * 5000 + "}",  # integer too long to parse
+        "[]",
+    ],
+)
+def test_an_unreadable_newest_audit_is_never_replaced_by_an_older_pass(tmp_path, newest):
+    write_audit(tmp_path, audit_doc("s1", "2026-01-01", "PASS"))
+    write(tmp_path, "reports/s1/2026-06-01.json", newest)
+    data = bd.collect(tmp_path)
+    s1 = data["strategies"][0]
+    assert s1["latest"]["date"] == "2026-06-01" and s1["latest"]["state"] == bd.UNREADABLE
+    assert s1["stage"] == "audited" and data["overview"]["strategies_ready"] == 0
+    assert [h["state"] for h in s1["history"]] == [bd.READY, bd.UNREADABLE]
+    integrity = [x for x in data["warnings"] if x["level"] == "integrity"]
+    assert len(integrity) == 1 and "reports/s1/2026-06-01.json" in integrity[0]["message"]
+    assert "2026-01-01" in integrity[0]["message"]
+    page_data(bd.render(data, TEMPLATE))
+
+
+def test_an_unreadable_older_audit_stays_in_the_history_only(tmp_path):
+    write(tmp_path, "reports/s1/2026-01-01.json", "{")
+    write_audit(tmp_path, audit_doc("s1", "2026-06-01", "PASS"))
+    data = bd.collect(tmp_path)
+    s1 = data["strategies"][0]
+    assert s1["latest"]["state"] == bd.READY and s1["stage"] == "ready"
+    assert [h["state"] for h in s1["history"]] == [bd.UNREADABLE, bd.READY]
+    assert data["overview"]["integrity_warnings"] == 0
+    assert warnings_for(data, "reports/s1/2026-01-01.json")
+
+
+def test_a_pass_with_no_number_behind_it_is_an_integrity_warning(tmp_path):
+    doc = audit_doc("s1", "2026-11-19", "PASS")
+    doc["gates"]["dsr"] = {"value": float("nan"), "threshold": 0.95, "op": ">=", "pass": True}
+    doc["gates"]["pbo"] = {"threshold": 0.25, "op": "<=", "pass": True}  # no value at all
+    doc["gates"]["mc_p95_max_drawdown"] = {"value": 0.2, "threshold": None, "op": "<=", "pass": True}
+    doc["gates"]["beats_benchmarks"] = {"value": True, "pass": True}  # true/false gate: fine
+    write(tmp_path, "reports/s1/2026-11-19.json", json.dumps(doc))  # NaN written as NaN
+    write(tmp_path, "reports/s1/2026-11-19.md", "# audit\n")
+    data = bd.collect(tmp_path)
+    latest = data["strategies"][0]["latest"]
+    assert latest["state"] == bd.READY  # the flags still decide the state; nothing is re-judged
+    gates = {g["key"]: g for g in latest["gates"]}
+    assert gates["dsr"]["unsupported"] == ["value"] and gates["pbo"]["unsupported"] == ["value"]
+    assert gates["mc_p95_max_drawdown"]["unsupported"] == ["threshold"]
+    assert gates["beats_benchmarks"]["unsupported"] == [] and gates["final_test"]["unsupported"] == []
+    integrity = [x for x in data["warnings"] if x["level"] == "integrity"]
+    assert len(integrity) == 1 and "dsr" in integrity[0]["message"] and "pbo" in integrity[0]["message"]
+    assert [a["level"] for a in latest["alerts"]] == ["integrity"]
+
+
+def test_threshold_is_shown_as_written():
+    g = bd.normalise_gate(
+        "wf_oos_sharpe", {"value": 1.2, "threshold": 1.0, "op": ">=", "pass": True}, "f", bd.Warnings()
+    )
+    assert g["threshold_text"] == "1.0" and g["unsupported"] == []
+
+
+def test_equity_values_out_of_range_become_gaps_and_small_values_survive():
+    w = bd.Warnings()
+    eq = bd.normalise_equity(
+        {
+            "dates": ["2020-01-01", "2020-01-02", "2020-01-03"],
+            "series": {"strategy": [1, 1e300, 1e308], "tiny_base": [1e-300, 1, 1e-9], "small": [1, 1e-9, 2]},
+        },
+        "f",
+        w,
+    )
+    by = {s["name"]: s["values"] for s in eq["series"]}
+    assert by["strategy"] == [1.0, None, None]
+    assert by["tiny_base"] == [1.0, None, None]
+    assert by["small"] == [1.0, 1e-9, 2.0]  # not rounded away to 0
+    text = " ".join(i["message"] for i in w.items)
+    assert text.count("shown as gaps") == 2 and "log scale" not in text
+
+
+def test_template_guards_the_chart_and_test_tile():
+    # Bounded tick loops, a range check before drawing, and per-chart error isolation.
+    assert "guard < 100" in TEMPLATE and "e1 - e0 > 8" in TEMPLATE
+    assert "out of the range this chart can draw" in TEMPLATE
+    assert "redraws.push(safeDraw)" in TEMPLATE
+    # The test-run tile is green only for a run with tests and nothing failing.
+    assert "if (j.total === 0) return" in TEMPLATE and "if (listed > 0) return" in TEMPLATE
+    # The mutation hint creates the folder before copying into it.
+    assert TEMPLATE.index("'mkdir -p results/tests/mutation'") < TEMPLATE.index(
+        "'cp mutants/mutmut-cicd-stats.json"
+    )

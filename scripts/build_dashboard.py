@@ -1110,7 +1110,9 @@ def normalise_equity(raw, source: str, w: Warnings):
         normalised, out_of_range = [], 0
         for v in nums:
             r = None if v is None else _sig(v / base)
-            if v is not None and (r is None or abs(r) > EQUITY_MAX_RATIO or 0 < abs(r) < 1 / EQUITY_MAX_RATIO):
+            if v is not None and (
+                r is None or abs(r) > EQUITY_MAX_RATIO or 0 < abs(r) < 1 / EQUITY_MAX_RATIO
+            ):
                 r, out_of_range = None, out_of_range + 1
             normalised.append(r)
         if out_of_range:

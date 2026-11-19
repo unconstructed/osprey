@@ -1,6 +1,6 @@
 {
   "updated": "2026-11-19",
-  "note": "Status is kept by hand in this file. No results have been recorded yet: no test run, audit or data snapshot.",
+  "note": "Milestone, open-work and paper status below is edited by hand. No results have been recorded yet: no test run, audit or data snapshot.",
   "milestones": {
     "0": {"status": "not_started", "note": "Starter code not yet copied into this repo"},
     "1": {"status": "not_started", "note": ""},

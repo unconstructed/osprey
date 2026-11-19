@@ -174,7 +174,11 @@ h4 { font-size: 14px; margin: 16px 0 8px; color: var(--ink-2); text-transform: n
 .empty { border: 1px dashed var(--axis); border-radius: 10px; padding: 12px 14px; color: var(--ink-2); font-size: 14px; background: var(--surface); }
 .empty p { margin: 0; }
 .empty .hint { margin-top: 8px; display: grid; gap: 4px; }
-.cmd { display: block; padding: 6px 8px; background: var(--wash); border-radius: 6px; color: var(--ink); white-space: pre-wrap; }
+.empty .hint { grid-template-columns: minmax(0, 1fr); }
+/* Commands keep their tokens whole and scroll inside their own box on a phone */
+.cmd { display: block; padding: 6px 8px; background: var(--wash); border-radius: 6px; color: var(--ink); white-space: pre; overflow-x: auto; overflow-wrap: normal; }
+/* Paths and test names carry <wbr> after "/", "." and "::"; break there first */
+.brk { overflow-wrap: anywhere; }
 
 /* Tables */
 .tw { position: relative; overflow-x: auto; max-width: 100%; }
@@ -216,12 +220,14 @@ tr:last-child > td, tr:last-child > th { border-bottom: 0; }
 .track .on .ic { color: var(--accent); }
 .track .cur .step { font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent); }
 .track .sep { color: var(--axis); }
+.note-src { color: var(--ink-2); font-size: 13px; margin-right: 6px; }
 .audit-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 14px 0 0; font-size: 14px; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 14px; }
 .facts dt { color: var(--ink-2); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
 .trail { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 13px; }
-.trail li { display: inline-flex; align-items: center; gap: 6px; }
+.trail li { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.trail .trail-v { overflow-wrap: anywhere; min-width: 0; }
 .lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
 .lines li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .lines .lbl { color: var(--ink-2); min-width: 9em; }
@@ -252,12 +258,15 @@ tr:last-child > td, tr:last-child > th { border-bottom: 0; }
 .matrix td.gc .ic { width: 16px; height: 16px; }
 .matrix td.na { color: var(--ink-2); font-size: 13px; text-align: left; }
 .matrix tbody th { white-space: nowrap; position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.matrix thead th:first-child { position: sticky; left: 0; z-index: 2; background: var(--surface); }
+.matrix tbody th a { display: inline-block; padding: 4px 0; }
 .legend-row { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; font-size: 13px; color: var(--ink-2); }
 .legend-row span { display: inline-flex; align-items: center; gap: 5px; }
 
 /* Meters (mutation score vs target) */
 .meters { display: grid; gap: 14px; }
-.meter-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 260px; gap: 4px 14px; align-items: center; }
+.meter-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 260px; gap: 4px 14px; align-items: center; }
+.m-none { margin: 0; font-size: 14px; color: var(--ink-2); }
 .m-name strong { display: block; }
 .m-bar { position: relative; height: 8px; border-radius: 4px; background: var(--track); margin-top: 14px; }
 .m-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--k); }
@@ -289,7 +298,7 @@ figure.chart { margin: 0; min-width: 0; }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
 .key { display: inline-block; width: 16px; height: 2px; border-radius: 1px; background: var(--c); }
 .plot { position: relative; margin-top: 4px; }
-.plot svg { display: block; overflow: visible; }
+.plot svg { display: block; overflow: visible; touch-action: pan-y pinch-zoom; }
 .plot svg:focus { outline: none; }
 .plot svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .c1 { --c: var(--s1); } .c2 { --c: var(--s2); } .c3 { --c: var(--s3); } .c4 { --c: var(--s4); }
@@ -311,7 +320,7 @@ figure.chart { margin: 0; min-width: 0; }
 .tip .row { display: grid; grid-template-columns: 14px auto minmax(0, 1fr); align-items: center; gap: 6px; }
 .tip .row strong { font-variant-numeric: tabular-nums; }
 .tip .row span:last-child { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-details > summary { cursor: pointer; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+details > summary { cursor: pointer; font-size: 13px; color: var(--ink-2); margin-top: 4px; padding: 6px 0; }
 details[open] > summary { margin-bottom: 8px; }
 .mc-meter { position: relative; height: 8px; border-radius: 4px; background: var(--track); margin: 22px 0 4px; max-width: 320px; }
 
@@ -333,6 +342,10 @@ footer p { margin: 4px 0; }
   .page-head h1 { font-size: 20px; }
   .t-value { font-size: 24px; }
   .card { padding: 14px 12px; }
+}
+@media print {
+  .sample-banner { position: static; }
+  .cmd { white-space: pre-wrap; }
 }
 @media (forced-colors: active) {
   .chip, .tile, .card { border: 1px solid CanvasText; }
@@ -418,7 +431,7 @@ footer p { margin: 4px 0; }
 </main>
 
 <footer class="wrap">
-  <p>Built by scripts/build_dashboard.py from files in this repo. No number on this page is typed by hand except dashboard/status.json.</p>
+  <p id="footer-built">Built by scripts/build_dashboard.py from files in this repo. No number on this page is typed by hand except dashboard/status.json.</p>
   <p id="footer-links"></p>
 </footer>
 
@@ -508,10 +521,23 @@ footer p { margin: 4px 0; }
       String(D.link_root).split('/').map(encodeURIComponent).join('/') + '/';
     return base + enc + (parts[1] ? '#' + encodeURIComponent(parts[1]) : '');
   }
+  // Code text with <wbr> after "/", "::" and "." so long paths and test names
+  // break between their parts, not mid-word.
+  function brk(str) {
+    var out = [];
+    String(str).split(/(\/|::|\.)/).forEach(function (part, i) {
+      if (!part) return;
+      out.push(document.createTextNode(part));
+      if (i % 2 === 1) out.push(document.createElement('wbr'));
+    });
+    return out;
+  }
+  function codeText(str, cls) { return el('code', { class: 'brk' + (cls ? ' ' + cls : '') }, brk(str)); }
   function fileLink(path, label) {
     var h = href(path);
-    return h ? el('a', { href: h }, el('code', null, label || path)) : el('code', null, label || path);
+    return h ? el('a', { href: h }, codeText(label || path)) : codeText(label || path);
   }
+  function titleCase(s) { s = String(s); return s.charAt(0).toUpperCase() + s.slice(1); }
 
   // ---------------------------------------------------------------- icons
   var ICONS = {
@@ -557,7 +583,8 @@ footer p { margin: 4px 0; }
     'READY FOR PAPER': ['good', 'check', 'Ready for paper'],
     'AWAITING FINAL TEST': ['info', 'clock', 'Awaiting final test'],
     'INCOMPLETE': ['warning', 'triangle', 'Incomplete'],
-    'FAIL': ['critical', 'cross', 'Fail']
+    'FAIL': ['critical', 'cross', 'Fail'],
+    'UNREADABLE': ['critical', 'alert', 'Unreadable']
   };
   var GATE = {
     pass: ['good', 'check', 'Pass'],
@@ -617,11 +644,19 @@ footer p { margin: 4px 0; }
 
   // ---------------------------------------------------------------- header
   function renderHeader() {
-    if (D.sample) document.getElementById('sample-banner').hidden = false;
+    if (D.sample) {
+      var banner = document.getElementById('sample-banner');
+      banner.hidden = false;
+      // Section links must land below the sticky banner, whose height depends on the width.
+      var pad = function () { document.documentElement.style.scrollPaddingTop = (banner.offsetHeight + 16) + 'px'; };
+      pad();
+      window.addEventListener('resize', pad);
+      document.getElementById('footer-built').textContent = 'SAMPLE: built by scripts/build_dashboard.py --sample from a synthetic tree in a temp folder (seed 7). Nothing here comes from this repo.';
+    }
     var snap = D.data && D.data.snapshot;
     var meta = document.getElementById('meta');
     [['Generated', fmtTime(D.generated_utc)],
-     ['Commit', D.git ? D.git.commit : 'unknown'],
+     ['Built from commit', D.git ? D.git.commit : 'unknown'],
      ['Branch', D.git ? D.git.branch : 'unknown'],
      ['Data snapshot', snap && snap.id ? snap.id : 'no data snapshot yet'],
      ['status.json updated', D.status && D.status.updated ? D.status.updated : (D.status && D.status.present ? 'not set' : 'no status.json')]
@@ -630,14 +665,15 @@ footer p { margin: 4px 0; }
     });
     if (D.status && D.status.note) {
       var note = document.getElementById('status-note');
-      note.textContent = D.status.note;
+      note.appendChild(el('span', { class: 'note-src' }, 'From dashboard/status.json:'));
+      note.appendChild(document.createTextNode(D.status.note));
       note.hidden = false;
     }
     var integrity = (D.warnings || []).filter(function (w) { return w.level === 'integrity'; });
     if (integrity.length) {
       document.getElementById('integrity-top').appendChild(el('div', { class: 'alert', role: 'alert' },
         el('p', { class: 'alert-title' }, icon('alert'), plural(integrity.length, 'integrity warning') + ': an audit file disagrees with its own gate flags'),
-        el('ul', null, integrity.map(function (w) { return el('li', null, el('code', null, w.source), ' — ', w.message); }))));
+        el('ul', null, integrity.map(function (w) { return el('li', null, codeText(w.source), ' — ', w.message); }))));
     }
     var n = (D.warnings || []).length;
     document.getElementById('toc-warnings').textContent = 'Warnings (' + n + ')';
@@ -661,25 +697,42 @@ footer p { margin: 4px 0; }
     tiles.appendChild(tile('Strategies ready for paper',
       String(o.strategies_ready || 0),
       (o.strategies_audited || 0) + ' audited · ' + (o.strategies_total || 0) + ' tracked'));
-    if (isNum(o.tests_total)) {
-      tiles.appendChild(tile('Latest test run', o.tests_passed + '/' + o.tests_total,
-        o.tests_failed ? [icon('cross', 'k k-critical'), o.tests_failed + ' failed or errored'] :
-          [icon('check', 'k k-good'), 'passed (skips excluded)']));
-    } else {
-      tiles.appendChild(tile('Latest test run', 'No run recorded', 'see Testing health for the command', { dim: true }));
-    }
+    var run = testOutcome(D.testing && D.testing.junit);
+    tiles.appendChild(run ? tile('Latest test run', run.value, [icon(run.icon, 'k k-' + run.kind), run.sub]) :
+      tile('Latest test run', 'No run recorded', 'see Testing health for the command', { dim: true }));
     var cov = D.testing && D.testing.coverage;
     tiles.appendChild(isNum(o.coverage_percent) ?
-      tile('Coverage (branch)', o.coverage_percent.toFixed(1) + '%',
-        cov && isNum(cov.branches_total) && isNum(cov.branches_covered) ?
-          cov.branches_covered.toLocaleString('en-US') + ' of ' + cov.branches_total.toLocaleString('en-US') + ' branches' :
-          'coverage.py percent_covered') :
-      tile('Coverage (branch)', 'No report', 'results/tests/coverage.json', { dim: true }));
+      tile('Coverage', o.coverage_percent.toFixed(1) + '%', coverageSub(cov)) :
+      tile('Coverage', 'No report', 'results/tests/coverage.json', { dim: true }));
     var nw = o.warnings || 0;
+    var inputs = isNum(o.inputs_present) && isNum(o.inputs_total) ? o.inputs_present + ' of ' + o.inputs_total + ' inputs present' : null;
+    var mostlyThere = isNum(o.inputs_present) && isNum(o.inputs_total) && o.inputs_present * 2 >= o.inputs_total;
     tiles.appendChild(tile('Warnings', String(nw),
-      o.integrity_warnings ? [icon('alert', 'k k-critical'), o.integrity_warnings + ' integrity'] :
-        (nw ? 'see the Warnings section' : [icon('check', 'k k-good'), 'every input read cleanly'])));
+      o.integrity_warnings ? [icon('alert', 'k k-critical'), o.integrity_warnings + ' integrity', inputs ? ' · ' + inputs : null] :
+        nw ? ['see the Warnings section', inputs ? ' · ' + inputs : null] :
+          [mostlyThere ? icon('check', 'k k-good') : null, 'no unreadable files', inputs ? ' · ' + inputs : null]));
     body('overview').appendChild(tiles);
+  }
+
+  // The outcome first ("All passed", "1 failed"), the counts second. A run with
+  // no tests, or failing test cases the counts do not explain, is never green.
+  function testOutcome(j) {
+    if (!j || !isNum(j.total)) return null;
+    var bad = (j.failed || 0) + (j.errors || 0);
+    var listed = (j.failing_tests || []).length + (j.failing_more || 0);
+    var counts = fmt(j.passed) + ' passed · ' + fmt(j.skipped || 0) + ' skipped · ' + fmt(bad) + ' failed or errored, of ' + fmt(j.total);
+    if (bad > 0) return { value: fmt(bad) + ' failed', icon: 'cross', kind: 'critical', sub: counts };
+    if (j.total === 0) return { value: 'No tests', icon: 'alert', kind: 'serious', sub: 'the report counts 0 tests' };
+    if (listed > 0) return { value: 'Check report', icon: 'alert', kind: 'serious', sub: plural(listed, 'failing test case') + ' listed, but the counts say 0 failed' };
+    return { value: 'All passed', icon: 'check', kind: 'good', sub: counts };
+  }
+  function coverageSub(c) {
+    if (!c) return 'coverage.py total';
+    var head = c.branch_measured === false ? 'lines only (made without --cov-branch)' : 'coverage.py total, lines + branches';
+    if (isNum(c.branches_total) && isNum(c.branches_covered) && c.branches_total > 0) {
+      head += ' · branches ' + fmt(c.branches_covered) + '/' + fmt(c.branches_total) + ' (' + pct(c.branches_covered / c.branches_total) + ')';
+    }
+    return head;
   }
 
   // ---------------------------------------------------------------- milestones
@@ -704,7 +757,7 @@ footer p { margin: 4px 0; }
   var SERIES_NAMES = { buy_hold_btc: 'Buy and hold BTC', rebalance_50_50: '50/50 BTC/USDC rebalance', random_entry: 'Random entry' };
   var BENCH_SHORT = { buy_hold_btc: 'Buy & hold BTC', rebalance_50_50: '50/50 rebalance', random_entry: 'Random entry' };
   var METRIC_NAMES = {
-    wf_oos_sharpe: 'WF OOS Sharpe', cagr: 'CAGR', max_drawdown: 'Max drawdown', n_trades: 'Trades',
+    wf_oos_sharpe: 'WF OOS Sharpe', cagr: 'CAGR (fraction)', max_drawdown: 'Max drawdown (fraction)', n_trades: 'Trades',
     walk_forward_efficiency: 'WF efficiency', sharpe: 'Sharpe', sharpe_median: 'Sharpe, median', sharpe_p95: 'Sharpe, p95'
   };
   function seriesName(name, strategy) { return name === 'strategy' ? strategy : (SERIES_NAMES[name] || name); }
@@ -739,7 +792,8 @@ footer p { margin: 4px 0; }
     var card = el('article', { class: 'card', id: 'strategy-' + String(s.name).replace(/[^A-Za-z0-9_-]/g, '_'), 'aria-label': 'Strategy ' + s.name });
     card.appendChild(el('div', { class: 'strat-head' },
       el('h3', null, s.name),
-      s.risk_level ? el('span', { class: 'risk' }, 'Risk: ' + s.risk_level) : null,
+      D.sample ? chip(['warning', 'alert', 'SAMPLE']) : null,
+      s.risk_level ? el('span', { class: 'risk' }, 'Risk: ' + titleCase(s.risk_level)) : null,
       stateChip(latest ? latest.state : null, true)));
     var ideaBits = [];
     if (s.idea) ideaBits.push(s.idea);
@@ -748,18 +802,35 @@ footer p { margin: 4px 0; }
     if (ideaBits.length) card.appendChild(el('p', { class: 'idea' }, ideaBits.join(' · ')));
     card.appendChild(stageTrack(s));
 
-    if (latest && latest.integrity) {
-      var hard = latest.integrity.level === 'integrity';
+    var alerts = latest ? (latest.alerts && latest.alerts.length ? latest.alerts : (latest.integrity ? [latest.integrity] : [])) : [];
+    alerts.forEach(function (a) {
+      var hard = a.level === 'integrity';
       card.appendChild(el('div', { class: hard ? 'alert' : 'alert soft', role: hard ? 'alert' : null },
         el('p', { class: 'alert-title' }, icon('alert'), hard ? 'Integrity warning' : 'Verdict mismatch'),
-        el('p', null, latest.integrity.message)));
-    }
+        el('p', null, a.message)));
+    });
 
     if (!latest) {
       card.appendChild(el('div', { class: 'mt' }, empty(
         'Not audited yet. backtest-auditor writes reports/' + s.name + '/<YYYY-MM-DD>.md and a JSON sidecar next to it (schema in HOWTO.md#dashboard).',
         ['uv run python -m lab.validation.audit --strategy ' + s.name + '   # to build (milestone 4)'])));
       card.appendChild(paperExport(s));
+      return card;
+    }
+
+    if (latest.unreadable) {
+      card.appendChild(el('p', { class: 'audit-line' },
+        el('span', null, 'Latest audit ', el('strong', null, latest.date)),
+        el('span', { class: 'muted' }, latest.state_reason)));
+      var dl = el('dl', { class: 'facts' });
+      dl.appendChild(el('dt', null, 'Audit file'));
+      dl.appendChild(el('dd', null, fileLink(latest.path)));
+      dl.appendChild(el('dt', null, 'Report'));
+      dl.appendChild(el('dd', null, latest.md_path ? fileLink(latest.md_path) : '—'));
+      var g = el('div', { class: 'grid2' });
+      g.appendChild(el('div', null, el('h4', null, 'Audit details'), dl));
+      g.appendChild(historyBlock(s));
+      card.appendChild(g);
       return card;
     }
 
@@ -779,16 +850,22 @@ footer p { margin: 4px 0; }
 
     var grid2 = el('div', { class: 'grid2' });
     grid2.appendChild(el('div', null, el('h4', null, 'Audit details'), auditFacts(latest)));
-    grid2.appendChild(el('div', null,
-      el('h4', null, 'Audit history (' + plural((s.history || []).length, 'audit') + ', oldest first)'),
-      el('ol', { class: 'trail' }, (s.history || []).map(function (h, i) {
-        return el('li', null, i ? el('span', { class: 'muted', 'aria-hidden': 'true' }, '→') : null,
-          el('span', { class: 'nowrap' }, h.date), stateChip(h.state),
-          el('span', { class: 'muted small' }, '(file: ' + (h.verdict || '—') + ')'));
-      })),
-      paperExport(s)));
+    grid2.appendChild(historyBlock(s));
     card.appendChild(grid2);
     return card;
+  }
+
+  function historyBlock(s) {
+    return el('div', null,
+      el('h4', null, 'Audit history (' + plural((s.history || []).length, 'audit') + ', oldest first)'),
+      el('ol', { class: 'trail' }, (s.history || []).map(function (h, i) {
+        var verdict = h.state === 'UNREADABLE' ? null : String(h.verdict || '—');
+        var shown = verdict && verdict.length > 24 ? verdict.slice(0, 23) + '…' : verdict;
+        return el('li', null, i ? el('span', { class: 'muted', 'aria-hidden': 'true' }, '→') : null,
+          el('span', { class: 'nowrap' }, h.date), stateChip(h.state),
+          shown ? el('span', { class: 'muted small trail-v', title: verdict !== shown ? verdict : null }, '(file: ' + shown + ')') : null);
+      })),
+      paperExport(s));
   }
 
   function gateTable(a) {
@@ -797,34 +874,68 @@ footer p { margin: 4px 0; }
     var rows = (a.gates || []).map(function (g) {
       var def = defs[g.key] || {};
       var hasThreshold = g.threshold !== null && g.threshold !== undefined;
-      var rule = hasThreshold ? (g.op ? g.op + ' ' : '') + fmt(g.threshold) : '—';
+      // Thresholds as the auditor wrote them (1.0 stays "1.0").
+      var rule = hasThreshold ? (g.op ? g.op + ' ' : '') + (g.threshold_text || fmt(g.threshold)) : '—';
+      var unsupported = g.unsupported && g.unsupported.length ?
+        el('div', { class: 'small' }, icon('alert', 'k k-critical'), ' pass with no ' + g.unsupported.join(' or ')) : null;
       return [
         { content: [def.label || g.key, el('span', { class: 'gdef' }, 'Default: ' + (def.rule || '—'))] },
         { content: fmt(g.value), cls: 'num' },
         { content: [rule, g.note ? el('div', { class: 'small muted' }, g.note) : null] },
-        { content: chip(GATE[g.state] || GATE.missing) }
+        { content: [chip(GATE[g.state] || GATE.missing), unsupported] }
       ];
     });
     return table(['Gate', { label: 'Value', cls: 'num' }, 'Rule used', 'Result'], rows,
       { cls: 'gate-tbl', label: 'Validation gates', caption: 'Validation gates for the latest audit' });
   }
 
+  // One "Sharpe" row lines the strategy up with every benchmark: the strategy's
+  // walk-forward OOS Sharpe, each benchmark's sharpe, and random entry's median
+  // and p95 in one cell. Every value is shown exactly as the auditor wrote it.
   function metricsTable(a, name) {
-    var cols = [{ key: '__strategy', label: name, values: a.metrics || [] }].concat((a.benchmarks || []).map(function (b) {
-      return { key: b.name, label: BENCH_SHORT[b.name] || b.name, values: b.values || [] };
+    function get(list, k) { return (list || []).filter(function (kv) { return kv[0] === k; })[0] || null; }
+    var cols = [{ label: name, values: a.metrics || [], strategy: true }].concat((a.benchmarks || []).map(function (b) {
+      return { label: BENCH_SHORT[b.name] || b.name, values: b.values || [] };
     }));
-    var keys = [];
-    cols.forEach(function (c) { c.values.forEach(function (kv) { if (keys.indexOf(kv[0]) < 0) keys.push(kv[0]); }); });
-    if (!keys.length) return empty('No metrics or benchmarks in the audit file.');
-    var rows = keys.map(function (k) {
-      return [{ content: metricName(k), th: true }].concat(cols.map(function (c) {
-        var hit = c.values.filter(function (kv) { return kv[0] === k; })[0];
-        return { content: hit ? fmt(hit[1]) : '—', cls: 'num' };
-      }));
+    var used = cols.map(function () { return {}; });
+    var footnote = false;
+    var sharpe = cols.map(function (c, ci) {
+      if (c.strategy) {
+        var k = get(c.values, 'wf_oos_sharpe') ? 'wf_oos_sharpe' : (get(c.values, 'sharpe') ? 'sharpe' : null);
+        if (!k) return null;
+        used[ci][k] = true;
+        if (k !== 'wf_oos_sharpe') return fmt(get(c.values, k)[1]);
+        footnote = true;
+        return [fmt(get(c.values, k)[1]), el('span', { 'aria-hidden': 'true' }, ' *'), el('span', { class: 'sr' }, ' (walk-forward out-of-sample)')];
+      }
+      if (get(c.values, 'sharpe')) { used[ci].sharpe = true; return fmt(get(c.values, 'sharpe')[1]); }
+      var md = get(c.values, 'sharpe_median'), hi = get(c.values, 'sharpe_p95');
+      if (!md && !hi) return null;
+      if (md) used[ci].sharpe_median = true;
+      if (hi) used[ci].sharpe_p95 = true;
+      return [md ? 'median ' + fmt(md[1]) : null, hi ? 'p95 ' + fmt(hi[1]) : null].filter(Boolean).join(' / ');
     });
+    var rows = [];
+    if (sharpe.some(function (v) { return v !== null; })) {
+      rows.push([{ content: 'Sharpe', th: true }].concat(sharpe.map(function (v) { return { content: v === null ? '—' : v, cls: 'num' }; })));
+    }
+    var keys = [];
+    cols.forEach(function (c, ci) {
+      c.values.forEach(function (kv) { if (!used[ci][kv[0]] && keys.indexOf(kv[0]) < 0) keys.push(kv[0]); });
+    });
+    keys.forEach(function (k) {
+      var label = metricName(k);
+      if (rows.length && label === 'Sharpe') label = 'Sharpe (' + k + ')';
+      rows.push([{ content: label, th: true }].concat(cols.map(function (c, ci) {
+        var hit = used[ci][k] ? null : get(c.values, k);
+        return { content: hit ? fmt(hit[1]) : '—', cls: 'num' };
+      })));
+    });
+    if (!rows.length) return empty('No metrics or benchmarks in the audit file.');
     return el('div', null, table(['Metric'].concat(cols.map(function (c) { return { label: c.label, cls: 'num' }; })), rows,
       { cls: 'metrics-tbl', label: 'Key metrics versus benchmarks', caption: 'Metrics as written by the auditor' }),
-      el('p', { class: 'small muted' }, 'As written by the auditor. WF = walk-forward, out-of-sample (OOS).'));
+      el('p', { class: 'small muted' }, (footnote ? '* The strategy’s Sharpe is its walk-forward out-of-sample figure (wf_oos_sharpe). ' : '') +
+        'Every value as written by the auditor. WF = walk-forward, out-of-sample (OOS). Fractions are of 1 (0.25 = 25%).'));
   }
 
   function auditFacts(a) {
@@ -843,11 +954,11 @@ footer p { margin: 4px 0; }
     row('Git commit', a.git_commit ? el('code', null, a.git_commit) : '—');
     var mcNode = '—';
     if (mc && mc.present) {
-      var budget = isNum(mc.threshold) ? 'budget ' + fmt(mc.threshold) : (mc.note || 'no budget set');
+      var budget = isNum(mc.threshold) ? 'budget ' + (mc.threshold_text || fmt(mc.threshold)) : (mc.note || 'no budget set');
       mcNode = el('div', null, el('span', null, fmt(mc.value) + ' vs ' + budget + ' '), chip(GATE[mc.state] || GATE.missing),
         isNum(mc.value) && isNum(mc.threshold) && mc.threshold > 0 ? mcMeter(mc) : null);
     }
-    row('MC p95 max drawdown', mcNode);
+    row('MC p95 max drawdown (fraction)', mcNode);
     return dl;
   }
 
@@ -891,14 +1002,22 @@ footer p { margin: 4px 0; }
     var f = raw / p;
     return (f >= 7.5 ? 10 : f >= 3.5 ? 5 : f >= 1.5 ? 2 : 1) * p;
   }
+  // Every tick loop is bounded: a bad range must never hang the page.
   function linearTicks(lo, hi, count) {
     var step = niceStep(hi - lo || Math.abs(hi) || 1, count);
     var out = [];
-    for (var v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(Number(v.toPrecision(12)));
+    if (!isFinite(step) || step <= 0) return out;
+    for (var v = Math.ceil(lo / step) * step, guard = 0; v <= hi + step * 1e-9 && guard < 100; v += step, guard++) out.push(Number(v.toPrecision(12)));
     return out;
   }
   function logTicks(lo, hi) {
     var e0 = Math.floor(Math.log10(lo)), e1 = Math.ceil(Math.log10(hi));
+    if (!isFinite(e0) || !isFinite(e1)) return [];
+    if (e1 - e0 > 8) {
+      var every = Math.ceil((e1 - e0) / 8), wide = [];
+      for (var x = e0; x <= e1; x += every) { var t = Math.pow(10, x); if (t >= lo && t <= hi) wide.push(t); }
+      return wide;
+    }
     var sets = [[1], [1, 2, 5], [1, 1.5, 2, 3, 5, 7]];
     var best = [];
     for (var s = 0; s < sets.length; s++) {
@@ -946,12 +1065,12 @@ footer p { margin: 4px 0; }
       mode = m;
       btnLog.setAttribute('aria-pressed', String(m === 'log'));
       btnLin.setAttribute('aria-pressed', String(m === 'linear'));
-      draw();
+      safeDraw();
     }
     btnLog.addEventListener('click', function () { setMode('log'); });
     btnLin.addEventListener('click', function () { setMode('linear'); });
     fig.appendChild(el('div', { class: 'chart-top' },
-      el('figcaption', { class: 'chart-title' }, 'Growth of 1.0, strategy vs benchmarks'),
+      el('figcaption', { class: 'chart-title' }, 'Growth of 1.0, strategy vs benchmarks' + (D.sample ? ' (SAMPLE)' : '')),
       el('div', { class: 'seg', role: 'group', 'aria-label': 'Y-axis scale' }, btnLog, btnLin)));
     fig.appendChild(el('ul', { class: 'legend', 'aria-label': 'Legend' }, series.map(function (s, i) {
       return el('li', null, el('span', { class: 'key c' + (i + 1), 'aria-hidden': 'true' }), seriesName(s.name, strategyName));
@@ -988,12 +1107,15 @@ footer p { margin: 4px 0; }
       if (mode === 'log') {
         var l0 = Math.log10(lo), l1 = Math.log10(hi), pad = Math.max((l1 - l0) * 0.05, 0.01);
         lo = Math.pow(10, l0 - pad); hi = Math.pow(10, l1 + pad);
-        ticks = logTicks(lo, hi);
       } else {
         var span = hi - lo || 1;
         lo = lo - span * 0.05; hi = hi + span * 0.05;
-        ticks = linearTicks(lo, hi, narrow ? 4 : 5);
       }
+      if (!isFinite(lo) || !isFinite(hi) || !(hi > lo) || (mode === 'log' && !(lo > 0))) {
+        plot.appendChild(empty('These values are out of the range this chart can draw. The data table below has every point.'));
+        return;
+      }
+      ticks = mode === 'log' ? logTicks(lo, hi) : linearTicks(lo, hi, narrow ? 4 : 5);
       // End labels sit right of the plot when there is room and they do not collide.
       var lastPts = series.map(function (s, i) {
         for (var j = n - 1; j >= 0; j--) if (ok(s.values[j])) return { i: i, j: j, v: s.values[j] };
@@ -1040,29 +1162,35 @@ footer p { margin: 4px 0; }
       root.appendChild(svg('text', { class: 'axis-title', transform: 'translate(13,' + (m.t + ih / 2) + ') rotate(-90)', 'text-anchor': 'middle' },
         'Growth of 1.0 (' + mode + ')'));
 
-      series.forEach(function (s, i) {
+      // Paint benchmarks first and the strategy (slot 1) last, so the series the
+      // card is about is never hidden where the lines meet. Colours keep their slot.
+      for (var si = series.length - 1; si >= 0; si--) {
         var d = '', pen = false;
         for (var j = 0; j < n; j++) {
-          var v = s.values[j];
+          var v = series[si].values[j];
           if (!ok(v)) { pen = false; continue; }
           d += (pen ? 'L' : 'M') + X(j).toFixed(1) + ' ' + Y(v).toFixed(1);
           pen = true;
         }
-        root.appendChild(svg('path', { class: 'line c' + (i + 1), d: d }));
-      });
-      lastPts.forEach(function (p) {
+        root.appendChild(svg('path', { class: 'line c' + (si + 1), d: d }));
+      }
+      lastPts.slice().reverse().forEach(function (p) {
         if (!p) return;
         root.appendChild(svg('circle', { class: 'dot c' + (p.i + 1), cx: X(p.j), cy: Y(p.v), r: 4 }));
-        if (showLabels) {
+      });
+      if (showLabels) {
+        lastPts.forEach(function (p) {
+          if (!p) return;
           root.appendChild(svg('text', { class: 'end-label', x: X(p.j) + 9, y: Y(p.v) + 4 },
             seriesName(series[p.i].name, strategyName)));
-        }
-      });
+        });
+      }
 
       var hover = svg('g', { 'pointer-events': 'none', visibility: 'hidden' });
       var xhair = svg('line', { class: 'xhair', y1: m.t, y2: m.t + ih });
       hover.appendChild(xhair);
-      var hoverDots = series.map(function (s, i) { var c = svg('circle', { class: 'dot c' + (i + 1), r: 4 }); hover.appendChild(c); return c; });
+      var hoverDots = series.map(function (s, i) { return svg('circle', { class: 'dot c' + (i + 1), r: 4 }); });
+      hoverDots.slice().reverse().forEach(function (c) { hover.appendChild(c); });
       root.appendChild(hover);
       var hit = svg('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', 'pointer-events': 'all' });
       root.appendChild(hit);
@@ -1100,11 +1228,16 @@ footer p { margin: 4px 0; }
         tip.style.top = m.t + 'px';
       }
       function hide() { hover.setAttribute('visibility', 'hidden'); tip.hidden = true; }
-      hit.addEventListener('pointermove', function (ev) {
+      function showAt(ev) {
         var r = root.getBoundingClientRect();
         show(nearest(ev.clientX - r.left));
-      });
-      hit.addEventListener('pointerleave', hide);
+      }
+      // A tap reads the tapped date: pointerdown comes before the focus that a
+      // tap also causes, and focus then shows the same point. A touch tooltip
+      // stays until the chart loses focus (pointerleave follows every lifted finger).
+      hit.addEventListener('pointerdown', showAt);
+      hit.addEventListener('pointermove', showAt);
+      hit.addEventListener('pointerleave', function (ev) { if (ev.pointerType !== 'touch') hide(); });
       root.addEventListener('focus', function () { show(cur); });
       root.addEventListener('blur', hide);
       root.addEventListener('keydown', function (ev) {
@@ -1150,8 +1283,18 @@ footer p { margin: 4px 0; }
       return out;
     }
 
+    // A chart that cannot be drawn says so; it never stops the other charts.
+    function safeDraw() {
+      try {
+        draw();
+      } catch (e) {
+        while (plot.lastChild && plot.lastChild !== tip) plot.removeChild(plot.lastChild);
+        plot.appendChild(empty('This chart could not be drawn. The data table below has every point.'));
+        if (window.console) console.warn('dashboard: chart failed to draw', e);
+      }
+    }
     // Draw once the figure is in the document (it needs a width).
-    redraws.push(draw);
+    redraws.push(safeDraw);
     return fig;
   }
 
@@ -1181,6 +1324,11 @@ footer p { margin: 4px 0; }
       target.appendChild(empty('No strategies yet.'));
       return;
     }
+    if (!list.some(function (s) { return s.latest; })) {
+      target.appendChild(empty('No strategy has an audit yet, so there is nothing to compare. Each audit file (reports/<strategy>/<YYYY-MM-DD>.json) adds a row here; ' +
+        plural(list.length, 'strategy', 'strategies') + ' tracked under Strategies.'));
+      return;
+    }
     var headers = [{ label: 'Strategy' }].concat(defs.map(function (g) {
       return { label: g.short, title: g.label + ' (default: ' + g.rule + ')' };
     })).concat([{ label: 'State' }]);
@@ -1188,6 +1336,8 @@ footer p { margin: 4px 0; }
       var row = [{ content: el('a', { href: '#strategy-' + String(s.name).replace(/[^A-Za-z0-9_-]/g, '_') }, s.name), th: true }];
       if (!s.latest) {
         row.push({ content: 'Not audited yet', colspan: defs.length, cls: 'na' });
+      } else if (s.latest.unreadable) {
+        row.push({ content: 'Latest audit file (' + s.latest.date + ') could not be read', colspan: defs.length, cls: 'na' });
       } else {
         var byKey = {};
         (s.latest.gates || []).forEach(function (g) { byKey[g.key] = g; });
@@ -1235,9 +1385,11 @@ footer p { margin: 4px 0; }
       return empty('No test results yet. Write them with:', ['uv run pytest -n auto --junitxml=results/tests/junit.xml']);
     }
     var wrap = el('div', null);
-    wrap.appendChild(el('p', { class: 't-value' }, j.passed + '/' + j.total + ' passed'));
-    var dl = el('dl', { class: 'facts' });
-    [['Failed', j.failed], ['Errors', j.errors], ['Skipped', j.skipped], ['Duration', isNum(j.time_s) ? j.time_s.toFixed(1) + ' s' : '—'],
+    var run = testOutcome(j);
+    wrap.appendChild(el('p', { class: 't-value' }, run.value));
+    wrap.appendChild(el('p', { class: 't-sub' }, icon(run.icon, 'k k-' + run.kind), run.sub));
+    var dl = el('dl', { class: 'facts mt' });
+    [['Passed', j.passed], ['Failed', j.failed], ['Errors', j.errors], ['Skipped', j.skipped], ['Duration', isNum(j.time_s) ? j.time_s.toFixed(1) + ' s' : '—'],
      ['Run at', fmtTime(j.timestamp)], ['File', fileLink(j.path)]].forEach(function (r) {
       dl.appendChild(el('dt', null, r[0]));
       dl.appendChild(el('dd', null, typeof r[1] === 'number' ? fmt(r[1]) : r[1]));
@@ -1246,7 +1398,7 @@ footer p { margin: 4px 0; }
     if (j.failing_tests && j.failing_tests.length) {
       wrap.appendChild(el('h4', null, 'Failing tests'));
       wrap.appendChild(el('ul', { class: 'plain' }, j.failing_tests.map(function (name) {
-        return el('li', null, icon('cross', 'k k-critical'), el('code', null, name));
+        return el('li', null, icon('cross', 'k k-critical'), codeText(name));
       }), j.failing_more ? el('li', { class: 'muted' }, '… and ' + j.failing_more + ' more') : null));
     }
     return wrap;
@@ -1266,50 +1418,60 @@ footer p { margin: 4px 0; }
     if (c.lowest_files && c.lowest_files.length) {
       wrap.appendChild(el('h4', null, 'Lowest-covered files (' + c.lowest_files.length + ' of ' + c.n_files + ')'));
       wrap.appendChild(table(['File', { label: 'Covered', cls: 'num' }], c.lowest_files.map(function (f) {
-        return [el('code', null, f.file), isNum(f.percent) ? f.percent.toFixed(1) + '%' : '—'];
+        return [codeText(f.file), isNum(f.percent) ? f.percent.toFixed(1) + '%' : '—'];
       }), { label: 'Lowest-covered files' }));
     }
     wrap.appendChild(el('p', { class: 'small muted' }, 'Run at ' + fmtTime(c.timestamp) + ' · ', fileLink(c.path)));
     return wrap;
   }
 
+  // A meter is drawn only for an area with a score. No result means no track at
+  // all: an empty track would read as 0%.
   function mutationBlock(areas) {
     var any = areas.some(function (a) { return a.present; });
     var wrap = el('div', { class: 'meters' });
     if (!any) {
-      wrap.appendChild(empty('No mutation results yet. After each area run, export the stats and copy them into results/tests/mutation/<area>.json:', [
-        'uv run mutmut run', 'uv run mutmut export-cicd-stats', 'cp mutants/mutmut-cicd-stats.json results/tests/mutation/<area>.json',
-        el('span', { class: 'small' }, 'Areas: validation, runner, search, models, data. Baseline in TESTING.md 5.3: 492 killed, 3 timed out, 123 survived (80%).')]));
+      wrap.appendChild(empty('No mutation results yet. After each area’s final run, export mutmut’s stats and copy them to results/tests/mutation/<area>.json (HOWTO.md#mutation-results-per-area):', [
+        'HYPOTHESIS_PROFILE=fast uv run mutmut run --max-children 4', 'uv run mutmut export-cicd-stats',
+        'mkdir -p results/tests/mutation', 'cp mutants/mutmut-cicd-stats.json results/tests/mutation/<area>.json',
+        el('span', { class: 'small' }, 'Baseline in TESTING.md 5.3: 492 killed, 3 timed out, 123 survived (80%).')]));
+      wrap.appendChild(el('div', null, el('h4', null, 'Targets (TESTING.md 5.3 and 5.4)'),
+        el('ul', { class: 'plain' }, areas.map(function (a) {
+          return el('li', null, el('strong', null, a.area), codeText(a.code_path, 'small'), el('span', { class: 'muted' }, '≥ ' + pct(a.target, 0)));
+        }))));
+      return wrap;
     }
     areas.forEach(function (a) {
-      var fill = el('div', { class: 'm-fill' });
+      var name = el('div', { class: 'm-name' }, el('strong', null, a.area), codeText(a.code_path, 'small muted'));
+      var cnt = a.counts || {};
+      var parts = [fmt(cnt.killed || 0) + ' killed', fmt(cnt.timeout || 0) + ' timed out', fmt(cnt.survived || 0) + ' survived'];
+      if (cnt.equivalent) parts.push(fmt(cnt.equivalent) + ' marked equivalent');
+      if (cnt.no_tests) parts.push(fmt(cnt.no_tests) + ' no tests');
+      if (cnt.segfault) parts.push(fmt(cnt.segfault) + ' segfault');
+      if (cnt.check_was_interrupted_by_user) parts.push(fmt(cnt.check_was_interrupted_by_user) + ' not checked (run interrupted)');
+      if (!a.present || !isNum(a.score_excluding_equivalent)) {
+        var what = !a.present ? 'No result yet' :
+          'No score: ' + parts.slice(0, 3).join(', ') + (cnt.equivalent ? ' (' + (cnt.equivalent >= (cnt.survived || 0) ? 'all' : fmt(cnt.equivalent)) + ' marked equivalent)' : '');
+        wrap.appendChild(el('div', { class: 'meter-row' }, name,
+          el('p', { class: 'm-none' }, what),
+          el('div', { class: 'm-fig muted small' }, 'Target ' + pct(a.target, 0) + ' · ', codeText(a.path))));
+        return;
+      }
+      var meets = a.meets_target;
       var bar = el('div', { class: 'm-bar', role: 'img',
-        'aria-label': a.area + ': ' + (a.present ? pct(a.score_excluding_equivalent) : 'no result') + ', target ' + pct(a.target, 0) });
+        'aria-label': a.area + ': ' + pct(a.score_excluding_equivalent) + ', target ' + pct(a.target, 0) });
+      var fill = el('div', { class: 'm-fill ' + (meets ? 'k-info' : 'k-serious') });
+      fill.style.width = Math.max(0, Math.min(100, a.score_excluding_equivalent * 100)) + '%';
       var mark = el('div', { class: 'm-target' }, el('span', null, 'target ' + pct(a.target, 0)));
       mark.style.left = (a.target * 100) + '%';
-      var fig;
-      if (a.present && isNum(a.score_excluding_equivalent)) {
-        var meets = a.meets_target;
-        fill.className = 'm-fill ' + (meets ? 'k-info' : 'k-serious');
-        fill.style.width = Math.max(0, Math.min(100, a.score_excluding_equivalent * 100)) + '%';
-        bar.appendChild(fill);
-        var cnt = a.counts || {};
-        var parts = [fmt(cnt.killed || 0) + ' killed', fmt(cnt.timeout || 0) + ' timed out', fmt(cnt.survived || 0) + ' survived'];
-        if (cnt.equivalent) parts.push(fmt(cnt.equivalent) + ' equivalent');
-        if (cnt.no_tests) parts.push(fmt(cnt.no_tests) + ' no tests');
-        fig = el('div', { class: 'm-fig' },
-          el('span', { class: 'score' }, pct(a.score_excluding_equivalent)),
-          chip(meets ? ['good', 'check', 'Meets ' + pct(a.target, 0)] : ['serious', 'cross', 'Below ' + pct(a.target, 0)]),
-          el('div', { class: 'small muted' }, parts.join(' · ') +
-            (cnt.equivalent && isNum(a.score) ? ' · raw score ' + pct(a.score) : '')));
-      } else {
-        fig = el('div', { class: 'm-fig muted' }, a.present ? 'No score (no killed or survived mutants)' : 'No result yet',
-          el('div', { class: 'small' }, a.path));
-      }
+      bar.appendChild(fill);
       bar.appendChild(mark);
-      wrap.appendChild(el('div', { class: 'meter-row' },
-        el('div', { class: 'm-name' }, el('strong', null, a.area), el('code', { class: 'small muted' }, a.code_path)),
-        bar, fig));
+      var fig = el('div', { class: 'm-fig' },
+        el('span', { class: 'score' }, pct(a.score_excluding_equivalent)),
+        chip(meets ? ['good', 'check', 'Meets ' + pct(a.target, 0)] : ['serious', 'cross', 'Below ' + pct(a.target, 0)]),
+        el('div', { class: 'small muted' }, parts.join(' · ') +
+          (cnt.equivalent && isNum(a.score) ? ' · raw score ' + pct(a.score) : '')));
+      wrap.appendChild(el('div', { class: 'meter-row' }, name, bar, fig));
     });
     return wrap;
   }
@@ -1350,7 +1512,7 @@ footer p { margin: 4px 0; }
     } else {
       var dl = el('dl', { class: 'facts' });
       [['Snapshot id', s.id ? el('code', null, s.id) : '—'], ['Created', s.created || '—'],
-       ['Sources', s.sources && s.sources.length ? s.sources.join(', ') : '—'], ['File', el('code', null, s.path)],
+       ['Sources', s.sources && s.sources.length ? s.sources.join(', ') : '—'], ['File', codeText(s.path)],
        ['Modified', fmtTime(s.modified)]].forEach(function (r) {
         dl.appendChild(el('dt', null, r[0])); dl.appendChild(el('dd', null, r[1]));
       });
@@ -1387,7 +1549,7 @@ footer p { margin: 4px 0; }
     }
     target.appendChild(el('div', { class: 'card' }, table(['Study folder', { label: 'Parquet files', cls: 'num' }, 'Optuna journal', 'Last modified'],
       list.map(function (s) {
-        return [el('code', null, s.path), fmt(s.parquet_files),
+        return [codeText(s.path), fmt(s.parquet_files),
           s.journal ? [icon('check', 'k k-good'), ' found'] : [icon('dash', 'k k-muted'), ' none'], fmtTime(s.modified)];
       }), { label: 'Search runs' })));
   }
