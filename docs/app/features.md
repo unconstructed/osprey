@@ -12,7 +12,7 @@ An iPhone and Android app where users **own their crypto wallet and our strategi
 
 1. **Sign up and get a wallet in under a minute:** email or Apple, Face ID, no seed phrase
 2. **Add cash** with Apple Pay, a debit card or a bank transfer; it shows as a dollar balance (USDC)
-3. **Buy, sell and hold crypto** by hand, or set up recurring buys ("$25 of BTC every Friday")
+3. **Buy, sell and hold crypto** by hand with live price charts for every coin, or set up recurring buys ("$25 of BTC every Friday")
 4. **Pick a risk level and use our strategies:** choose Steady, Balanced or Bold, browse strategy cards that show the risks as well as the gains, then subscribe
 5. **Build their own rules** from templates like "buy $X when BTC drops Y%", with a required stop-loss
 6. **Let it run or stay in the loop:** each strategy or rule runs on **Auto-trade** (inside a limited permission) or **Approve each trade** (one tap and Face ID)
@@ -81,7 +81,9 @@ Priority key: **Must** = must-have · **Standout** = what sets us apart · **Lat
 | Feature | What it does | Tab | Phase | Priority |
 |---|---|---|---|---|
 | Portfolio view | Coins, cash, profit/loss, every trade with a blockchain link | Home, Activity | 1 | Must #2 |
-| Manual buy/sell | Swap between cash and allowed coins | Trade | 1 | — |
+| Live price charts | Every coin's chart with 1H, 1D, 1W, 1M, 1Y and All ranges; price updates live while the screen is open; 24-hour sparklines in coin lists | Trade, Home | 1 | — |
+| Portfolio chart | Total account value over the same ranges, with profit and loss | Home | 1 | — |
+| Manual buy/sell | Swap between cash and allowed coins; the exact swap quote is shown before confirming | Trade | 1 | — |
 | Recurring buys (DCA) | "Buy $25 of BTC every Friday" | Trade | 1 | Must #4 |
 
 ### Strategies and rules
@@ -167,9 +169,9 @@ Priority key: **Must** = must-have · **Standout** = what sets us apart · **Lat
 
 | Tab | What's on it |
 |---|---|
-| **Home** | Total balance (coins and cash), today's change, active strategies with their mode, anything waiting for approval |
-| **Strategies** | Strategies grouped by risk level, honest strategy cards, subscribe with Auto-trade or Approve, rule builder |
-| **Trade** | Buy/sell, recurring buys, Add cash, Cash out |
+| **Home** | Total balance (coins and cash) with a portfolio chart, today's change, live prices of holdings, active strategies with their mode, anything waiting for approval |
+| **Strategies** | Strategies grouped by risk level, honest strategy cards with live result charts, subscribe with Auto-trade or Approve, rule builder |
+| **Trade** | Coin screens with live price charts, buy/sell, recurring buys, Add cash, Cash out |
 | **Activity** | Every trade with its "why" reason and blockchain link, cash in and out |
 | **Account** | Wallet (address, receive, send, recovery), auto-trading permissions, limits, Pause everything, risk level, security, tax export, demo mode toggle |
 
@@ -216,6 +218,7 @@ Every feature runs on the same backend pieces (details in [Technical](technical.
 - **Auto-trading permission**: a limited signer on each user's wallet, enforced by the wallet provider; see [Technical: Auto-trading permission](technical.md#auto-trading-permission)
 - **Risk engine**: four layers (platform kill switch, strategy auto-halt, customer limits, wallet permission); any error rejects the trade
 - **Chain watcher and reconciliation**: confirms every trade on Base and compares our records with the chain; pauses auto-trading and alerts on any mismatch
+- **Market data service and live price gateway**: pulls prices once for every coin, stores chart history, and streams live prices to the app; see [Technical: Live prices and charts](technical.md#live-prices-and-charts)
 - **Ledger and audit log**: every signal, approval, permission change, trade and cash movement, append-only
 
 ## Open questions that change the feature set
@@ -225,3 +228,4 @@ Every feature runs on the same backend pieces (details in [Technical](technical.
 - [ ] Which policy conditions Privy enforces natively for the auto-trading permission
 - [ ] Final coin list per risk level on Base
 - [ ] Subscription price, given gas sponsorship and provider costs
+- [ ] Market data rights: can we show exchange prices in our charts, or do we need a licensed data vendor?

@@ -33,7 +33,8 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | Customer-built strategies | Rules stored as small versioned records (data, not code), run by one shared rule engine. Simple mode at launch; advanced mode with backtests in Phase 2 (paid tier). No customer-written code | [Technical](technical.md#customer-rules-and-advanced-mode) |
 | Strategy lineup | Three risk levels customers choose themselves: Steady (rebalancing), Balanced (dip buying), Bold (momentum). Coins limited to tokens with deep trading on Base. No leverage or shorting at any level | [Product](product.md#strategies-by-risk-level) |
 | Backend language | Python (FastAPI), matching NautilusTrader | [Technical](technical.md#architecture) |
-| Database | Shared PostgreSQL with per-user Row-Level Security, append-only ledger mirroring the chain, Redis; price history in date-partitioned Postgres tables | [Technical](technical.md#database) |
+| Database | One PostgreSQL database in 12 schemas with per-user Row-Level Security and an append-only ledger mirroring the chain; Redis for live data | [Database](database.md) |
+| Live charts | One market data service pulls exchange prices once for every coin; Redis holds live prices, Postgres holds chart history; a WebSocket gateway streams prices to the app | [Technical](technical.md#live-prices-and-charts) |
 | Hosting | AWS, phased: lean launch on ECS Fargate, RDS Multi-AZ, SQS, KMS; upgrades only when load calls for it; infrastructure as code | [Technical](technical.md#hosting) |
 | Legal review | Skipped before launch by owner decision; risks and mitigations recorded | [Business](business.md#accepted-risks) |
 | Later track | Brokerage version through a CaaS partner (Alpaca first) for bank-deposit users and stocks | [Business](business.md#later-brokerage-track) |
@@ -62,6 +63,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 - [ ] Final coin list per risk level on Base
 - [ ] Subscription price, given gas sponsorship, Privy and RPC costs
 - [ ] Subscriptions: in-app purchase only, or also US web checkout?
+- [ ] Market data rights for live charts: can we show exchange prices (Coinbase, Kraken) in a commercial app, or do we need a licensed data vendor?
 - [ ] Fee model: subscription only, or also a small swap fee later
 - [ ] App name and brand
 - [ ] Parked legal questions (not blocking): see [Business: Open legal questions](business.md#open-legal-questions-not-blocking)

@@ -1,6 +1,6 @@
 # Database
 
-[← Hub](README.md) · [Technical](technical.md) · [Schema (SQL)](schema.sql)
+[← Hub](README.md) · [Technical](technical.md) · [Schema (SQL)](schema.sql) · [Spot checks (SQL)](schema_checks.sql)
 
 ## The short version
 
@@ -22,9 +22,9 @@
 | `auth` | Who the user is (login itself is Privy's job) | `users`, `identities`, `devices`, `sessions` |
 | `app` | The user's settings and controls, plus shared helpers | `user_settings`, `user_limits`, `pauses`, `referral_codes`, `referrals` |
 | `wallet` | Wallets and the auto-trading permission | `wallets`, `auto_trade_permissions`, `address_book`, `transfers` |
-| `market` | Coins and price history | `tokens`, `candles` (partitioned by month) |
+| `market` | Coins, price feeds and chart history | `tokens`, `price_feeds`, `candles` (1-minute bars in monthly partitions; hourly and daily bars), functions `chart()` and `chart_bars()` |
 | `strategy` | Risk levels, our strategies, customer rules | `risk_levels`, `risk_level_tokens`, `strategies`, `strategy_versions`, `performance`, `model_account_daily`, `halts`, `enrollments`, `rules`, `rule_versions`, `rule_backtests` |
-| `trading` | Everything about trades | `accounts`, `signals`, `orders`, `approvals`, `executions`, `recurring_buys`, `balances`, `reconciliation_runs`, `reconciliation_mismatches` |
+| `trading` | Everything about trades | `accounts`, `signals`, `orders`, `approvals`, `executions`, `recurring_buys`, `balances`, `account_value_daily` (portfolio chart), `reconciliation_runs`, `reconciliation_mismatches` |
 | `ramp` | Cash in and out through Coinbase or MoonPay | `transactions`, `webhook_events` |
 | `ledger` | The permanent record of every movement | `entries`, `tax_lots`, `tax_exports` |
 | `billing` | App subscriptions | `plans`, `subscriptions`, `store_events`, view `current_plans` |
@@ -32,9 +32,17 @@
 | `ops` | Staff and platform switches | `staff`, `platform_controls` (kill switch), `incidents` |
 | `audit` | Who did what, forever | `events` (partitioned by month), `signing_log` |
 
-51 tables and one view in total. Every feature in [features.md](features.md) has a home; phase 2 features (referrals, rule backtests) are included so they don't need a redesign later.
+53 tables, one view and two chart functions in total. Every feature in [features.md](features.md) has a home; phase 2 features (referrals, rule backtests) are included so they don't need a redesign later.
 
-**Checked:** the schema loads cleanly into PostgreSQL 16, and 27 spot checks pass. They cover user isolation, role limits, append-only records, duplicate signals and orders, permission limits, price protection, Face ID on sends and the required stop-loss. These are spot checks, not the full test suite below.
+**Checked:** the schema loads cleanly into PostgreSQL 16, and all 39 spot checks in [schema_checks.sql](schema_checks.sql) pass. They cover:
+- user isolation and role limits
+- append-only records
+- duplicate signals and orders
+- auto-trading permission limits and price protection
+- Face ID on sends and the required stop-loss
+- chart ranges and bar math
+
+Rerun them on a scratch database after any schema change. They're spot checks, not the full test suite below.
 
 ## Rules built into the database
 
@@ -94,14 +102,53 @@ These are enforced by Postgres itself, so a bug in our code can't break them.
 
 A customer rule works the same way, starting from a rule signal. A recurring buy or a manual trade starts at step 2.
 
+## Live charts
+
+The architecture is in [Technical: Live prices and charts](technical.md#live-prices-and-charts). Here's what the database holds.
+
+**Live data in Redis** (suggested keys; the market data service owns them):
+
+| Key or channel | Holds |
+|---|---|
+| `price:{coin}` | Latest price, 24-hour change, high, low and volume, and the time of the last update |
+| `candle:{coin}:1m` | The 1-minute bar still forming |
+| `prices:{coin}` (pub/sub channel) | Each update, about once a second, for the live price gateway |
+| `chart:{coin}:{range}` | Cached chart responses, kept 10-60 seconds |
+
+**History in Postgres:**
+- `market.price_feeds`: where each coin's price comes from (primary feed and backups).
+- `market.candles`: finished bars only. 1-minute bars are kept 90 days in monthly partitions. 1-hour and 1-day bars are rolled up from them and kept forever. Every bar starts on a UTC boundary, and its high, low, open and close must be consistent.
+- `trading.account_value_daily`: each account's end-of-day value, for the long ranges of the portfolio chart. Today's line is computed live from balances and prices.
+- `strategy.model_account_daily`: each strategy's live equity, for strategy card charts.
+
+**How the app loads a chart:**
+1. `GET /v1/markets/{coin}/chart?range=1D` calls `market.chart(coin, '1D')`, which returns about 400 bars or fewer:
+
+   | Range | One bar is |
+   |---|---|
+   | 1H | 1 minute |
+   | 1D | 5 minutes |
+   | 1W | 1 hour |
+   | 1M | 4 hours |
+   | 1Y | 1 day |
+   | All | 1 week |
+
+   The response is the same for every user, so the API caches it in Redis and CloudFront.
+2. The app opens the live price connection for that coin and draws the forming bar and the latest price on top.
+3. After a reconnect, the app loads the history again to fill the gap.
+
+Bars follow UTC, the crypto convention: a daily bar runs midnight to midnight UTC. The app converts times to the user's time zone for display.
+
 ## For the backend agent: building it
 
 1. **Migrations.** Use Alembic (the API is FastAPI). Make [schema.sql](schema.sql) revision 0001 as raw SQL; every later change is a new revision. Never edit a deployed database by hand.
-2. **Partitions.** Set up `pg_partman` (available on RDS) to create monthly partitions ahead of time for `market.candles` and `audit.events`. Choose a retention period for 1-minute candles.
+2. **Partitions.** Set up `pg_partman` (available on RDS) to create monthly partitions ahead of time for `market.candles_1m` (drop partitions older than 90 days) and `audit.events` (keep; archived to S3).
 3. **Coins.** Seed `market.tokens` and `strategy.risk_level_tokens` in a reviewed migration once the coin list is final. Check every contract address against the issuer's official docs (Circle for USDC, Coinbase for cbBTC).
-4. **Connections.** The API must set `app.user_id` with `SET LOCAL` inside each transaction. That works with PgBouncer or RDS Proxy in transaction mode; plain `SET` does not.
-5. **Archives.** Export `ledger.entries` and `audit.events` to S3 under Object Lock every night.
-6. **Required tests** (money paths, per [Technical: Agent team rules](technical.md#agent-team-rules)):
+4. **Price feeds.** Seed `market.price_feeds` with each coin's primary feed and backups, in the same migration.
+5. **Chart history.** Backfill `market.candles` from the same historical sources the Strategy Lab uses (Kraken, Binance, Coinbase): 1-hour and 1-day bars for the full history, 1-minute bars for the last 90 days.
+6. **Connections.** The API must set `app.user_id` with `SET LOCAL` inside each transaction. That works with PgBouncer or RDS Proxy in transaction mode; plain `SET` does not.
+7. **Archives.** Export `ledger.entries` and `audit.events` to S3 under Object Lock every night.
+8. **Required tests** (money paths, per [Technical: Agent team rules](technical.md#agent-team-rules)). Start from [schema_checks.sql](schema_checks.sql) and turn each check into a proper test:
    - **Isolation:** for every protected table, user A can't read, insert or update user B's rows, and the API with no `app.user_id` sees nothing
    - **Permissions:** the API role can't delete anything, can't insert into the ledger, and can't read signals, webhooks or audit tables
    - **Append-only:** update, delete and truncate fail on the ledger, audit, signing log and rule versions
@@ -115,6 +162,13 @@ A customer rule works the same way, starting from a rule signal. A recurring buy
      - an execution can't use another user's permission
    - **Transfers:** an outgoing transfer can't be submitted without Face ID confirmation
    - **Ledger:** a wrong sign, a missing source, or a demo credit tied to a trade is rejected
+   - **Charts:**
+     - every range returns the right number of bars
+     - each bucket's open, high, low, close and volume match a hand calculation
+     - no bar is later than "now"
+     - weekly bars start on Monday (UTC)
+     - an unknown range or a misaligned bar is rejected
+     - the 1-hour and 1-day rollups match the 1-minute bars they came from
 
 ## Decisions still open that touch the schema
 
@@ -123,6 +177,7 @@ A customer rule works the same way, starting from a rule signal. A recurring buy
 - Which ramp partner handles buying and which handles cashing out
 - Plan names, prices and features (seed data)
 - Which policy checks Privy enforces natively; anything it can't enforce is checked by the trade router before it signs
+- Market data rights: whether we can show exchange prices in our charts, or need a licensed data vendor (the `market.price_feeds.provider` values)
 
 ## Later, not in v1
 

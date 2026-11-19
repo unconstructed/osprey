@@ -34,6 +34,8 @@ Base: swap through the 0x aggregator (decentralized exchanges)
 Chain watcher: confirms trades, reads balances, reconciliation
 
 Ramps: Coinbase Onramp/Offramp, MoonPay (cash in and out, ID checks for those)
+Prices: exchange feeds → market data service → Redis → live price gateway (WebSocket) → app charts
+        closed 1-minute candles → Postgres chart history (see Live prices and charts)
 Data: PostgreSQL · Redis · SQS · S3 (Object Lock)
 ```
 
@@ -115,9 +117,64 @@ Customers build their own strategies as **rules stored as data, never as code**.
 
 **Versioning:** editing a rule creates a new version. Every trade records which rule version fired it, for "why did this trade happen" and the audit log.
 
+### Live prices and charts
+
+Every coin has a live chart, and prices update while a screen is open.
+
+**What users see**
+
+| Where | What |
+|---|---|
+| Coin screen (Trade tab) | Price chart with 1H, 1D, 1W, 1M, 1Y and All ranges; live price and the change over the range |
+| Home and coin lists | Live prices and a 24-hour sparkline next to each coin |
+| Home | Portfolio value chart, same ranges |
+| Strategy cards | The model account's equity chart (live results, kept separate from backtests) |
+
+**How it works**
+
+```
+Coinbase / Kraken WebSocket feeds        Base DEX quotes (coins with no exchange listing)
+              │                                   │
+              ▼                                   ▼
+      Market data service: one always-on service for every coin
+      builds 1-minute candles; drops stale or out-of-range ticks
+              │                                   │
+              ▼                                   ▼
+  Redis: latest price, the forming       Postgres market.candles: closed bars,
+  candle, 24h stats; one live            rolled up into 1-hour and 1-day bars
+  channel per coin
+              │                                   │
+              ▼                                   ▼
+  Live price gateway (WebSocket)         Chart API: GET /v1/markets/{coin}/chart?range=1D
+  about 1 update per second per coin     the same for every user, so cached for 10-60 s
+              │                                   │
+              └─────────────►  app  ◄─────────────┘
+               loads the history first, then draws live updates on top
+```
+
+- **Fetched once, shared by everyone.** Prices are the same for every user, so one service pulls them and fans them out. Chart history is public data, so CloudFront and Redis can cache it.
+- **Ranges and detail.** Each range stays at about 400 points or fewer, so charts stay fast on a phone. The database function `market.chart()` builds any range from stored bars ([database.md: Live charts](database.md#live-charts)):
+
+| Range | One bar is | Built from |
+|---|---|---|
+| 1H | 1 minute | 1-minute candles |
+| 1D | 5 minutes | 1-minute candles |
+| 1W | 1 hour | 1-hour candles |
+| 1M | 4 hours | 1-hour candles |
+| 1Y | 1 day | 1-day candles |
+| All | 1 week | 1-day candles |
+
+- **Only finished bars are stored.** The bar still forming lives in Redis and reaches the app over the live connection. 1-minute bars are kept 90 days; hourly and daily bars are kept forever. Bars follow UTC, the crypto convention; the app shows times in the user's own time zone.
+- **Easy on battery and data.** The app subscribes only to the coins on screen, closes the connection in the background, and reloads the chart history after reconnecting to fill any gap.
+- **One price for display and safety.** The risk engine's stale-price guard reads the same Redis prices, so if prices are stale on screen, trading stops too.
+- **Honest labels.** Charts show the market price in USD from exchanges. The actual swap price on Base can differ slightly, so the trade screen always shows the exact quote before the user confirms.
+- **Portfolio chart.** Each account's end-of-day value is stored (`trading.account_value_daily`) for the long ranges; today's line is computed from current holdings and live prices.
+- **Data rights.** Confirm we're allowed to show each feed's prices in a commercial app. If an exchange's data terms don't allow it, a licensed market data vendor feeds the same service, with no change to the app.
+
 ### If something breaks
 
 - **Nautilus node goes down:** no new signals, so nothing trades for that strategy; alert fires
+- **Price feed drops:** the market data service switches to the backup feed. If every feed is down, charts show "Prices delayed" with the time of the last update, and the stale-price guard blocks trades
 - **Signal arrives late, or the swap quote has moved too far from the signal price:** the router drops it
 - **Same signal arrives twice:** ignored (signal ID)
 - **Swap fails on-chain:** retried only inside the signal's time window, never late; then logged and the user notified
@@ -258,8 +315,8 @@ Add an `org_id` tenant layer only if we later white-label the platform for other
 |---|---|---|
 | **PostgreSQL** (managed) | Users (keyed to Privy user ID and wallet address), settings, customer rules (versioned records), strategy subscriptions and modes, auto-trading permissions (policy IDs and versions), signals, approvals, trades (transaction hashes), cash in/out records, audit log | Relational, transactional, Row-Level Security; NautilusTrader also supports Postgres |
 | **Ledger tables in Postgres** | Every trade and cash movement, append-only | Never update or delete; corrections are new entries. Mirrors the chain; used for history and taxes |
-| **Price history tables in Postgres**, partitioned by date | Price history, candles, strategy performance | AWS's managed Postgres (RDS and Aurora) doesn't offer the TimescaleDB extension, so start with plain date-partitioned tables. Move to Timescale's own cloud or ClickHouse if chart and performance queries slow down |
-| **Redis** | Nautilus cache and message bus, the signal stream from Nautilus to the trade router, rate limits, live prices | NautilusTrader uses Redis for crash recovery |
+| **Price history tables in Postgres**, partitioned | Chart history: 1-minute candles (kept 90 days) and 1-hour and 1-day candles (kept forever); daily portfolio values; strategy performance | AWS's managed Postgres (RDS and Aurora) doesn't offer the TimescaleDB extension, so start with plain partitioned tables. Move to Timescale's own cloud or ClickHouse if chart and performance queries slow down |
+| **Redis** | Nautilus cache and message bus, the signal stream from Nautilus to the trade router, rate limits; live prices, forming candles and one live price channel per coin; cached chart responses | NautilusTrader uses Redis for crash recovery; Redis pub/sub fans live prices out to the gateway |
 | **Object storage (S3)** | Backtest results, logs, statements, data snapshots; ledger and audit archives under Object Lock | Cheap, durable; Object Lock makes archives tamper-proof |
 
 **What we don't store:** private keys (they stay with the wallet provider), ID documents, bank details and card data (they stay with the ramp partners). Secrets live in Secrets Manager / KMS, never in the database, code or mobile app.
@@ -276,6 +333,8 @@ Start lean and upgrade only when real load calls for it. Anything that protects 
 |---|---|---|
 | App API, trade router, rules service, chain watcher, workers | Containers on ECS Fargate | No servers to patch |
 | Nautilus strategy nodes | Long-running ECS services | Need always-on WebSocket connections; not serverless |
+| Market data service, live price gateway | Long-running ECS services; the gateway sits behind the load balancer | Always-on WebSockets to the exchanges and to the app |
+| Chart history caching | CloudFront in front of the public market endpoints | The same data for every user, so it's cached at the edge |
 | Login and wallets | **Privy** (external) | Login, passkeys, embedded and smart wallets, signers and policies, gas sponsorship |
 | Edge | Load balancer + AWS WAF | Blocks abusive traffic and rate-limits the API |
 | Postgres | RDS for PostgreSQL, **Multi-AZ** | Keep a standby in a second availability zone; point-in-time backups |
@@ -298,6 +357,7 @@ Upgrade each piece when it becomes the bottleneck, not on a schedule.
 | RDS → **Aurora PostgreSQL** (plus read replicas) | Database CPU or storage I/O stays high, or app reads slow down trade writes |
 | Price history → **Timescale Cloud or ClickHouse** | Charts or strategy performance queries get slow on partitioned tables |
 | Larger or clustered **ElastiCache** | Redis memory or connection limits are reached |
+| More live price gateway tasks, or a **managed WebSocket service** (for example API Gateway WebSocket APIs) | Open app connections outgrow a few gateway tasks |
 | **Autoscaling on SQS queue depth** | Trade queues back up during volatile markets |
 | **Rule backtest workers** (ECS tasks started on demand) | Advanced mode launches |
 | **Second chain** (for example Solana) | Users want tokens Base doesn't have |

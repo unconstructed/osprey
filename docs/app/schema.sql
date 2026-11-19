@@ -215,23 +215,97 @@ CREATE UNIQUE INDEX tokens_one_native_coin ON market.tokens (chain_id) WHERE con
 -- Token rows are added by a reviewed migration once the coin list is final.
 -- Verify every contract address against the issuer's official docs first.
 
--- Price history in USD from exchange feeds. Partitioned by month: run
--- pg_partman (available on RDS) to create partitions ahead of time. The
--- default partition only catches stray rows.
+-- Where each coin's live price comes from. The market data service
+-- subscribes to every active feed; priority 1 is primary, the rest are
+-- backups. Coins with no exchange listing use 'dex' (Base DEX quotes).
+CREATE TABLE market.price_feeds (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_id         uuid NOT NULL REFERENCES market.tokens(id),
+  provider         text NOT NULL CHECK (provider IN ('coinbase', 'kraken', 'dex', 'vendor')),
+  provider_symbol  text NOT NULL,               -- e.g. 'BTC-USD' on Coinbase
+  priority         smallint NOT NULL DEFAULT 1 CHECK (priority >= 1),
+  active           boolean NOT NULL DEFAULT true,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (token_id, provider)
+);
+CREATE UNIQUE INDEX price_feeds_one_per_priority ON market.price_feeds (token_id, priority) WHERE active;
+
+-- Chart history in USD. Only closed bars are stored; the bar that is still
+-- forming lives in Redis and reaches the app over the live price connection.
+-- The market data service writes 1-minute bars and rolls them up into
+-- 1-hour and 1-day bars.
+--   1m      kept 90 days, in monthly partitions. pg_partman (available on RDS)
+--           creates them ahead of time and drops old ones.
+--   1h, 1d  kept forever: a few thousand rows per coin per year.
 CREATE TABLE market.candles (
   token_id   uuid NOT NULL REFERENCES market.tokens(id),
   bar_size   text NOT NULL CHECK (bar_size IN ('1m', '1h', '1d')),
-  open_time  timestamptz NOT NULL,
+  open_time  timestamptz NOT NULL,              -- start of the bar, on a UTC boundary
   open       numeric(38,18) NOT NULL,
   high       numeric(38,18) NOT NULL,
   low        numeric(38,18) NOT NULL,
   close      numeric(38,18) NOT NULL,
   volume     numeric(38,18) NOT NULL DEFAULT 0,
-  source     text NOT NULL,                     -- 'coinbase', 'kraken', ...
+  source     text NOT NULL,                     -- 'coinbase', 'kraken', 'dex', 'vendor' or 'rollup'
   PRIMARY KEY (token_id, bar_size, open_time),
-  CHECK (low > 0 AND low <= LEAST(open, close) AND high >= GREATEST(open, close))
-) PARTITION BY RANGE (open_time);
-CREATE TABLE market.candles_default PARTITION OF market.candles DEFAULT;
+  CHECK (low > 0 AND low <= LEAST(open, close) AND high >= GREATEST(open, close)),
+  CHECK (open_time = date_trunc(CASE bar_size WHEN '1m' THEN 'minute' WHEN '1h' THEN 'hour' ELSE 'day' END,
+                                open_time, 'UTC'))
+) PARTITION BY LIST (bar_size);
+CREATE TABLE market.candles_1m PARTITION OF market.candles FOR VALUES IN ('1m') PARTITION BY RANGE (open_time);
+CREATE TABLE market.candles_1m_default PARTITION OF market.candles_1m DEFAULT;   -- catches stray rows only
+CREATE TABLE market.candles_1h PARTITION OF market.candles FOR VALUES IN ('1h');
+CREATE TABLE market.candles_1d PARTITION OF market.candles FOR VALUES IN ('1d');
+
+-- Bars for a chart, grouped into buckets of any size from stored bars.
+-- Weekly buckets start on Mondays (the origin below is a Monday).
+CREATE FUNCTION market.chart_bars(
+  p_token_id uuid, p_from_bar text, p_bucket interval, p_from timestamptz, p_to timestamptz)
+RETURNS TABLE (bucket_start timestamptz, open numeric, high numeric, low numeric, close numeric, volume numeric)
+LANGUAGE sql STABLE AS $$
+  SELECT date_bin(p_bucket, c.open_time, timestamptz '2000-01-03 00:00:00+00'),
+         (array_agg(c.open ORDER BY c.open_time))[1],
+         max(c.high),
+         min(c.low),
+         (array_agg(c.close ORDER BY c.open_time DESC))[1],
+         sum(c.volume)
+  FROM market.candles c
+  WHERE c.token_id = p_token_id
+    AND c.bar_size = p_from_bar
+    AND c.open_time >= p_from
+    AND c.open_time < p_to
+  GROUP BY 1
+  ORDER BY 1
+$$;
+
+-- The chart for a range the app shows. Each range stays at or under about
+-- 400 points so charts stay fast on a phone. The API caches the result for
+-- 10-60 seconds; it is the same for every user.
+--   1H: 1-minute bars   1D: 5-minute    1W: 1-hour
+--   1M: 4-hour          1Y: 1-day       ALL: 1-week
+CREATE FUNCTION market.chart(p_token_id uuid, p_range text, p_now timestamptz DEFAULT now())
+RETURNS TABLE (bucket_start timestamptz, open numeric, high numeric, low numeric, close numeric, volume numeric)
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+  v_bar     text;
+  v_bucket  interval;
+  v_span    interval;
+BEGIN
+  SELECT r.from_bar, r.bucket, r.span INTO v_bar, v_bucket, v_span
+  FROM (VALUES
+    ('1H',  '1m', interval '1 minute',  interval '1 hour'),
+    ('1D',  '1m', interval '5 minutes', interval '1 day'),
+    ('1W',  '1h', interval '1 hour',    interval '7 days'),
+    ('1M',  '1h', interval '4 hours',   interval '30 days'),
+    ('1Y',  '1d', interval '1 day',     interval '365 days'),
+    ('ALL', '1d', interval '7 days',    interval '100 years')
+  ) AS r(code, from_bar, bucket, span)
+  WHERE r.code = upper(p_range);
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'unknown chart range: %', p_range USING ERRCODE = '22023';
+  END IF;
+  RETURN QUERY SELECT * FROM market.chart_bars(p_token_id, v_bar, v_bucket, p_now - v_span, p_now);
+END $$;
 
 -- =====================================================================
 -- strategy (part 1): risk levels and our strategies
@@ -747,6 +821,21 @@ CREATE TABLE trading.balances (
   FOREIGN KEY (account_id, user_id) REFERENCES trading.accounts (id, user_id)
 );
 
+-- The portfolio chart: each account's value at the end of each UTC day.
+-- Today's line is computed live from holdings and live prices, not stored.
+CREATE TABLE trading.account_value_daily (
+  account_id        uuid NOT NULL,
+  day               date NOT NULL,
+  user_id           uuid NOT NULL,
+  value_usd         app.usd NOT NULL CHECK (value_usd >= 0),
+  cash_usd          app.usd NOT NULL CHECK (cash_usd >= 0),
+  net_deposits_usd  app.usd NOT NULL,          -- cash in minus cash out to date, for profit and loss
+  computed_at       timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, day),
+  FOREIGN KEY (account_id, user_id) REFERENCES trading.accounts (id, user_id),
+  CHECK (cash_usd <= value_usd)
+);
+
 -- =====================================================================
 -- ramp: cash in and out through Coinbase or MoonPay.
 -- No card, bank or ID-document data is stored; it stays with the partner.
@@ -1070,7 +1159,7 @@ BEGIN
     'app.user_settings', 'app.user_limits', 'app.pauses', 'app.referral_codes', 'app.referrals',
     'wallet.wallets', 'wallet.auto_trade_permissions', 'wallet.address_book', 'wallet.transfers',
     'trading.accounts', 'trading.recurring_buys', 'trading.orders', 'trading.approvals',
-    'trading.executions', 'trading.balances',
+    'trading.executions', 'trading.balances', 'trading.account_value_daily',
     'strategy.enrollments', 'strategy.rules', 'strategy.rule_versions', 'strategy.rule_backtests',
     'ramp.transactions',
     'ledger.entries', 'ledger.tax_lots', 'ledger.tax_exports',
@@ -1109,10 +1198,13 @@ GRANT SELECT, INSERT, UPDATE ON
   TO osprey_api;
 GRANT SELECT, INSERT ON trading.accounts, strategy.rule_versions, ledger.tax_exports TO osprey_api;
 GRANT SELECT ON
-  app.referrals, trading.balances, ledger.entries, ledger.tax_lots,
+  app.referrals, trading.balances, trading.account_value_daily, ledger.entries, ledger.tax_lots,
   billing.subscriptions, notify.statements
   TO osprey_api;
 GRANT EXECUTE ON FUNCTION auth.user_id_for_privy(text, citext) TO osprey_api;
+GRANT EXECUTE ON FUNCTION market.chart(uuid, text, timestamptz),
+  market.chart_bars(uuid, text, interval, timestamptz, timestamptz)
+  TO osprey_api, osprey_worker, osprey_admin;
 
 -- Workers: read and write across users; append-only tables get INSERT only
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA
