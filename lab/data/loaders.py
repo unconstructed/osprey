@@ -6,8 +6,9 @@ Output of every loader: a DataFrame indexed by bar CLOSE time (tz-aware UTC ``Da
 has none), ready for ``validate_bars``.
 
 Cleaning, in this order:
-1. A header row (first field not a number) is skipped; lines with more fields than the first line are
-   skipped by the CSV reader.
+1. A header row (first field not a number) is skipped. Lines are read against the format's full width
+   (7 fields for Kraken, 12 for Binance): a shorter line gets NaN for its missing fields (e.g. no trades
+   count), a line with MORE fields than that is skipped and counted in ``dropped_bad``.
 2. Bad rows are dropped: a timestamp or price that is not a number, a price <= 0, negative volume,
    ``high < low``, or an open or close outside ``[low, high]``.
 3. Rows are sorted by time (stable), then duplicate timestamps keep the LAST row in file order (a later
@@ -18,12 +19,13 @@ Epoch timestamps are detected per value by magnitude, so one file may mix units 
 switched from milliseconds to microseconds on 2025-01-01): below 1e11 seconds, below 1e14
 milliseconds, below 1e17 microseconds, else nanoseconds.
 
-``attrs`` of a loaded frame records ``source``, ``rows_read`` (data rows parsed, header excluded),
-``dropped_bad`` and ``dropped_duplicates`` for the data quality report.
+``attrs`` of a loaded frame records ``source``, ``rows_read`` (data lines read, header excluded, over-wide
+lines included), ``dropped_bad`` and ``dropped_duplicates`` for the data quality report.
 """
 
 from __future__ import annotations
 
+import csv
 import re
 from pathlib import Path
 
@@ -84,18 +86,34 @@ def epoch_to_ns(values: pd.Series) -> pd.Series:
     return _epoch(values)[0]
 
 
-def _read_fields(path: Path, min_fields: int) -> tuple[pd.DataFrame, str]:
-    """Every CSV field as a string (header row removed) and the file name for messages."""
-    try:
-        raw = pd.read_csv(path, header=None, dtype=str, on_bad_lines="skip", skipinitialspace=True)
-    except pd.errors.EmptyDataError as exc:
-        raise ValueError(f"{path.name}: file is empty") from exc
-    if raw.shape[1] < min_fields:
-        raise ValueError(f"{path.name}: expected at least {min_fields} columns, found {raw.shape[1]}")
+def _read_fields(path: Path, min_fields: int, width: int) -> tuple[pd.DataFrame, str, int]:
+    """Every CSV field as a string in ``width`` columns (header row removed), the file name for messages, and
+    the number of lines skipped for having more than ``width`` fields.
+
+    Each line is read whole and split here, so the field count is per line: a shorter line is padded with NaN
+    (a first line without the optional trades field can't make the reader drop every later full line, as
+    pandas' ``on_bad_lines="skip"`` did), and an over-wide line is counted, never silently lost or shifted.
+    Whitespace inside a line is removed (the sources are plain numbers; this replaces ``skipinitialspace``).
+    """
+    lines = pd.read_csv(
+        path, header=None, names=["line"], sep="\x1e", dtype=str, quoting=csv.QUOTE_NONE
+    )["line"]
+    if lines.empty:
+        raise ValueError(f"{path.name}: file is empty")
+    lines = lines.str.replace(r"\s+", "", regex=True)
+    n_fields = lines.str.count(",").to_numpy(dtype=int) + 1
+    over_wide = n_fields > width
+    if over_wide.all():
+        raise ValueError(f"{path.name}: all {len(lines)} lines have more than {width} fields")
+    found = int(n_fields[~over_wide].max())
+    if found < min_fields:
+        raise ValueError(f"{path.name}: expected at least {min_fields} columns, found {found}")
+    raw = lines[~over_wide].str.split(",", expand=True).reindex(columns=range(width))
+    raw = raw.replace("", None)  # an empty field is a missing value, as in read_csv
     first = pd.to_numeric(raw.iloc[:1, 0], errors="coerce")
     if first.isna().all():  # header row
         raw = raw.iloc[1:]
-    return raw.reset_index(drop=True), path.name
+    return raw.reset_index(drop=True), path.name, int(over_wide.sum())
 
 
 def _numbers(raw: pd.DataFrame, positions: dict[str, int]) -> pd.DataFrame:
@@ -127,9 +145,11 @@ def _require_rows(good: np.ndarray, source: str) -> None:
         raise ValueError(f"{source}: no valid rows")
 
 
-def _finish(bars: pd.DataFrame, close_ns: pd.Series, good: np.ndarray, source: str) -> pd.DataFrame:
+def _finish(
+    bars: pd.DataFrame, close_ns: pd.Series, good: np.ndarray, source: str, over_wide: int
+) -> pd.DataFrame:
     """Drop bad rows, sort (stable), de-duplicate keeping the last row, index by close time."""
-    rows_read = len(bars)
+    rows_read = len(bars) + over_wide
     bars = bars.loc[good].copy()
     # microsecond resolution, like every other bar index in the lab (pandas 3 default); no source has finer
     stamps = pd.to_datetime(close_ns.loc[bars.index].to_numpy(dtype="int64"), unit="ns", utc=True)
@@ -172,14 +192,14 @@ def load_kraken_ohlcvt(path: str | Path, interval: pd.Timedelta | str | int | No
     timestamps of the valid rows.
     """
     path = Path(path)
-    raw, source = _read_fields(path, 6)
+    raw, source, over_wide = _read_fields(path, 6, len(KRAKEN_COLUMNS))
     open_ns = epoch_to_ns(raw[0])
     bars = _numbers(raw, {name: i for i, name in enumerate(BAR_COLUMNS, start=1)})
-    bars["trades"] = pd.to_numeric(raw[6], errors="coerce").astype(float) if raw.shape[1] > 6 else np.nan
+    bars["trades"] = pd.to_numeric(raw[6], errors="coerce").astype(float)
     good = _good_rows(bars, open_ns.notna().to_numpy(dtype=bool))
     _require_rows(good, source)
     step = _kraken_interval(path, open_ns.loc[good], interval)
-    return _finish(bars, open_ns + step, good, source)
+    return _finish(bars, open_ns + step, good, source, over_wide)
 
 
 _SECOND_NS = 1_000_000_000
@@ -195,17 +215,17 @@ def load_binance_klines(path: str | Path) -> pd.DataFrame:
     A row whose length rounds to zero or less is bad. ``trades`` is Binance's ``count``.
     """
     path = Path(path)
-    raw, source = _read_fields(path, 7)
+    raw, source, over_wide = _read_fields(path, 7, len(BINANCE_COLUMNS))
     open_ns = epoch_to_ns(raw[0])
     close_ns, close_unit = _epoch(raw[6])
     bars = _numbers(raw, {name: i for i, name in enumerate(BAR_COLUMNS, start=1)})
-    bars["trades"] = pd.to_numeric(raw[8], errors="coerce").astype(float) if raw.shape[1] > 8 else np.nan
+    bars["trades"] = pd.to_numeric(raw[8], errors="coerce").astype(float)
     # integer round-half-up to whole seconds
     length = (close_ns + close_unit - open_ns + _SECOND_NS // 2) // _SECOND_NS * _SECOND_NS
     ts_ok = (length > 0).fillna(False).to_numpy(dtype=bool)
     good = _good_rows(bars, ts_ok)
     _require_rows(good, source)
-    return _finish(bars, open_ns + length, good, source)
+    return _finish(bars, open_ns + length, good, source, over_wide)
 
 
 def resample(bars: pd.DataFrame, rule: str) -> pd.DataFrame:

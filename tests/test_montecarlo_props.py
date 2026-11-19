@@ -245,3 +245,22 @@ def test_any_turnover_with_extra_cost_hurts(rt, bps, seed):
     turnover[0] = 1.0
     totals = degrade_execution(r, turnover, extra_cost_bps=bps, n_sims=10, seed=seed)
     assert np.all(totals < math.prod(1.0 + r) - 1.0)
+
+
+# ------------------------------------------------------------------ ported from the starter's montecarlo props
+
+
+@given(returns_list.filter(len), seeds)
+def test_sorted_order_is_the_worst_shuffle(r, seed):
+    """All losses first is the worst possible ordering, so no shuffle can draw down further."""
+    d = shuffled_trade_drawdowns(r, n_sims=50, seed=seed)
+    assert d.shape == (50,) and np.all(d <= 0)
+    assert d.min() >= max_drawdown(np.sort(r)) - TOL
+
+
+@given(st.lists(returns_value, min_size=1, max_size=30), st.integers(0, 29), st.floats(0.01, 0.5))
+def test_adding_a_loss_never_reduces_drawdown(r, i, loss):
+    i = i % len(r)
+    worse = list(r)
+    worse[i] = (1 + worse[i]) * (1 - loss) - 1
+    assert max_drawdown(worse) <= max_drawdown(r) + TOL

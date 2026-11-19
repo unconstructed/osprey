@@ -21,7 +21,17 @@ import pandas as pd
 import pytest
 
 from lab.runner import reference
+from lab.runner.interface import validate_bars
 from lab.runner.reference import Costs
+
+
+def dip_buy_with_forecast(params: dict, bars: pd.DataFrame, costs: Costs | None = None) -> pd.DataFrame:
+    """``dip_buy`` sized from a model column (``vol_col``). The stand-in forecast is a point-in-time function of
+    the bars: 1.2 x the annualised 5-bar realised volatility, NaN for the first 5 bars (so the fallback to
+    realised volatility runs too). Tampering bars from ``cut`` on therefore can't move it before ``cut``."""
+    validate_bars(bars)
+    forecast = 1.2 * reference.realised_vol(bars["close"].to_numpy(dtype=float), 5)
+    return reference.dip_buy({**params, "vol_col": "pred_vol"}, bars.assign(pred_vol=forecast), costs)
 
 
 @dataclass(frozen=True)
@@ -80,6 +90,12 @@ RUNNERS: tuple[Runner, ...] = (
             {"drop": 0.04, "lookback": 5, "vol_target": -0.5},
             {"drop": 0.04, "lookback": 5, "vol_target": 0.5, "vol_lookback": 1},
         ),
+    ),
+    Runner(
+        "ref_dip_buy_model_vol",
+        dip_buy_with_forecast,
+        {"drop": 0.05, "lookback": 5, "hold": 6, "vol_target": 0.5},
+        bad_params=({"drop": 0.05, "lookback": 5}, {"drop": 0.05, "lookback": 5, "vol_target": 0.0}),
     ),
     Runner("ref_buy_and_hold", reference.buy_and_hold, {}, bad_params=({"weight": 0.0}, {"weight": 1.5})),
     Runner("ref_buy_and_hold_half", reference.buy_and_hold, {"weight": 0.5}, bad_params=({"size": 0.5},)),

@@ -19,10 +19,18 @@ from __future__ import annotations
 
 from itertools import combinations
 from math import comb
+from typing import NamedTuple
 
 import numpy as np
 
-__all__ = ["cpcv", "cpcv_paths", "walk_forward"]
+__all__ = ["Fold", "cpcv", "cpcv_paths", "walk_forward"]
+
+
+class Fold(NamedTuple):
+    """One walk-forward fold: ``train`` and ``test`` row positions. Unpacks as ``(train, test)``."""
+
+    train: np.ndarray
+    test: np.ndarray
 
 
 def _int_arg(name: str, value, minimum: int) -> int:
@@ -42,8 +50,8 @@ def walk_forward(
     purge: int = 0,
     expanding: bool = False,
     start: int | None = None,
-) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Walk-forward folds ``[(train_idx, test_idx), ...]`` over ``n`` time-ordered rows.
+) -> list[Fold]:
+    """Walk-forward folds ``[Fold(train, test), ...]`` over ``n`` time-ordered rows (each unpacks as a pair).
 
     - Test blocks are ``test_size`` rows long. The first starts at row ``start`` (default ``train_size + purge``)
       and each next one ``step`` rows later (default ``test_size``: back-to-back blocks). A block that would run
@@ -73,7 +81,7 @@ def walk_forward(
     for test_start in range(start, n - test_size + 1, step):
         train_end = test_start - purge  # exclusive
         train_start = 0 if expanding else train_end - train_size
-        folds.append((np.arange(train_start, train_end), np.arange(test_start, test_start + test_size)))
+        folds.append(Fold(np.arange(train_start, train_end), np.arange(test_start, test_start + test_size)))
     if not folds:
         raise ValueError(
             f"no fold fits: n={n} rows but the first test block needs rows {start}..{start + test_size - 1}"

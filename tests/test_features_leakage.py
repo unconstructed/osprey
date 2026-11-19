@@ -150,6 +150,9 @@ def test_each_feature_reacts_to_the_present_bar(btc, features, cut):
     pd.testing.assert_frame_equal(got.iloc[:cut], features.iloc[:cut], check_exact=True)
     unchanged = [name for name in FEATURES if got[name].iloc[cut] == features[name].iloc[cut]]
     assert unchanged == []
+    # the starter's criterion: a MEANINGFUL change, not a last-bit one (it caught raw-volume z saturating)
+    barely = [name for name in FEATURES if np.isclose(got[name].iloc[cut], features[name].iloc[cut])]
+    assert barely == []
 
 
 @given(
@@ -529,3 +532,26 @@ def test_cross_sectional_ranks_errors(features):
         cross_sectional_ranks({})
     with pytest.raises(ValueError, match="missing columns"):
         cross_sectional_ranks({"BTC": features[["ret_1"]]})
+
+
+# ------------------------------------------------------------------ ported from the starter (merge)
+
+
+def test_feature_ranges(features):
+    """Cheap invariants over the whole market fixture (starter's test_feature_ranges, osprey names)."""
+    f = features.iloc[WARMUP - 1 :]
+    assert not f.isna().any().any()
+    assert (f[["vol_10", "vol_20", "vol_60", "ewma_vol_20", "park_vol_20"]] > 0).all().all()
+    assert ((f["eff_ratio_20"] >= 0) & (f["eff_ratio_20"] <= 1 + 1e-12)).all()
+    assert (f["drawdown_60"] <= 0).all()
+
+
+@given(spike=st.floats(1.0, 1e9), cut=st.integers(WARMUP - 1, N_BARS - 1))
+def test_volume_z_is_bounded_by_its_window(btc, spike, cut):
+    """A z-score whose window includes the present bar can't exceed (n-1)/sqrt(n) = 4.2485 for n = 20, however
+    large the spike: big spikes all look alike (design note in TESTING.md; the starter z-scored log volume,
+    which saturates too, only more slowly)."""
+    bars = btc.iloc[: cut + 1].copy()
+    bars.iloc[cut, bars.columns.get_loc("volume")] *= spike
+    z = compute_features(bars)["volume_z_20"].iloc[cut]
+    assert abs(z) <= 19 / math.sqrt(20) * (1 + 1e-12)

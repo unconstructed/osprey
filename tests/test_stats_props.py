@@ -506,3 +506,55 @@ def test_pbo_of_a_dominant_trial_is_zero(half, per_block, cols, seed):
     out = pbo(m, n_blocks=n_blocks, max_combinations=100, seed=seed)
     assert out["pbo"] == 0.0
     assert out["logits"] == pytest.approx(np.full(out["n_combinations"], math.log(cols)), rel=1e-12)
+
+
+# ------------------------------------------------- ported from the starter's test_stats_props / test_validation
+
+
+def test_psr_penalizes_negative_skew_and_fat_tails():
+    """Same mean and std, but crash-prone: PSR must be lower (the direction of the skew and kurtosis terms)."""
+    rng = np.random.default_rng(2)
+    normal = rng.normal(0.001, 0.02, 5000)
+    crashy = np.where(rng.random(5000) < 0.02, -0.12, 0.0035) + rng.normal(0, 0.005, 5000)
+    crashy = (crashy - crashy.mean()) / crashy.std() * normal.std() + normal.mean()  # same mean and std
+    assert probabilistic_sharpe_ratio(crashy) < probabilistic_sharpe_ratio(normal)
+
+
+def test_psr_rises_with_more_data_for_same_edge():
+    rng = np.random.default_rng(1)
+    short = rng.normal(0.002, 0.02, 200)
+    long_ = np.tile(short, 10)
+    assert probabilistic_sharpe_ratio(long_) > probabilistic_sharpe_ratio(short)
+
+
+def test_effective_trials_two_independent_groups_of_clones():
+    rng = np.random.default_rng(5)
+    a, b = rng.normal(size=(2000, 1)), rng.normal(size=(2000, 1))
+    m = np.hstack([a.repeat(10, 1), b.repeat(10, 1)]) + rng.normal(scale=1e-4, size=(2000, 20))
+    assert effective_trials(m) == pytest.approx(2.0, abs=0.1)
+
+
+def test_effective_trials_identical_vs_independent():
+    rng = np.random.default_rng(3)
+    base = rng.normal(size=(1000, 1))
+    identical = np.repeat(base, 20, axis=1) + rng.normal(scale=1e-6, size=(1000, 20))
+    independent = rng.normal(size=(1000, 20))
+    assert effective_trials(identical) < 1.5
+    assert effective_trials(independent) > 17
+
+
+def test_pbo_noise_is_near_half_and_real_edge_is_low():
+    rng = np.random.default_rng(4)
+    noise = rng.normal(0, 0.01, size=(2000, 40))
+    pbo_noise = pbo(noise, n_blocks=10)["pbo"]
+    assert 0.3 < pbo_noise < 0.7
+    edge = noise.copy()
+    edge[:, 7] += 0.004  # one trial with a real, persistent edge
+    pbo_edge = pbo(edge, n_blocks=10)["pbo"]
+    assert pbo_edge < 0.1
+
+
+def test_probability_of_backtest_overfitting_is_the_starter_name_for_pbo():
+    from lab.validation import stats
+
+    assert stats.probability_of_backtest_overfitting is stats.pbo

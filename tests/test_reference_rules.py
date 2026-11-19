@@ -106,7 +106,7 @@ def test_stop_is_measured_from_the_entry_fill_price(make_bars):
     assert result.attrs["trade_returns"] == pytest.approx([86.0 / 90.0 - 1.0], rel=1e-12)
 
 
-@pytest.mark.parametrize("hold", [1, 2, 3, 5])
+@pytest.mark.parametrize("hold", [1, 2, 3, 5, 6, 10, 25])  # 6/10/25: the starter's test_hold_days_is_exact
 def test_hold_period_exits_after_hold_bars(make_bars, hold):
     bars = make_bars([100.0] * 6 + [85.0] + [99.0] * (hold + 2))  # 99 is no dip: one round trip only
     result = dip_buy({"drop": 0.1, "lookback": 5, "hold": hold}, bars, ZERO)
@@ -169,6 +169,109 @@ def test_vol_target_waits_for_a_defined_vol_and_zero_vol_is_uncapped(make_bars):
     result = dip_buy(params, bars, ZERO)
     assert fill_bars(result) == [3]
     assert result["turnover"].iloc[3] == 0.6
+
+
+# Ported from the starter's test_backtester_props.py (model-forecast sizing), shifted to fills at the next open:
+# the size comes from the forecast at the signal close and the entry fills at the open after it.
+
+MODEL_DIP = {"drop": 0.1, "lookback": 5, "hold": 5, "stop": 0.1, "vol_col": "pred_vol"}
+
+
+def dip_then_flat(make_bars):
+    """30 bars at 100, then 85 for 31 bars: the dip signals at close 30 and the entry fills at open 31 (= 85)."""
+    return make_bars([100.0] * 30 + [85.0] * 31)
+
+
+@pytest.mark.parametrize(("pred", "vt", "weight", "size"), [(0.8, 0.4, 1.0, 0.5), (0.2, 0.4, 1.0, 1.0), (0.2, 0.4, 0.7, 0.7)])
+def test_vol_target_sizes_from_the_model(make_bars, pred, vt, weight, size):
+    bars = dip_then_flat(make_bars).assign(pred_vol=pred)
+    result = dip_buy({**MODEL_DIP, "vol_target": vt, "weight": weight}, bars, ZERO)
+    assert fill_bars(result)[0] == 31
+    assert result["turnover"].iloc[31] == pytest.approx(size, rel=1e-12)
+    assert result["position"].iloc[31] == pytest.approx(size, rel=1e-12)  # flat bar 31: no drift
+
+
+@pytest.mark.parametrize("missing", [math.nan, math.inf])
+def test_vol_target_falls_back_to_realised_vol_where_the_model_has_no_forecast(btc, missing):
+    bars = btc.iloc[:400].assign(pred_vol=missing)
+    params = {"drop": 0.05, "lookback": 5, "hold": 10, "stop": 0.1, "vol_target": 0.3}
+    result = dip_buy({**params, "vol_col": "pred_vol"}, bars, ZERO)
+    plain = dip_buy(params, bars, ZERO)
+    np.testing.assert_array_equal(result.to_numpy(), plain.to_numpy())
+    t = fill_bars(result)[0]  # first entry; sized at close t-1 from the 20-bar realised volatility
+    trailing = realised_vol(bars["close"].to_numpy(), 20)
+    assert t - 1 >= 20 and result["turnover"].iloc[t] == pytest.approx(min(1.0, 0.3 / trailing[t - 1]), rel=1e-12)
+
+
+def test_the_forecast_at_the_signal_close_is_used_not_a_later_one(make_bars):
+    bars = dip_then_flat(make_bars)
+    pred = np.full(len(bars), 0.8)
+    pred[31:] = 0.1  # the forecast only drops after the signal close: the entry is still sized from 0.8
+    result = dip_buy({**MODEL_DIP, "vol_target": 0.4}, bars.assign(pred_vol=pred), ZERO)
+    assert result["turnover"].iloc[31] == pytest.approx(0.5, rel=1e-12)
+
+
+@pytest.mark.parametrize("bad", [0.0, -0.5])
+def test_non_positive_vol_forecast_never_trades(make_bars, bad):
+    bars = dip_then_flat(make_bars).assign(pred_vol=bad)
+    result = dip_buy({**MODEL_DIP, "vol_target": 0.4}, bars, ZERO)
+    assert (result["position"] == 0.0).all() and result.attrs["n_trades"] == 0
+
+
+@given(start=st.integers(0, 1000), cut=st.integers(30, 380), seed=st.integers(0, 2**16))
+def test_no_look_ahead_in_model_column(btc, start, cut, seed):
+    """Tamper the forecast column from ``cut`` on: every row up to and including ``cut`` is identical (the
+    decision at close cut-1 read forecast[cut-1] and filled at open cut)."""
+    rng = np.random.default_rng(seed)
+    bars = btc.iloc[start : start + 400].copy()
+    pred = rng.uniform(0.2, 1.2, len(bars))
+    pred[rng.random(len(bars)) < 0.2] = np.nan  # some bars without a forecast: realised-vol fallback
+    bars["pred_vol"] = pred
+    tampered = bars.copy()
+    tampered.iloc[cut:, tampered.columns.get_loc("pred_vol")] = rng.uniform(0.01, 3.0, len(bars) - cut)
+    params = {"drop": 0.05, "lookback": 5, "hold": 10, "stop": 0.1, "vol_target": 0.4, "vol_col": "pred_vol"}
+    a, b = dip_buy(params, bars, Costs()), dip_buy(params, tampered, Costs())
+    np.testing.assert_array_equal(a.to_numpy()[: cut + 1], b.to_numpy()[: cut + 1])
+
+
+DRAWN_DIP_PARAMS = st.fixed_dictionaries(
+    {
+        "drop": st.floats(0.02, 0.25),
+        "lookback": st.integers(2, 20),
+        "hold": st.integers(1, 40),
+        "stop": st.floats(0.02, 0.30),
+    },
+    optional={"vol_target": st.floats(0.1, 1.0), "weight": st.floats(0.2, 1.0)},
+)
+
+
+@given(params=DRAWN_DIP_PARAMS, start=st.integers(0, 1000), cut=st.integers(30, 380), factor=st.floats(0.3, 3.0))
+def test_drawn_params_keep_the_identities_and_never_look_ahead(btc, params, start, cut, factor):
+    """Ported from the starter's params_st properties: drawn parameters on 400-bar windows of the regime-switching
+    market reach long holds, many round trips and vol-target paths the fixed contract entries never hit."""
+    bars = btc.iloc[start : start + 400]
+    result = dip_buy(params, bars, Costs())
+    validate_result(result, bars)
+    o, c = bars["open"].to_numpy(), bars["close"].to_numpy()
+    g, h, r = o[1:] / c[:-1] - 1, c[1:] / o[1:] - 1, c[1:] / c[:-1] - 1
+    ret, pos, turnover, cost = (result[k].to_numpy() for k in ("ret", "position", "turnover", "cost"))
+    w0, fill = pos[:-1], turnover[1:] > 0
+    np.testing.assert_allclose((1 + ret[1:])[~fill], (1 + w0 * r)[~fill], rtol=0, atol=1e-12)
+    target = pos[1:] / (1 + h * (1 - pos[1:]))
+    expected = (1 + w0 * g) * (1 - cost[1:]) * (1 + target * h)
+    np.testing.assert_allclose((1 + ret[1:])[fill], expected[fill], rtol=0, atol=1e-12)
+    total = np.prod(1 + ret)
+    assert np.prod(1 + result.attrs["trade_returns"]) == pytest.approx(total, rel=1e-10)
+    # tamper the future (keep each bar valid): nothing decided before the cut moves
+    tampered = bars.copy()
+    for col in ("open", "high", "low", "close"):
+        tampered.iloc[cut + 1 :, tampered.columns.get_loc(col)] *= factor
+    tampered.iloc[cut, tampered.columns.get_loc("close")] *= factor
+    tampered["high"] = tampered[["open", "high", "close"]].max(axis=1)
+    tampered["low"] = tampered[["open", "low", "close"]].min(axis=1)
+    other = dip_buy(params, tampered, Costs())
+    np.testing.assert_array_equal(result.to_numpy()[:cut], other.to_numpy()[:cut])
+    assert result["turnover"].iloc[cut] == other["turnover"].iloc[cut]
 
 
 def test_realised_vol_by_hand():
@@ -425,6 +528,9 @@ BAD_PARAMS = [
         {"drop": 0.1, "lookback": 5, "vol_target": 0.5, "vol_lookback": 1},
         "vol_lookback must be >= 2",
     ),
+    (dip_buy, {"drop": 0.1, "lookback": 5, "vol_col": "close"}, "vol_col needs vol_target"),
+    (dip_buy, {"drop": 0.1, "lookback": 5, "vol_target": 0.5, "vol_col": "pred_vol"}, "vol_col must name a column"),
+    (dip_buy, {"drop": 0.1, "lookback": 5, "vol_target": 0.5, "vol_col": 3}, "vol_col must name a column"),
     (buy_and_hold, {"weight": 2.0}, r"weight must be in \(0.0, 1.0\]"),
     (buy_and_hold, {"size": 1.0}, r"buy_and_hold: unknown params \['size'\]"),
     (constant_mix, {"weight": 0.0}, r"weight must be in \(0.0, 1.0\]"),

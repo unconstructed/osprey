@@ -313,3 +313,14 @@ def test_cpcv_paths_bad_arguments_raise():
         cpcv_paths(12, 4, 2, bad)
     with pytest.raises(ValueError, match=r"^n_test_groups must be >= 1, got 0$"):
         cpcv_paths(12, 4, 0, preds)
+
+
+def test_walk_forward_folds_are_named_pairs():
+    """Fold (for the starter's lab/search/walkforward.py) has .train/.test and still unpacks as a pair."""
+    from lab.validation.splits import Fold
+
+    folds = walk_forward(10, train_size=4, test_size=2)
+    assert all(isinstance(f, Fold) for f in folds)
+    train, test = folds[0]
+    assert train is folds[0].train and test is folds[0].test
+    assert folds[0].test.tolist() == [4, 5] and folds[0].train.tolist() == [0, 1, 2, 3]

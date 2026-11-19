@@ -17,6 +17,7 @@ from lab.validation.montecarlo import (
     bootstrap_trade_drawdowns,
     degrade_execution,
     max_drawdown,
+    percentiles,
     shuffled_trade_drawdowns,
     stationary_bootstrap_indices,
 )
@@ -335,3 +336,50 @@ def test_inputs_are_not_modified():
     block_bootstrap_drawdowns(r, mean_block=2, n_sims=5)
     degrade_execution(r, to, n_sims=5)
     assert r.tolist() == [0.1, -0.2, 0.05] and to.tolist() == [1.0, 0.0, 0.5]
+
+
+# ------------------------------------------------------------- mutation survivors (comparer run, TESTING 5.3)
+
+
+def test_default_arguments_are_used_not_just_declared():
+    """Value checks (mutmut's trampolines hide changed defaults from inspect.signature)."""
+    r = np.random.default_rng(4).normal(0.0005, 0.02, 200)
+    assert np.array_equal(block_bootstrap_drawdowns(r, n_sims=30), block_bootstrap_drawdowns(r, 20, 30))
+    to = np.random.default_rng(2).uniform(0, 1, 200)
+    assert np.array_equal(degrade_execution(r, to, n_sims=30), degrade_execution(r, to, 10.0, n_sims=30))
+
+
+def test_degrade_limit_uses_the_largest_turnover_not_one():
+    # 6000 bps drawn up to 2x on turnover 0.1 is at most 12% per period: allowed.
+    totals = degrade_execution([0.0, 0.0], [0.1, 0.1], extra_cost_bps=6000.0, n_sims=20)
+    assert np.all(totals <= 0.0) and np.all(totals >= -1.0)
+
+
+def test_degrade_one_period_known_value():
+    u = np.random.default_rng(0).uniform(0.0, 2.0, size=1)[0]
+    total = degrade_execution([0.0], [1.0], extra_cost_bps=10.0, n_sims=1, seed=0)[0]
+    assert total == (1.0 - u * 10.0 / 1e4) - 1.0
+
+
+# ------------------------------------------------------------------------- percentiles (starter helper)
+
+
+def test_percentiles_known_values_and_order():
+    assert percentiles([1.0, 2.0, 3.0, 4.0, 5.0], (0, 50, 100)) == {"p0": 1.0, "p50": 3.0, "p100": 5.0}
+    assert percentiles([0.0, 10.0], (5,)) == {"p5": 0.5}  # linear interpolation
+    p = percentiles(np.random.default_rng(2).normal(size=1000))
+    assert list(p) == ["p5", "p50", "p95"] and p["p5"] <= p["p50"] <= p["p95"]
+
+
+@pytest.mark.parametrize(
+    ("values", "qs", "match"),
+    [
+        ([], (5,), r"^values must be non-empty and finite$"),
+        ([0.1, float("nan")], (5,), r"^values must be non-empty and finite$"),
+        ([0.1, 0.2], (101,), r"^percentiles must be in \[0, 100\], got 101$"),
+        ([0.1, 0.2], (-1,), r"^percentiles must be in \[0, 100\], got -1$"),
+    ],
+)
+def test_percentiles_bad_input_raises(values, qs, match):
+    with pytest.raises(ValueError, match=match):
+        percentiles(values, qs)

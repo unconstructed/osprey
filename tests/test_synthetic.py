@@ -137,3 +137,15 @@ def test_shuffle_autocorrelation_is_zero_on_average(market):
     se = (1 / np.sqrt(len(market["BTC"]) - 1)) / np.sqrt(len(acs))
     assert abs(np.mean(acs)) < 3 * se
     assert lag1_autocorr(np.abs(log_returns(market["BTC"]))) > 20 * se
+
+
+@pytest.mark.parametrize(("n_days", "seed"), [(800, 5), (1500, 21), (3400, 7)])
+def test_volatility_and_correlation_are_realistic(n_days, seed):
+    """Level bands ported from the starter's test_synthetic_is_deterministic_valid_and_realistic: a generator
+    change that made volatility unrealistic (say 3x) or BTC and ETH near-identical would otherwise pass."""
+    market = synthetic_market(n_days, seed=seed)
+    for bars in market.values():
+        vol = np.log(bars["close"]).diff().std() * np.sqrt(365)
+        assert 0.2 < vol < 1.5
+    r = pd.DataFrame({s: np.log(b["close"]).diff() for s, b in market.items()}).corr().iloc[0, 1]
+    assert 0.6 < r < 0.95

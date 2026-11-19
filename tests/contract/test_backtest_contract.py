@@ -22,7 +22,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from lab.runner.interface import BAR_COLUMNS, RESULT_COLUMNS, WEIGHT_TOL, validate_result
-from lab.runner.reference import Costs
+from lab.runner.reference import Costs, dip_buy
 
 # ------------------------------------------------------------------------------------------------ helpers
 
@@ -299,6 +299,7 @@ BAD_BARS = {
     "nan_close": lambda b: b.assign(close=b["close"].where(b.index != b.index[5])),
     "non_positive_price": lambda b: b.assign(low=-b["low"]),
     "high_below_close": lambda b: b.assign(high=b["close"] * 0.5),
+    "negative_volume": lambda b: b.assign(volume=b["volume"].where(b.index != b.index[7], -1.0)),
 }
 
 
@@ -306,3 +307,68 @@ BAD_BARS = {
 def test_bad_bars_raise_value_error(runner, btc, breaker):
     with pytest.raises(ValueError):
         runner.run(breaker(btc.iloc[:60]))
+
+
+# ------------------------------------------------------------------------- the checker itself (ported 5.6)
+
+
+def _set(col: str, row: int, value: float):
+    def breaker(r: pd.DataFrame) -> pd.DataFrame:
+        r.iloc[row, r.columns.get_loc(col)] = value
+        return r
+
+    return breaker
+
+
+def _attr(key: str, value):
+    def breaker(r: pd.DataFrame) -> pd.DataFrame:
+        r.attrs[key] = value
+        return r
+
+    return breaker
+
+
+def _drop_attr(key: str):
+    def breaker(r: pd.DataFrame) -> pd.DataFrame:
+        del r.attrs[key]
+        return r
+
+    return breaker
+
+
+BAD_RESULTS = {
+    "not_a_frame": (lambda r: r["ret"], "must be a pandas DataFrame"),
+    "index_not_bars_index": (lambda r: r.iloc[1:], "index must equal bars.index"),
+    "missing_cost": (lambda r: r.drop(columns="cost"), r"missing columns: \['cost'\]"),
+    "nan_ret": (_set("ret", 5, math.nan), "NaN or infinite"),
+    "ret0_not_zero": (_set("ret", 0, 0.01), r"ret\[0\] and position\[0\] must be 0"),
+    "position0_not_zero": (_set("position", 0, 0.5), r"ret\[0\] and position\[0\] must be 0"),
+    "total_loss": (_set("ret", 5, -1.0), "greater than -1"),
+    "leverage": (_set("position", 5, 1.5), r"within \[0, 1\]"),
+    "short": (_set("position", 5, -0.5), r"within \[0, 1\]"),
+    "negative_turnover": (_set("turnover", 5, -0.1), "non-negative"),
+    "negative_cost": (_set("cost", 5, -0.001), "non-negative"),
+    "cost_without_fill": (lambda r: _set("cost", 5, 0.001)(_set("turnover", 5, 0.0)(r)), "cost must be 0"),
+    "missing_n_trades": (_drop_attr("n_trades"), "'trade_returns' and 'n_trades'"),
+    "missing_trade_returns": (_drop_attr("trade_returns"), "'trade_returns' and 'n_trades'"),
+    "trade_returns_2d": (_attr("trade_returns", np.zeros((2, 2))), "1-D array of finite"),
+    "trade_returns_nan": (_attr("trade_returns", np.array([0.1, math.nan])), "1-D array of finite"),
+    "n_trades_bool": (_attr("n_trades", True), "non-negative int"),
+    "n_trades_negative": (_attr("n_trades", -1), "non-negative int"),
+    "n_trades_float": (_attr("n_trades", 2.0), "non-negative int"),
+}
+
+
+@pytest.mark.parametrize("case", list(BAD_RESULTS.values()), ids=list(BAD_RESULTS))
+def test_validate_result_rejects_bad_output(btc, case):
+    """Ported from the starter's test_check_result_rejects_bad_output, one case per rejection. A checker that
+    let any of these through would let a broken runner pass the contract."""
+    bars = btc.iloc[:200]
+    good = dip_buy({"drop": 0.05, "lookback": 5}, bars, Costs())
+    validate_result(good, bars)
+    breaker, match = case
+    bad = good.copy()
+    bad.attrs = {k: (v.copy() if hasattr(v, "copy") else v) for k, v in good.attrs.items()}
+    with pytest.raises(ValueError, match=match):
+        validate_result(breaker(bad), bars)
+    validate_result(good, bars)  # breaking a copy left the original valid

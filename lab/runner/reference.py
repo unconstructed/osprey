@@ -374,21 +374,35 @@ def _dip_signal(close: np.ndarray, drop: float, lookback: int) -> np.ndarray:
     return signal
 
 
-def _entry_size(close: np.ndarray, weight: float, vol_target: float | None, vol_lookback: int) -> np.ndarray:
+def _entry_size(
+    close: np.ndarray,
+    weight: float,
+    vol_target: float | None,
+    vol_lookback: int,
+    forecast: np.ndarray | None = None,
+) -> np.ndarray:
     """Target weight of an entry decided at each close: ``weight``, or min(weight, vol_target / vol) when
-    vol-targeting. NaN while the volatility is undefined (no entry can be sized yet). Zero volatility puts no
-    cap on the weight.
+    vol-targeting. NaN while the volatility is undefined (no entry can be sized yet). Zero realised volatility
+    puts no cap on the weight.
+
+    ``forecast`` (optional): an annualised volatility forecast per close. Where it is finite it replaces the
+    realised volatility; where it is NaN or infinite (e.g. before the first model is trained) the realised
+    volatility is used. A finite forecast <= 0 is not a usable forecast: no entry is sized from it.
     """
     if vol_target is None:
         return np.full(len(close), weight)
     vol = realised_vol(close, vol_lookback)
+    if forecast is not None:
+        vol = np.where(np.isfinite(forecast), forecast, vol)
     cap = np.divide(vol_target, vol, out=np.full(len(close), np.inf), where=vol > 0)
     size = np.minimum(weight, cap)
     size[np.isnan(vol)] = np.nan
+    if forecast is not None:
+        size[np.isfinite(forecast) & (forecast <= 0)] = np.nan
     return size
 
 
-_DIP_PARAMS = frozenset({"drop", "lookback", "stop", "hold", "weight", "vol_target", "vol_lookback"})
+_DIP_PARAMS = frozenset({"drop", "lookback", "stop", "hold", "weight", "vol_target", "vol_lookback", "vol_col"})
 
 
 def dip_buy(params: Mapping, bars: pd.DataFrame, costs: Costs | None = None) -> pd.DataFrame:
@@ -406,6 +420,10 @@ def dip_buy(params: Mapping, bars: pd.DataFrame, costs: Costs | None = None) -> 
     - ``vol_target`` (annualised volatility > 0; None = off) and ``vol_lookback`` (bars >= 2, default 20):
       weight = min(weight, vol_target / realised_vol) at the signal close. While the volatility is still
       undefined, entry signals are ignored.
+    - ``vol_col`` (column name; needs ``vol_target``): size from a model's ANNUALISED volatility forecast in
+      ``bars[vol_col]`` instead, the value at the signal close (it must be known at that close, i.e. computed
+      point in time, such as ``walk_forward_predict`` output). Where the forecast is NaN or infinite (before the
+      first model exists) the realised volatility is used; a forecast <= 0 means no entry.
 
     Every signal fills at the next open. After an exit fills on bar x, no entry is decided at the close of
     bar x, so the earliest re-entry fills at x + 2 (TESTING.md bug #5: an exit never re-enters on its own bar).
@@ -421,11 +439,19 @@ def dip_buy(params: Mapping, bars: pd.DataFrame, costs: Costs | None = None) -> 
         None if p.get("vol_target") is None else _param_float(p, "vol_target", low=0.0, low_inclusive=False)
     )
     vol_lookback = _param_int(p, "vol_lookback", 20, minimum=2)
+    vol_col = p.get("vol_col")
     costs = _prepare(bars, costs)
+    forecast = None
+    if vol_col is not None:
+        if vol_target is None:
+            raise ValueError("vol_col needs vol_target (the forecast is only used to size by volatility)")
+        if not isinstance(vol_col, str) or vol_col not in bars.columns:
+            raise ValueError(f"vol_col must name a column of bars, got {vol_col!r}")
+        forecast = bars[vol_col].to_numpy(dtype=float)
 
     close = bars["close"].to_numpy(dtype=float)
     signal = _dip_signal(close, drop, lookback).tolist()
-    size = _entry_size(close, weight, vol_target, vol_lookback).tolist()
+    size = _entry_size(close, weight, vol_target, vol_lookback, forecast).tolist()
     closes = close.tolist()
 
     def decide(t: int, s: _State) -> float | None:

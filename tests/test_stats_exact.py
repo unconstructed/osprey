@@ -791,3 +791,16 @@ def test_pbo_uses_uneven_blocks_when_rows_do_not_divide():
 def test_pbo_rejects_bad_arguments(m, kwargs, message):
     with pytest.raises(ValueError, match=re.escape(message)):
         pbo(m, **kwargs)
+
+
+# ------------------------------------------------------------- mutation survivors (comparer run, TESTING 5.3)
+
+
+def test_annualized_sharpe_with_one_period_per_year_is_the_plain_sharpe():
+    r = [0.01, -0.02, 0.03, 0.005]
+    assert annualized_sharpe(r, 1) == sharpe(r)  # 1 period per year is valid (kills "> 0" -> "> 1")
+
+
+def test_dsr_empty_trials_message_is_pinned_exactly():
+    with pytest.raises(ValueError, match=r"^trial_sharpes must not be empty$"):
+        deflated_sharpe_ratio([0.01, 0.02, -0.01], [])

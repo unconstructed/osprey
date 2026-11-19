@@ -16,9 +16,9 @@ every feature reads a fixed trailing window, so the last ``WARMUP`` bars are all
         if feats is None:
             return  # still warming up
 
-``ModelPredictor`` loads a saved model read-only (:func:`lab.models.artifact.load_model`, which refuses a
-tampered file) and turns one ``{feature: value}`` dict, such as ``FeatureBuffer.latest()``, into one
-forecast::
+``ModelPredictor`` (from the starter code) loads a saved model read-only (:func:`lab.models.artifact.load_model`,
+which refuses a tampered file) and turns one ``{feature: value}`` mapping, such as ``FeatureBuffer.latest()``,
+into one forecast::
 
         self.vol_model = ModelPredictor("models/vol_20d")
         forecast_vol = self.vol_model.predict(feats)
@@ -36,7 +36,6 @@ import pandas as pd
 
 from lab.models.artifact import load_model
 from lab.models.features import FEATURES, WARMUP, feature_matrix
-from lab.models.train import predict_values
 
 
 def _utc(ts: pd.Timestamp | datetime | np.datetime64 | int | str) -> pd.Timestamp:
@@ -112,28 +111,26 @@ class FeatureBuffer:
 
 
 class ModelPredictor:
-    """A saved model, loaded read-only, that forecasts from one ``{feature: value}`` mapping.
+    """Read-only wrapper around a saved model artifact (the starter's, taking a mapping).
 
-    ``path`` is a directory written by :func:`lab.models.artifact.save_model`; loading refuses a tampered
-    model file. ``predict`` builds the model's input row by feature NAME in the order recorded in the
-    metadata, so the mapping's key order never matters and extra keys are ignored. By kind:
-
-    - ``"vol"``: the EWMA-anchored volatility forecast ``feats[anchor] * exp(correction)``
-      (:class:`lab.models.train.VolModel`).
-    - ``"classification"``: the probability of class 1 (e.g. P(trend) for a regime model).
-    - ``"regression"``: the regressor's prediction (e.g. a cross-sectional rank).
+    ``predict`` reads the features by NAME in the order the metadata records, so the mapping's key order never
+    matters and extra keys are ignored: pass ``FeatureBuffer.latest()`` (a dict) or a ``pd.Series`` row of
+    ``compute_features``. A missing feature raises ValueError instead of becoming NaN (LightGBM would accept a NaN
+    silently). Kind "vol" returns the EWMA-anchored volatility forecast exactly as it was validated
+    (:class:`lab.models.train.AnchoredVolModel`); "classification" the probability of class 1; "regression" the
+    regressor's prediction.
     """
 
-    def __init__(self, path) -> None:
-        self.model, self.metadata = load_model(path)
-        self.kind: str = self.metadata["kind"]
-        self.features: tuple[str, ...] = tuple(self.metadata["features"])
-        self.horizon: int = self.metadata["horizon"]
+    def __init__(self, artifact_dir: str):
+        self.model, self.meta = load_model(artifact_dir)
+        self.columns = list(self.meta.get("features", FEATURES))
+        self.kind = self.meta["kind"]
 
-    def predict(self, feats: Mapping[str, float]) -> float:
-        """One forecast from ``feats`` (missing features raise ValueError; values must be numbers)."""
-        missing = [f for f in self.features if f not in feats]
+    def predict(self, features: Mapping[str, float]) -> float:
+        missing = [c for c in self.columns if c not in features]
         if missing:
             raise ValueError(f"missing features for the model: {missing}")
-        row = pd.DataFrame([[float(feats[f]) for f in self.features]], columns=list(self.features))
-        return float(predict_values(self.model, row)[0])
+        x = pd.DataFrame([[float(features[c]) for c in self.columns]], columns=self.columns)
+        if self.kind == "classification":
+            return float(self.model.predict_proba(x)[:, 1][0])
+        return float(self.model.predict(x)[0])

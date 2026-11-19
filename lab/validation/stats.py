@@ -288,3 +288,7 @@ def pbo(returns_matrix, n_blocks: int = 16, max_combinations: int = 4000, seed=0
         "n_combinations": len(combos),
         "n_trials": n,
     }
+
+
+# The starter code's name for ``pbo`` (lab/search/report.py and tests/test_calibration.py call it by this name).
+probability_of_backtest_overfitting = pbo

@@ -499,3 +499,92 @@ def test_resample_rejects_invalid_bars():
     bars.iloc[3, bars.columns.get_loc("close")] = np.nan
     with pytest.raises(ValueError, match="NaN"):
         resample(bars, "1D")
+
+
+# ---------------------------------------------------------------- ported: comparer findings (merge)
+
+
+def test_lines_the_reader_would_skip_are_read_or_counted(tmp_path):
+    """Regression (osprey bug): the CSV reader used the FIRST line's field count, so a first line without the
+    optional trades field silently dropped every later full line, and an over-wide line vanished uncounted."""
+    first_short = kraken_line(JAN1, KRAKEN_BARS[0]).rsplit(",", 1)[0]  # 6 fields: no trades count
+    lines = [
+        first_short,
+        kraken_line(JAN1 + DAY, KRAKEN_BARS[1]),
+        kraken_line(JAN1 + 9 * DAY, KRAKEN_BARS[0]) + ",999",  # 8 fields: over-wide, dropped and counted
+        kraken_line(JAN1 + 2 * DAY, KRAKEN_BARS[2]),
+    ]
+    got = load_kraken_ohlcvt(write_csv(tmp_path / "XBTUSD_1440.csv", lines))
+    expected = KRAKEN_EXPECTED.copy()
+    expected.iloc[0, expected.columns.get_loc("trades")] = np.nan
+    pd.testing.assert_frame_equal(got, expected, check_freq=False)
+    assert got.attrs["rows_read"] == 4 and got.attrs["dropped_bad"] == 1 and got.attrs["dropped_duplicates"] == 0
+
+
+def test_an_over_wide_first_line_shifts_nothing(tmp_path):
+    """pandas turns the extra leading fields of an over-wide FIRST line into an index (or truncates it with
+    index_col=False); the loader counts fields per line instead."""
+    lines = [kraken_line(JAN1 + 9 * DAY, KRAKEN_BARS[0]) + ",1,2"]
+    lines += [kraken_line(JAN1 + i * DAY, b) for i, b in enumerate(KRAKEN_BARS)]
+    got = load_kraken_ohlcvt(write_csv(tmp_path / "XBTUSD_1440.csv", lines))
+    pd.testing.assert_frame_equal(got, KRAKEN_EXPECTED, check_freq=False)
+    assert got.attrs["rows_read"] == 4 and got.attrs["dropped_bad"] == 1
+    with pytest.raises(ValueError, match="all 1 lines have more than 7 fields"):
+        load_kraken_ohlcvt(write_csv(tmp_path / "XBTUSD_1440.csv", lines[:1]))
+
+
+# Three verbatim rows each of data.binance.vision BTCUSDT-1d-2017-08.csv (ms) and BTCUSDT-1h-2025-06.csv (us).
+REAL_BINANCE = {
+    "BTCUSDT-1d-2017-08.csv": [
+        "1502928000000,4261.48000000,4485.39000000,4200.74000000,4285.08000000,795.15037700,1503014399999,"
+        "3454770.05073206,3427,616.24854100,2678216.40060401,8733.91139481",
+        "1503014400000,4285.08000000,4371.52000000,3938.77000000,4108.37000000,1199.88826400,1503100799999,"
+        "5086958.30617151,5233,972.86871000,4129123.31651808,9384.14140858",
+        "1503100800000,4108.37000000,4184.69000000,3850.00000000,4139.98000000,381.30976300,1503187199999,"
+        "1549483.73542151,2153,274.33604200,1118001.87008735,9184.08552906",
+    ],
+    "BTCUSDT-1h-2025-06.csv": [
+        "1748736000000000,104591.88000000,104647.11000000,104320.02000000,104446.49000000,293.78295000,"
+        "1748739599999999,30688862.20908260,81426,131.48518000,13734263.47444880,0",
+        "1748739600000000,104446.49000000,104505.58000000,103991.37000000,104126.07000000,466.13267000,"
+        "1748743199999999,48597321.05228810,86577,153.68227000,16026390.67633320,0",
+        "1748743200000000,104126.08000000,104324.21000000,103924.52000000,104195.12000000,313.34738000,"
+        "1748746799999999,32628297.36497210,78286,159.68914000,16630529.97330230,0",
+    ],
+}
+REAL_EXPECTED = {
+    "BTCUSDT-1d-2017-08.csv": frame(
+        [
+            (4261.48, 4485.39, 4200.74, 4285.08, 795.150377, 3427),
+            (4285.08, 4371.52, 3938.77, 4108.37, 1199.888264, 5233),
+            (4108.37, 4184.69, 3850.0, 4139.98, 381.309763, 2153),
+        ],
+        [utc("2017-08-18"), utc("2017-08-19"), utc("2017-08-20")],
+    ),
+    "BTCUSDT-1h-2025-06.csv": frame(
+        [
+            (104591.88, 104647.11, 104320.02, 104446.49, 293.78295, 81426),
+            (104446.49, 104505.58, 103991.37, 104126.07, 466.13267, 86577),
+            (104126.08, 104324.21, 103924.52, 104195.12, 313.34738, 78286),
+        ],
+        [utc("2025-06-01 01:00"), utc("2025-06-01 02:00"), utc("2025-06-01 03:00")],
+    ),
+}
+
+
+@pytest.mark.parametrize("name", list(REAL_BINANCE))
+@pytest.mark.parametrize("as_zip", [False, True])
+def test_binance_real_rows_known_answer(tmp_path, name, as_zip):
+    """The real 12-field layout, close_time = open + interval - 1 unit (ms in 2017, us in 2025), and the .zip
+    exactly as data.binance.vision serves it. The index is the bar close time."""
+    import zipfile
+
+    csv = write_csv(tmp_path / name, REAL_BINANCE[name])
+    path = csv
+    if as_zip:
+        path = tmp_path / (name.removesuffix(".csv") + ".zip")
+        with zipfile.ZipFile(path, "w") as zf:
+            zf.write(csv, arcname=name)
+    got = load_binance_klines(path)
+    pd.testing.assert_frame_equal(got, REAL_EXPECTED[name], check_freq=False)
+    validate_bars(got)

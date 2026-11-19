@@ -20,6 +20,7 @@ __all__ = [
     "bootstrap_trade_drawdowns",
     "degrade_execution",
     "max_drawdown",
+    "percentiles",
     "shuffled_trade_drawdowns",
     "stationary_bootstrap_indices",
 ]
@@ -165,3 +166,21 @@ def degrade_execution(
         extra = rng.uniform(0.0, 2.0, size=n_sims) * (extra_cost_bps / 1e4) * period_turnover
         wealth *= growth * (1.0 - extra)
     return wealth - 1.0
+
+
+def percentiles(values, qs=(5, 50, 95)) -> dict[str, float]:
+    """``{"p<q>": q-th percentile of values}`` for each ``q`` in ``qs`` (numpy's linear interpolation).
+
+    Summarises a simulation's output, e.g. ``percentiles(block_bootstrap_drawdowns(r), (5,))["p5"]`` is the
+    5th-percentile (worst 5%) drawdown. Raises ValueError for empty or non-finite ``values`` or a ``q``
+    outside [0, 100].
+    """
+    v = np.array(values, dtype=float).ravel()
+    if v.size == 0 or not np.all(np.isfinite(v)):
+        raise ValueError("values must be non-empty and finite")
+    out = {}
+    for q in qs:
+        if not 0 <= q <= 100:
+            raise ValueError(f"percentiles must be in [0, 100], got {q}")
+        out[f"p{q}"] = float(np.percentile(v, q))
+    return out
