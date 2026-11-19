@@ -1,0 +1,61 @@
+[project]
+name = "strategy-lab"
+version = "0.1.0"
+description = "Osprey Strategy Lab: build, simulate, validate and approve trading strategies"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "nautilus_trader[visualization]==2.0.0rc9",
+    "numpy",
+    "pandas",
+    "polars",
+    "pyarrow",
+    "duckdb",
+    "optuna",
+    "mlflow",
+    "scipy",
+    "scikit-learn",
+    "lightgbm",
+    "joblib",
+    "pyyaml",
+    "httpx",
+    "tabulate",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "hypothesis",
+    "mutmut",
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: statistical calibration tests (thousands of simulated strategies); skip with -m 'not slow'",
+]
+filterwarnings = ["error::RuntimeWarning:lab.*"]
+
+[tool.coverage.run]
+source = ["lab"]
+branch = true
+omit = ["lab/data/synthetic.py"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]

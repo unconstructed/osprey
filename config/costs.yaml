@@ -1,0 +1,10 @@
+# config/costs.yaml — PLACEHOLDERS until measured. Pessimistic on purpose.
+venue: base_via_0x
+pool_fee_bps: 5            # major-pair pool fee tiers seen at 1–5 bps
+aggregator_fee_bps: 0      # confirm with 0x
+slippage_bps:              # by trade size in USD
+  "100": 10
+  "1000": 15
+  "10000": 30
+gas_usd_per_trade: 0.10    # sponsored by us; replace with measured Base gas
+stress_multiplier: 2.0     # every finalist is re-run with all costs doubled

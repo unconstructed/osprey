@@ -1,0 +1,13 @@
+# config/risk_levels.yaml — owned by risk-officer. Budgets are TBD from the first backtests.
+steady:
+  coins: [BTC, ETH, USDC]
+  min_cash_pct: 20
+  max_coin_pct: 60
+  max_drawdown_budget_pct: TBD   # set from Monte Carlo 95th-percentile drawdown
+balanced:
+  coins: [BTC, ETH, USDC]        # plus vetted large tokens on Base, once listed
+  stop_loss_required: true
+  max_drawdown_budget_pct: TBD
+bold:
+  coins: []                      # vetted list of the most liquid tokens on Base
+  max_drawdown_budget_pct: TBD

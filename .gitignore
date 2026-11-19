@@ -3,9 +3,9 @@
 .venv/
 __pycache__/
 .ipynb_checkpoints/
-data/
-results/
-mlruns/
+/data/
+/results/
+/mlruns/
 *.parquet
 .hypothesis/
 mutants/
