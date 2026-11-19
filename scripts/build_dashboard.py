@@ -46,7 +46,8 @@ AUDIT_SCHEMA = "osprey.audit/1"
 TITLE = "Osprey Strategy Lab - results dashboard"
 SAMPLE_BANNER = "SAMPLE DATA - not real results"
 SAMPLE_MARKER = ".osprey-dashboard-sample"  # file at the root of a --sample tree
-TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "dashboard" / "template.html"
+REPO_ROOT = Path(__file__).resolve().parent.parent  # the checkout this builder belongs to
+TEMPLATE_PATH = REPO_ROOT / "dashboard" / "template.html"
 DATA_PLACEHOLDER = "__DASHBOARD_DATA__"
 TITLE_PLACEHOLDER = "__DASHBOARD_TITLE__"
 UTC = dt.timezone.utc  # noqa: UP017 - datetime.UTC needs Python 3.11; this script supports 3.10
@@ -58,6 +59,7 @@ READY = "READY FOR PAPER"
 AWAITING = "AWAITING FINAL TEST"
 INCOMPLETE = "INCOMPLETE"
 FAIL = "FAIL"
+UNREADABLE = "UNREADABLE"  # the newest audit file exists but could not be used
 
 # (key, display label, short label, default rule as written in AGENTS.md)
 GATES = (
@@ -87,6 +89,9 @@ GATES = (
     ),
 )
 GATE_KEYS = tuple(g[0] for g in GATES)
+# Gates whose value and threshold are numbers in the audit schema. beats_benchmarks
+# is true/false and final_test is judged in words ("a reasonable distance").
+NUMERIC_GATES = tuple(k for k in GATE_KEYS if k not in ("beats_benchmarks", "final_test"))
 
 # (area, code mutated, target share of non-equivalent mutants killed) from TESTING.md 5.3/5.4
 MUTATION_AREAS = (
@@ -96,7 +101,21 @@ MUTATION_AREAS = (
     ("models", "lab/models/", 0.80),
     ("data", "lab/data/loaders.py", 0.80),
 )
-MUTATION_KEYS = ("killed", "survived", "timeout", "suspicious", "no_tests", "skipped", "total", "equivalent")
+# The keys of mutmut 3.8's `export-cicd-stats` file, plus `equivalent`, which is
+# never written by mutmut: the team adds it by hand (survivors documented in
+# tests/MUTATION_NOTES.md).
+MUTATION_KEYS = (
+    "killed",
+    "survived",
+    "timeout",
+    "suspicious",
+    "no_tests",
+    "skipped",
+    "total",
+    "segfault",
+    "check_was_interrupted_by_user",
+    "equivalent",
+)
 
 STAGES = (
     ("planned", "Planned"),
@@ -111,6 +130,9 @@ STAGES = (
 EQUITY_ORDER = ("strategy", "buy_hold_btc", "rebalance_50_50")
 EQUITY_MAX_SERIES = 8
 EQUITY_MAX_POINTS = 2500
+# A normalised equity value further than this factor from 1.0 (either way) is
+# treated as a data error and drawn as a gap: no real curve grows 10^12-fold.
+EQUITY_MAX_RATIO = 1e12
 
 NOT_STRATEGY_REPORT_DIRS = {"demo", "data"}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -177,26 +199,62 @@ def scalar(value):
     return None
 
 
-def clean(obj):
-    """Recursively replace non-finite floats by None. Returns (value, n_replaced)."""
+SURROGATE_RE = re.compile("[\ud800-\udfff]")
+
+
+def fix_text(s: str, tally: dict | None = None) -> str:
+    """Replace lone surrogates by U+FFFD so the string can be written as UTF-8.
+
+    They come from JSON escapes such as "\\ud800" and from file names that are not
+    UTF-8 (Python decodes those bytes as surrogates). A real character outside the
+    Basic Multilingual Plane is one code point in Python, so it is never touched.
+    """
+    if not SURROGATE_RE.search(s):
+        return s
+    fixed = SURROGATE_RE.sub("�", s)
+    if tally is not None:
+        tally["text"] = tally.get("text", 0) + 1
+        examples = tally.setdefault("examples", [])
+        if len(examples) < 3 and fixed not in examples:
+            examples.append(fixed[:200])
+    return fixed
+
+
+def clean(obj, tally: dict | None = None):
+    """Make a value JSON- and UTF-8-safe: non-finite floats become None and lone
+    surrogates in strings (keys included) become U+FFFD.
+
+    Returns (value, n_nonfinite). If `tally` is a dict, tally["text"] counts the
+    strings that had to be repaired and tally["examples"] keeps up to three.
+    """
     if isinstance(obj, float):
         return (obj, 0) if math.isfinite(obj) else (None, 1)
+    if isinstance(obj, str):
+        return fix_text(obj, tally), 0
     if isinstance(obj, dict):
         out, bad = {}, 0
         for k, v in obj.items():
-            out[str(k)], b = clean(v)
+            out[fix_text(str(k), tally)], b = clean(v, tally)
             bad += b
         return out, bad
     if isinstance(obj, (list, tuple)):
         out, bad = [], 0
         for v in obj:
-            v, b = clean(v)
+            v, b = clean(v, tally)
             out.append(v)
             bad += b
         return out, bad
-    if obj is None or isinstance(obj, (str, int, bool)):
+    if obj is None or isinstance(obj, (int, bool)):
         return obj, 0
-    return str(obj), 0
+    return fix_text(str(obj), tally), 0
+
+
+def _sig(value: float, digits: int = 10):
+    """Round to significant figures (not decimal places, which would turn 1e-9
+    into 0). None if the value is not finite (e.g. an overflowed ratio)."""
+    if not math.isfinite(value):
+        return None
+    return float(f"{value:.{digits}g}")
 
 
 def utc_iso(timestamp: float):
@@ -253,8 +311,9 @@ def read_json(path: Path, source: str, w: Warnings):
     if not raw.strip():
         w.add(source, "file is empty; skipped")
         return None
+    tally: dict = {}
     try:
-        obj, bad = clean(json.loads(raw))
+        obj, bad = clean(json.loads(raw), tally)
     except json.JSONDecodeError as exc:
         w.add(source, f"invalid JSON (line {exc.lineno}, column {exc.colno}: {exc.msg}); skipped")
         return None
@@ -266,6 +325,12 @@ def read_json(path: Path, source: str, w: Warnings):
         return None
     if bad:
         w.add(source, f"{bad} non-finite number(s) (NaN or Infinity) shown as empty")
+    if tally.get("text"):
+        w.add(
+            source,
+            f"{tally['text']} text value(s) contain invalid Unicode (a lone surrogate escape such as "
+            "\\ud800); the bad characters are shown as �",
+        )
     return obj
 
 
@@ -542,9 +607,10 @@ def _dict_field(obj: dict, key: str, source: str, w: Warnings) -> dict:
 
 
 def _xml_int(element, name: str):
+    """A whole-number attribute; None for text, NaN or Infinity (e.g. tests="1e400")."""
     try:
         return int(float(element.get(name, "0") or 0))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -687,6 +753,12 @@ def collect_mutation(root: Path, w: Warnings) -> list:
             continue
         if (counts.get("equivalent") or 0) > (counts.get("survived") or 0):
             w.add(src, "'equivalent' is larger than 'survived'; capped at 'survived'")
+        if counts.get("check_was_interrupted_by_user"):
+            w.add(
+                src,
+                f"{counts['check_was_interrupted_by_user']} mutant(s) were not checked because the run "
+                "was interrupted; the counts are partial. Rerun the area to completion",
+            )
         score, score_ex = mutation_scores(counts)
         entry.update(
             {
@@ -910,10 +982,12 @@ def normalise_gate(key: str, raw, source: str, w: Warnings) -> dict:
         "present": False,
         "value": None,
         "threshold": None,
+        "threshold_text": None,
         "op": None,
         "pass": None,
         "note": None,
         "state": "missing",
+        "unsupported": [],
     }
     if raw is None:
         return gate
@@ -926,6 +1000,8 @@ def normalise_gate(key: str, raw, source: str, w: Warnings) -> dict:
     if gate["value"] is None and value is not None:
         w.add(source, f"gate '{key}': value of type {type(value).__name__} not shown")
     gate["threshold"] = scalar(raw.get("threshold"))
+    # The threshold as written in the file (1.0 stays "1.0"), for display.
+    gate["threshold_text"] = text(gate["threshold"], 40) if num(gate["threshold"]) is not None else None
     gate["op"] = text(raw.get("op"), 10)
     gate["note"] = text(raw.get("note"), 300)
     flag = raw.get("pass")
@@ -937,6 +1013,11 @@ def normalise_gate(key: str, raw, source: str, w: Warnings) -> dict:
             f"gate '{key}': pass should be true, false or null, found '{text(flag, 40)}'; treated as pending",
         )
     gate["state"] = {True: "pass", False: "fail", None: "pending"}[gate["pass"]]
+    # A pass with no number behind it. The flag still decides the state (nothing
+    # is re-judged), but normalise_audit raises an integrity warning about it.
+    gate["unsupported"] = []
+    if gate["pass"] is True and key in NUMERIC_GATES:
+        gate["unsupported"] = [f for f in ("value", "threshold") if num(raw.get(f)) is None]
     return gate
 
 
@@ -1026,7 +1107,18 @@ def normalise_equity(raw, source: str, w: Warnings):
                 "cannot normalise to 1.0, skipped",
             )
             continue
-        normalised = [None if v is None else round(v / base, 8) for v in nums]
+        normalised, out_of_range = [], 0
+        for v in nums:
+            r = None if v is None else _sig(v / base)
+            if v is not None and (r is None or abs(r) > EQUITY_MAX_RATIO or 0 < abs(r) < 1 / EQUITY_MAX_RATIO):
+                r, out_of_range = None, out_of_range + 1
+            normalised.append(r)
+        if out_of_range:
+            w.add(
+                source,
+                f"equity series '{name}': {out_of_range} value(s) more than {EQUITY_MAX_RATIO:.0e} times "
+                "larger or smaller than the first value; shown as gaps",
+            )
         nonpositive = sum(1 for v in normalised if v is not None and v <= 0)
         if nonpositive:
             w.add(
@@ -1110,6 +1202,17 @@ def normalise_audit(obj: dict, strategy: str, date: str, root: Path, path: Path,
         verdict.strip().upper() if isinstance(verdict, str) else (None if verdict is None else text(verdict))
     )
     integrity = verdict_check(verdict, state, reason, source, w)
+    alerts = [integrity] if integrity else []
+    unsupported = [g for g in gates.values() if g["unsupported"]]
+    if unsupported:
+        detail = "; ".join(f"{g['key']}: no finite {' or '.join(g['unsupported'])}" for g in unsupported)
+        message = (
+            f"{len(unsupported)} gate(s) are marked pass with no number behind them ({detail}). "
+            "Missing numbers fail, never pass (TESTING.md). Do not treat these gates as passed "
+            "until the audit file is corrected."
+        )
+        w.add(source, message, level="integrity")
+        alerts.append({"level": "integrity", "message": message})
 
     window = obj.get("window") if isinstance(obj.get("window"), dict) else None
     md_sibling = path.with_suffix(".md")
@@ -1128,6 +1231,8 @@ def normalise_audit(obj: dict, strategy: str, date: str, root: Path, path: Path,
         "state": state,
         "state_reason": reason,
         "integrity": integrity,
+        "alerts": alerts,
+        "unreadable": False,
         "risk_level": text(obj.get("risk_level"), 60),
         "git_commit": text(obj.get("git_commit"), 64),
         "data_snapshot": text(obj.get("data_snapshot"), 200),
@@ -1163,8 +1268,44 @@ def _benchmarks(raw, source: str, w: Warnings) -> list:
     return out
 
 
+def unreadable_audit(date: str, root: Path, path: Path, reason: str) -> dict:
+    """Stand-in for a dated audit file that could not be used (invalid JSON, wrong
+    schema, ...). It keeps its place in the history, so an older audit is never
+    promoted to "latest" over a newer file nobody can read."""
+    md_sibling = path.with_suffix(".md")
+    return {
+        "date": date,
+        "path": rel(root, path),
+        "md_path": rel(root, md_sibling) if md_sibling.is_file() else None,
+        "report_md": None,
+        "verdict": None,
+        "state": UNREADABLE,
+        "state_reason": "audit file could not be read: " + reason,
+        "integrity": None,
+        "alerts": [],
+        "unreadable": True,
+        "risk_level": None,
+        "git_commit": None,
+        "data_snapshot": None,
+        "seed": None,
+        "n_trials": None,
+        "effective_trials": None,
+        "window": None,
+        "test_window_opened": None,
+        "gates": [normalise_gate(k, None, "", Warnings()) for k in GATE_KEYS],
+        "gate_counts": {"pass": 0, "fail": 0, "pending": 0, "missing": len(GATE_KEYS)},
+        "metrics": [],
+        "benchmarks": [],
+        "equity": None,
+    }
+
+
 def collect_audits(root: Path, w: Warnings) -> dict:
-    """reports/<strategy>/<YYYY-MM-DD>.json sidecars, oldest first per strategy."""
+    """reports/<strategy>/<YYYY-MM-DD>.json sidecars, oldest first per strategy.
+
+    Every validly named file keeps its date in the list, even when it cannot be
+    used: it becomes an UNREADABLE entry rather than disappearing.
+    """
     folder = root / "reports"
     audits: dict[str, list] = {}
     if not folder.is_dir():
@@ -1175,15 +1316,20 @@ def collect_audits(root: Path, w: Warnings) -> dict:
             if not valid_date(path.stem):
                 w.add(source, "audit file name is not a YYYY-MM-DD date; ignored")
                 continue
+            before = len(w.items)
             obj = read_json_object(path, source, w)
-            if obj is None:
-                continue
-            if obj.get("schema") != AUDIT_SCHEMA:
+            if obj is not None and obj.get("schema") != AUDIT_SCHEMA:
                 w.add(
                     source, f"schema is '{text(obj.get('schema'), 60)}', expected '{AUDIT_SCHEMA}'; skipped"
                 )
-                continue
-            audits.setdefault(sub.name, []).append(normalise_audit(obj, sub.name, path.stem, root, path, w))
+                obj = None
+            if obj is None:
+                reason = w.items[-1]["message"] if len(w.items) > before else "could not be read"
+                reason = re.sub(r";\s*skipped$", "", reason)
+                entry = unreadable_audit(path.stem, root, path, reason)
+            else:
+                entry = normalise_audit(obj, sub.name, path.stem, root, path, w)
+            audits.setdefault(sub.name, []).append(entry)
     for items in audits.values():
         items.sort(key=lambda a: a["date"])
     return audits
@@ -1245,6 +1391,21 @@ def build_strategies(agents, folders, audits, exports, status, w: Warnings) -> l
     for name in names:
         history = audits.get(name, [])
         latest = history[-1] if history else None
+        if latest and latest["unreadable"]:
+            readable = [a for a in history if not a["unreadable"]]
+            older = (
+                f" The newest readable audit ({readable[-1]['date']}, {readable[-1]['state']}) is older "
+                "and is not used as the current state."
+                if readable
+                else ""
+            )
+            message = (
+                f"The newest audit file for {name}, {latest['path']}, could not be read "
+                f"({latest['state_reason'].split(': ', 1)[-1]}).{older} Fix or replace the file."
+            )
+            w.add(latest["path"], message, level="integrity")
+            latest["alerts"] = [{"level": "integrity", "message": message}]
+            latest["integrity"] = latest["alerts"][0]
         paper = status["strategies"].get(name, {}).get("paper")
         folder = folders.get(name)
         reached = {
@@ -1296,6 +1457,8 @@ def build_overview(milestones, strategies, junit, coverage) -> dict:
         "tests_passed": junit["passed"] if junit else None,
         "tests_total": junit["total"] if junit else None,
         "tests_failed": (junit["failed"] + junit["errors"]) if junit else None,
+        "tests_skipped": junit["skipped"] if junit else None,
+        "tests_failing_listed": (len(junit["failing_tests"]) + junit["failing_more"]) if junit else None,
         "coverage_percent": coverage["percent"] if coverage else None,
     }
 
@@ -1380,6 +1543,15 @@ def collect(root) -> dict:
             "agents_md": agents["present"],
             "testing_md": testing_md["present"],
             "status_json": status["present"],
+            "junit": junit is not None,
+            "coverage": coverage is not None,
+            "mutation": any(a.get("present") for a in mutation),
+            "snapshot": snapshot is not None,
+            "audits": bool(audits),
+            "strategy_folders": bool(folders),
+            "exports": bool(exports),
+            "reports": bool(reports),
+            "studies": bool(studies),
         },
         "status": {"present": status["present"], "updated": status["updated"], "note": status["note"]},
         "milestones": milestones,
@@ -1400,10 +1572,27 @@ def collect(root) -> dict:
         "exports": [{"name": k, **v} for k, v in exports.items()],
         "overview": build_overview(milestones, strategies, junit, coverage),
     }
+    data["overview"]["inputs_present"] = sum(1 for v in data["inputs"].values() if v)
+    data["overview"]["inputs_total"] = len(data["inputs"])
     data["warnings"] = w.items
-    data["overview"]["warnings"] = len(w.items)
-    data["overview"]["integrity_warnings"] = sum(1 for x in w.items if x["level"] == "integrity")
-    return clean(data)[0]
+    # Last pass: file names that are not UTF-8 (and anything else that slipped
+    # through) must not stop the page from being written as UTF-8.
+    tally: dict = {}
+    data = clean(data, tally)[0]
+    if tally.get("text"):
+        examples = ", ".join(f"'{e}'" for e in tally["examples"])
+        data["warnings"].append(
+            {
+                "source": "file names",
+                "message": "some file or folder names (or other text) are not valid UTF-8; the bad bytes "
+                f"are shown as � and links to those files will not work. For example: {examples}. "
+                "Rename the files.",
+                "level": "warning",
+            }
+        )
+    data["overview"]["warnings"] = len(data["warnings"])
+    data["overview"]["integrity_warnings"] = sum(1 for x in data["warnings"] if x["level"] == "integrity")
+    return data
 
 
 # --------------------------------------------------------------------------
@@ -1862,8 +2051,9 @@ def make_sample_root(base) -> Path:
         audit = _sample_audit(rng, ctx, name, date, risk, verdict, sharpe, passes, budget, drop)
         _write(root / "reports" / name / f"{date}.json", audit)
         _write(root / "reports" / name / f"{date}.md", f"# Audit: {name}, {date} (sample)\n\n{SAMPLE_NOTE}\n")
-    # A truncated file, to show how a malformed input surfaces as a warning.
-    _write(root / "reports" / "momentum-bold" / "2026-10-27.json", '{"schema": "osprey.audit/1", "verdict": ')
+    # A truncated file older than the latest audit: it shows in the history trail as
+    # UNREADABLE and as a warning. (Were it the newest, the strategy would show UNREADABLE.)
+    _write(root / "reports" / "momentum-bold" / "2026-10-13.json", '{"schema": "osprey.audit/1", "verdict": ')
     return root
 
 
@@ -1887,51 +2077,113 @@ def parse_args(argv):
     p.add_argument(
         "--sample",
         action="store_true",
-        help="build from a synthetic repo tree generated in a temp folder (seed 7); "
-        "the page carries a SAMPLE DATA banner",
+        help="build from a synthetic repo tree generated in a temp folder (seed 7) and removed "
+        "afterwards; the page carries a SAMPLE DATA banner. Refuses an --out inside a git checkout",
     )
     return p.parse_args(argv)
+
+
+def git_checkout_of(path: Path):
+    """The git work tree (or this builder's own checkout) that would contain
+    `path`, or None. Used to keep --sample pages out of every repo."""
+    try:
+        target = path.resolve()
+    except (OSError, RuntimeError):
+        target = Path(os.path.abspath(path))
+    for parent in target.parents:
+        try:
+            if (parent / ".git").exists():
+                return parent
+        except OSError:
+            continue
+    own = REPO_ROOT.resolve()
+    if target == own or own in target.parents:
+        return own
+    return None
+
+
+def write_atomic(path: Path, content: str) -> None:
+    """Write via a temp file in the same folder and os.replace, so a failure
+    part-way never leaves a truncated page in place of the previous one."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = content.encode("utf-8")  # fails here, before anything on disk changes
+    try:
+        mode = path.stat().st_mode & 0o777
+    except OSError:
+        mode = 0o644
+    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def say(line: str, stream=None) -> None:
+    """print() that cannot fail on a path the terminal's encoding cannot show."""
+    stream = stream or sys.stdout
+    try:
+        print(line, file=stream)
+    except UnicodeEncodeError:
+        enc = getattr(stream, "encoding", None) or "ascii"
+        print(line.encode(enc, "backslashreplace").decode(enc, "replace"), file=stream)
 
 
 def main(argv=None) -> int:
     args = parse_args(argv)
     try:
         template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    except OSError as exc:
-        print(f"build_dashboard: cannot read template {TEMPLATE_PATH}: {exc.strerror}", file=sys.stderr)
+    except (OSError, UnicodeError) as exc:
+        say(f"build_dashboard: cannot read template {TEMPLATE_PATH}: {exc}", sys.stderr)
         return 2
     if args.sample:
         if args.root != ".":
-            print("build_dashboard: --root is ignored with --sample", file=sys.stderr)
-        root = make_sample_root(tempfile.mkdtemp(prefix="osprey-dashboard-sample-"))
+            say("build_dashboard: --root is ignored with --sample", sys.stderr)
         out = Path(args.out) if args.out else Path(tempfile.gettempdir()) / "osprey-dashboard-sample.html"
+        checkout = git_checkout_of(out)
+        if checkout is not None:
+            say(
+                f"build_dashboard: --sample will not write {out}: it is inside the git checkout {checkout}, "
+                "and a sample page must never be committed. Choose a path outside any repo, "
+                "e.g. --out /tmp/sample.html",
+                sys.stderr,
+            )
+            return 2
+        # The synthetic tree only lives while it is read; links on a sample page lead nowhere.
+        with tempfile.TemporaryDirectory(prefix="osprey-dashboard-sample-") as tmp:
+            data = collect(make_sample_root(tmp))
+        data["link_root"] = None
     else:
         root = Path(args.root).resolve()
         if not root.is_dir():
-            print(f"build_dashboard: --root {args.root} is not a folder", file=sys.stderr)
+            say(f"build_dashboard: --root {args.root} is not a folder", sys.stderr)
             return 2
         out = Path(args.out) if args.out else root / "dashboard" / "index.html"
-
-    data = collect(root)
-    data["link_root"] = link_root(root, out)
+        data = collect(root)
+        data["link_root"] = link_root(root, out)
+    data = clean(data)[0]  # link_root comes from a path, which may not be valid UTF-8
     try:
         page = render(data, template)
     except ValueError as exc:
-        print(f"build_dashboard: bad template {TEMPLATE_PATH}: {exc}", file=sys.stderr)
+        say(f"build_dashboard: bad template {TEMPLATE_PATH}: {exc}", sys.stderr)
         return 2
     try:
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(page, encoding="utf-8")
+        write_atomic(out, page)
         if args.json_out:
-            json_path = Path(args.json_out)
-            json_path.parent.mkdir(parents=True, exist_ok=True)
-            json_path.write_text(
-                json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8"
+            write_atomic(
+                Path(args.json_out), json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
             )
-    except OSError as exc:
-        print(f"build_dashboard: cannot write output ({exc.strerror or exc})", file=sys.stderr)
+    except (OSError, UnicodeError) as exc:
+        reason = exc.strerror if isinstance(exc, OSError) and exc.strerror else exc
+        say(f"build_dashboard: cannot write output ({reason})", sys.stderr)
         return 2
-    print(summary_line(data, out))
+    say(summary_line(data, out))
     return 0
 
 
