@@ -11,6 +11,7 @@ Each section starts with its status:
 | available now (this repo) | You can do it with what is in this repo today |
 | built (starter code) | The code exists in the starter code. Copy the starter code in first |
 | to build (milestone N) | Not written yet. Commands shown are the planned ones from AGENTS.md and do not run yet |
+| not yet possible (no milestone) | Needs a strategy that has passed its audit. AGENTS.md's milestones 0 to 5 do not include paper trading or export |
 
 ## Contents
 
@@ -153,7 +154,7 @@ Add these only when needed, and **ask the owner first**:
 
 ### .gitignore
 
-Already in this repo. It holds the list from AGENTS.md setup step 3, which includes the entries TESTING.md asks for (`.hypothesis/`, `mutants/`, `.coverage`, `htmlcov/`). `data/`, `results/` and `mlruns/` are ignored, so the data catalog, search runs and test results stay on your machine. Keys go in a git-ignored `.env`.
+Already in this repo. It holds the list from AGENTS.md setup step 3, which includes the entries TESTING.md asks for (`.hypothesis/`, `mutants/`, `.coverage`, `htmlcov/`). `/data/`, `/results/` and `/mlruns/` (the root folders only) are ignored, so the data catalog, search runs and test results stay on your machine. They are anchored to the repo root on purpose: AGENTS.md's unanchored `data/` would also ignore every folder named `data`, including `lab/data/`. Keys go in a git-ignored `.env`.
 
 ## Run the tests
 
@@ -490,7 +491,7 @@ Built (starter code), in `lab/models/`: point-in-time features and cross-section
 2. Compute features and labels point-in-time. Cross-validate with purged, embargoed CPCV.
 3. Compare against naive baselines (last value, rolling average).
 4. **Judge the model by strategy profit after costs in Nautilus**, not by forecast error alone.
-5. Train offline and version the model in MLflow (MLflow logging is to build, milestone 2). A Nautilus strategy loads it read-only.
+5. Train offline and version the model in MLflow (MLflow logging is still to build: milestone 2 covers trials; AGENTS.md gives model-version logging no milestone). A Nautilus strategy loads it read-only.
 6. No retraining inside a backtest window. Walk-forward retraining copies the production schedule.
 
 ### Lessons from the demo
@@ -530,7 +531,7 @@ Done when (milestone 5): volatility (5- and 20-day), regime and Bold-list rankin
 
 ## Paper and export
 
-Status: to build (after milestone 4). No strategy has been audited yet.
+Status: not yet possible (no milestone). No strategy has been audited yet.
 
 1. **Ready for paper:** `backtest-auditor` reports PASS on every gate.
 2. **Paper:** at least 4 weeks on a paper model account, with results within tolerance of the backtest. Paper accounts run in the production app, not in this repo.
@@ -570,7 +571,7 @@ python3 scripts/build_dashboard.py --json PATH     # also write the collected da
 python3 scripts/build_dashboard.py --sample --out /tmp/sample.html   # synthetic preview, SAMPLE banner, never writes into the repo by default
 ```
 
-The builder uses the Python standard library only, so plain `python3` works without the project environment. It uses PyYAML if installed and works without it. It prints a one-line summary of what it found and where it wrote. A missing, empty or broken input never stops it; the problem shows up in the page's Warnings section.
+The builder uses the Python standard library only, so plain `python3` works without the project environment. It needs no third-party package; YAML files are only listed by path, never parsed. It prints a one-line summary of what it found and where it wrote. A missing, empty or broken input never stops it; the problem shows up in the page's Warnings section.
 
 Rebuild and commit `index.html` when its inputs change: a status edit, a new audit, a new report. Test health, the data snapshot and search runs come from git-ignored files on your machine. A committed page shows whatever was on the builder's machine when it was built.
 
@@ -590,7 +591,7 @@ All inputs are optional. A missing one shows an empty state with a one-line hint
 | Data quality reports | `reports/data/*.md` | Yes | `data-engineer` | to build (milestone 1) |
 | Search runs | Each folder in `results/` except `results/tests/`: Parquet file count, Optuna journal (`*.log`, `*.journal`, `journal*`), last modified | No | `lab/search/study.py` | built (starter code) |
 | Audits | `reports/<strategy>/<YYYY-MM-DD>.json` | Yes | `backtest-auditor` ([schema](#audit-json-schema)) | to build (milestone 4) |
-| Exports | `exports/<name>/config.yaml`: path and last-modified only, never parsed | Yes | `risk-officer` | to build (after milestone 4) |
+| Exports | `exports/<name>/config.yaml`: path and last-modified only, never parsed | Yes | `risk-officer` | not yet possible (no milestone) |
 | Strategy folders | `strategies/<name>/`: whether `strategy.py`, `params.yaml`, `README.md` exist | Yes | `quant-researcher` | to build (milestone 3) |
 | Git commit and branch | `git rev-parse`; "unknown" if that fails | - | git | available now (this repo) |
 | Reports | Every `reports/**/*.md`, newest first | Yes | The demo, `data-engineer`, `backtest-auditor` | built (starter code): the demo report |
@@ -650,13 +651,13 @@ python3 scripts/build_dashboard.py
 
 Copy the file right after the area's final run. The next area's `rm -rf mutants/` deletes it.
 
-The dashboard reads the keys `killed`, `survived`, `timeout`, `suspicious`, `no_tests`, `skipped` and `total`, and computes:
+The dashboard reads the keys mutmut 3.8 writes: `killed`, `survived`, `timeout`, `suspicious`, `no_tests`, `skipped`, `total`, `segfault` and `check_was_interrupted_by_user`. It shows `segfault` when it is not 0, and warns that the counts are partial when `check_was_interrupted_by_user` is not 0. It computes:
 
 ```
 score = (killed + timeout) / (killed + timeout + survived)
 ```
 
-TESTING.md's baseline for `lab/validation/` uses the same formula: 492 killed, 3 timed out, 123 survived → 80%. `no_tests` mutants are not in the score. That matters because mutmut mutates all of `lab/` even when the config names one area (TESTING.md section 6). mutmut's own percentage (its `badge` command) divides by every mutant except skipped ones, so it can come out lower.
+TESTING.md's baseline for `lab/validation/` is consistent with this formula: 492 killed, 3 timed out, 123 survived → 495/618 = 80%. `no_tests` mutants are not in the score. That matters because mutmut mutates all of `lab/` even when the config names one area (TESTING.md section 6). mutmut's own percentage (its `badge` command) divides by every mutant except skipped ones, so it can come out lower.
 
 Optional: add `"equivalent": <n>` by hand to the copied file. `<n>` is the number of that area's survivors listed in `tests/MUTATION_NOTES.md`. The dashboard then also shows:
 
@@ -696,7 +697,7 @@ The committed file starts with every milestone and open-work item `not_started`,
 
 Schema `osprey.audit/1`. One file per audit, written by the audit step next to its report: `reports/<strategy>/<YYYY-MM-DD>.json` beside `reports/<strategy>/<YYYY-MM-DD>.md`. The newest date per strategy is the latest audit. Older files are its history; the dashboard shows their count and verdict trail.
 
-The shape, with `null` where the audit fills in a number. Thresholds shown are AGENTS.md's defaults; write the ones you actually used.
+The shape, with `null` where the audit fills in a number. Thresholds shown are AGENTS.md's defaults, except `regime_max_profit_share`, which AGENTS.md states only in words; confirm its number, and `<` versus `<=`, with the owner. Write the thresholds you actually used.
 
 ```json
 {
@@ -765,7 +766,7 @@ The nine gate keys, in AGENTS.md table order, with the label the dashboard shows
 | `plateau_retention` | Parameter plateau (+/-20% keeps Sharpe) | ≥ 0.70 (keeps ≥ 70% of the Sharpe) |
 | `mc_p95_max_drawdown` | Monte Carlo p95 max drawdown | ≤ the risk level's budget (TBD) |
 | `beats_benchmarks` | Beats benchmarks | Better risk-adjusted return than buy-and-hold BTC and 50/50 rebalance over the walk-forward |
-| `regime_max_profit_share` | No single regime makes most of the profit | < 0.5 |
+| `regime_max_profit_share` | No single regime makes most of the profit | No single regime produces most of the profit. AGENTS.md gives no number; this schema encodes it as a share of total profit, threshold 0.5 |
 | `final_test` | Final test window (run once) | Sharpe within a reasonable distance of walk-forward; no new failure modes |
 
 **The dashboard does not re-judge values against thresholds.** It shows the thresholds in the file, because those are what the auditor used, and the owner may change them. It derives each strategy's state from the gates' `pass` flags only:
@@ -776,8 +777,11 @@ The nine gate keys, in AGENTS.md table order, with the label the dashboard shows
 | All nine are `true` | READY FOR PAPER |
 | The other eight are `true`; only `final_test` is pending | AWAITING FINAL TEST |
 | Anything else: some `null` or missing | INCOMPLETE |
+| The newest dated file can't be used (invalid JSON, unknown `schema`, not an object) | UNREADABLE |
 
-A missing gate key counts as not passed: missing numbers fail, never pass. If `verdict` says `PASS` but the derived state is not READY FOR PAPER, the page shows an integrity warning. Write `verdict` to match the flags: `PASS` for READY FOR PAPER, `FAIL` for FAIL, `INCOMPLETE` for the other two states. Other mismatches get an ordinary warning. Invalid JSON or an unknown `schema`: the file is skipped with a warning, and the page still renders.
+A missing gate key counts as not passed: missing numbers fail, never pass. If `verdict` says `PASS` but the derived state is not READY FOR PAPER, the page shows an integrity warning. Write `verdict` to match the flags: `PASS` for READY FOR PAPER, `FAIL` for FAIL, `INCOMPLETE` for the other two states. Other mismatches get an ordinary warning. A gate marked `pass: true` with no finite `value` or `threshold` behind it (every gate except `beats_benchmarks` and `final_test`) also gets an integrity warning; its flag still decides the state.
+
+Invalid JSON, an unknown `schema` or a file that is not a JSON object: the file can't be used, and the page still renders. It keeps its date in the history as UNREADABLE. If it is the newest file for the strategy, the strategy shows UNREADABLE with an integrity warning: an older audit is never promoted to latest in its place.
 
 ### Strategy lifecycle
 
@@ -800,7 +804,7 @@ Approval for production is the owner's decision. The dashboard only reports stat
 python3 scripts/build_dashboard.py --sample --out /tmp/sample.html
 ```
 
-`--sample` fills the page with synthetic data made at run time and puts a "SAMPLE DATA - not real results" banner on it. Without `--out`, it writes `osprey-dashboard-sample.html` to the system temp folder and prints the path. **Never commit a sample page.**
+`--sample` fills the page with synthetic data made at run time and puts a "SAMPLE DATA - not real results" banner on it. Without `--out`, it writes `osprey-dashboard-sample.html` to the system temp folder and prints the path. The synthetic tree is made in a temp folder and deleted after the build. `--sample` refuses (exit code 2) an `--out` inside a git checkout, this one or any other. **Never commit a sample page.**
 
 ### What the dashboard never does
 
@@ -808,7 +812,7 @@ python3 scripts/build_dashboard.py --sample --out /tmp/sample.html
 - Re-judge gate values. It shows the auditor's numbers and derives state from `pass` flags.
 - Approve anything. Production approval is the owner's.
 - Read secrets. Export configs are listed by path and time, never parsed.
-- Write sample data into the repo by default.
+- Write sample data into a git checkout. `--sample` refuses an `--out` inside one.
 - Stop on bad input. Each problem becomes an entry in the page's Warnings.
 - Run tests, searches or backtests. It reads files, and asks git for the commit and branch.
 - Need a dependency. Standard library only.

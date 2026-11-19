@@ -385,9 +385,10 @@ def test_gate_state_derivation(states, drop, expected):
         assert sorted(missing) == sorted(drop)
 
 
-def test_gate_with_bad_pass_flag_counts_as_pending():
+@pytest.mark.parametrize("flag", ["yes", "true", "True", 1, 0, "false"])
+def test_gate_with_bad_pass_flag_counts_as_pending(flag):
     w = bd.Warnings()
-    g = bd.normalise_gate("dsr", {"value": 0.97, "pass": "yes"}, "f", w)
+    g = bd.normalise_gate("dsr", {"value": 0.97, "pass": flag}, "f", w)
     assert g["pass"] is None and g["state"] == "pending" and w.items
 
 

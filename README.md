@@ -20,7 +20,7 @@ What is in this repo today:
 | [HOWTO.md](HOWTO.md) | Task-by-task guide, with the status of each task |
 | [AGENTS.md](AGENTS.md) | The owner's instructions to the agent team |
 | [TESTING.md](TESTING.md) | Testing standard, bug log and the first work order |
-| `.gitignore` | The list from AGENTS.md setup step 3 |
+| `.gitignore` | The list from AGENTS.md setup step 3, with `/data/`, `/results/` and `/mlruns/` anchored to the repo root so `lab/data/` is not ignored |
 | `dashboard/` | Results dashboard: template, hand-edited status file, generated page ([dashboard/README.md](dashboard/README.md)) |
 | [scripts/build_dashboard.py](scripts/build_dashboard.py) | Builds `dashboard/index.html` from files in this repo |
 | [tests/test_dashboard.py](tests/test_dashboard.py) | Tests for the dashboard builder |
@@ -79,7 +79,7 @@ Then **start with [TESTING.md section 5](TESTING.md#5-open-work-in-order). It is
 | `lab/data/build.py` | Downloaders, quality checks, catalog writer, `SNAPSHOT.json` | To build (milestone 1) |
 | `lab/costs/` | Nautilus fee and fill models for Base DEX trading | To build (milestone 2) |
 | `lab/runner/nautilus.py` | `BacktestFn` on a NautilusTrader v2 `BacktestNode` | To build (milestone 2) |
-| MLflow logging | Each trial and model version | To build (milestone 2) |
+| MLflow logging | Each trial (milestone 2) and each model version (AGENTS.md states no milestone) | To build |
 | `strategies/` | The three launch strategies as Nautilus strategies | To build (milestone 3) |
 | Audits on real data | Search and validation with the Nautilus runner; first audit reports | To build (milestone 4) |
 | Prediction models on real data | Volatility, regime and Bold-list ranking models vs. baselines | To build (milestone 5) |

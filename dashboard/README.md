@@ -24,8 +24,10 @@ A missing input shows an empty state with a hint; a broken one shows up under
 Warnings. It never stops the build.
 
 `--sample` builds from a synthetic repo tree made at run time in the system temp
-folder (fixed seed 7). The page carries a sticky "SAMPLE DATA - not real results"
-banner and its title starts with "SAMPLE". Never commit a sample page.
+folder (fixed seed 7) and deleted after the build. The page carries a sticky
+"SAMPLE DATA - not real results" banner, its title starts with "SAMPLE", and each
+strategy card and chart is marked SAMPLE. It refuses an `--out` inside a git
+checkout. Never commit a sample page.
 
 ## What each section shows
 
@@ -45,6 +47,8 @@ banner and its title starts with "SAMPLE". Never commit a sample page.
 How a strategy's state is derived: any gate `pass: false` gives FAIL; all nine
 `true` gives READY FOR PAPER; eight `true` with `final_test` pending gives
 AWAITING FINAL TEST; anything else, including a missing gate, gives INCOMPLETE.
+If the newest dated audit file can't be read, the strategy shows UNREADABLE:
+an older audit never stands in for it.
 Values are never re-judged against thresholds. If an audit file's `verdict` says
 PASS but its flags do not, the page shows an integrity warning.
 
@@ -65,4 +69,4 @@ in [HOWTO.md: Dashboard](../HOWTO.md#dashboard).
 | `template.html` | Page template: layout, styles and the vanilla-JS renderer. Data is injected by the builder |
 | `status.json` | Hand-kept status: milestones, open work, paper accounts |
 | `../scripts/build_dashboard.py` | The builder |
-| `../tests/test_dashboard.py` | Its tests (standard library + pytest): `uv run pytest tests/test_dashboard.py`. They also run in every test tier |
+| `../tests/test_dashboard.py` | Its tests (standard library + pytest): `uv run pytest tests/test_dashboard.py`. They run with the rest of `tests/` in the quick, full and deep tiers. Inside mutmut's `mutants/` copy of `tests/` they find the builder by walking up to the repo root, and skip if there is none |

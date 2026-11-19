@@ -722,8 +722,8 @@ footer p { margin: 4px 0; }
     var listed = (j.failing_tests || []).length + (j.failing_more || 0);
     var counts = fmt(j.passed) + ' passed · ' + fmt(j.skipped || 0) + ' skipped · ' + fmt(bad) + ' failed or errored, of ' + fmt(j.total);
     if (bad > 0) return { value: fmt(bad) + ' failed', icon: 'cross', kind: 'critical', sub: counts };
-    if (j.total === 0) return { value: 'No tests', icon: 'alert', kind: 'serious', sub: 'the report counts 0 tests' };
     if (listed > 0) return { value: 'Check report', icon: 'alert', kind: 'serious', sub: plural(listed, 'failing test case') + ' listed, but the counts say 0 failed' };
+    if (j.total === 0) return { value: 'No tests', icon: 'alert', kind: 'serious', sub: 'the report counts 0 tests' };
     return { value: 'All passed', icon: 'check', kind: 'good', sub: counts };
   }
   function coverageSub(c) {
