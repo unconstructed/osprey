@@ -36,7 +36,6 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from urllib.parse import quote
 
 # --------------------------------------------------------------------------
 # Constants
@@ -50,6 +49,7 @@ SAMPLE_MARKER = ".osprey-dashboard-sample"  # file at the root of a --sample tre
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "dashboard" / "template.html"
 DATA_PLACEHOLDER = "__DASHBOARD_DATA__"
 TITLE_PLACEHOLDER = "__DASHBOARD_TITLE__"
+UTC = dt.timezone.utc  # noqa: UP017 - datetime.UTC needs Python 3.11; this script supports 3.10
 
 STATUS_VALUES = ("not_started", "in_progress", "done", "blocked")
 VERDICTS = ("PASS", "FAIL", "INCOMPLETE")
@@ -67,22 +67,34 @@ GATES = (
     ("pbo", "Probability of Backtest Overfitting", "PBO", "<= 0.25"),
     ("plateau_retention", "Parameter plateau (+/-20% keeps Sharpe)", "Plateau", "Keeps >= 70% of the Sharpe"),
     ("mc_p95_max_drawdown", "Monte Carlo p95 max drawdown", "MC p95 DD", "Within the risk level's budget"),
-    ("beats_benchmarks", "Beats benchmarks", "Benchmarks",
-     "Better risk-adjusted return than buy-and-hold BTC and 50/50 rebalance over the walk-forward"),
-    ("regime_max_profit_share", "No single regime makes most of the profit", "Regimes",
-     "No single regime (bull, bear, sideways) produces most of the profit"),
-    ("final_test", "Final test window (run once)", "Final test",
-     "Sharpe within a reasonable distance of walk-forward; no new failure modes"),
+    (
+        "beats_benchmarks",
+        "Beats benchmarks",
+        "Benchmarks",
+        "Better risk-adjusted return than buy-and-hold BTC and 50/50 rebalance over the walk-forward",
+    ),
+    (
+        "regime_max_profit_share",
+        "No single regime makes most of the profit",
+        "Regimes",
+        "No single regime (bull, bear, sideways) produces most of the profit",
+    ),
+    (
+        "final_test",
+        "Final test window (run once)",
+        "Final test",
+        "Sharpe within a reasonable distance of walk-forward; no new failure modes",
+    ),
 )
 GATE_KEYS = tuple(g[0] for g in GATES)
 
-# (area, code path, target share of non-equivalent mutants killed) from TESTING.md 5.3/5.4
+# (area, code mutated, target share of non-equivalent mutants killed) from TESTING.md 5.3/5.4
 MUTATION_AREAS = (
     ("validation", "lab/validation/", 0.90),
-    ("runner", "lab/runner/", 0.90),
+    ("runner", "lab/runner/reference.py", 0.90),
     ("search", "lab/search/", 0.80),
     ("models", "lab/models/", 0.80),
-    ("data", "lab/data/", 0.80),
+    ("data", "lab/data/loaders.py", 0.80),
 )
 MUTATION_KEYS = ("killed", "survived", "timeout", "suspicious", "no_tests", "skipped", "total", "equivalent")
 
@@ -108,6 +120,7 @@ MAX_TEXT = 2000
 # --------------------------------------------------------------------------
 # Warnings and small value helpers
 # --------------------------------------------------------------------------
+
 
 class Warnings:
     """Collects every problem the builder hits; they are shown on the page."""
@@ -146,7 +159,10 @@ def text(value, limit: int = MAX_TEXT):
         return "true" if value else "false"
     if isinstance(value, float) and not math.isfinite(value):
         return None
-    s = str(value)
+    try:
+        s = str(value)
+    except ValueError:  # an int too long to convert
+        return "(number too long to show)"
     return s if len(s) <= limit else s[: limit - 1] + "\u2026"
 
 
@@ -185,7 +201,7 @@ def clean(obj):
 
 def utc_iso(timestamp: float):
     try:
-        return dt.datetime.fromtimestamp(timestamp, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return dt.datetime.fromtimestamp(timestamp, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     except (OverflowError, OSError, ValueError):
         return None
 
@@ -218,6 +234,7 @@ def valid_date(s) -> bool:
 # File readers
 # --------------------------------------------------------------------------
 
+
 def read_text(path: Path, source: str, w: Warnings):
     try:
         return path.read_text(encoding="utf-8")
@@ -240,6 +257,9 @@ def read_json(path: Path, source: str, w: Warnings):
         obj, bad = clean(json.loads(raw))
     except json.JSONDecodeError as exc:
         w.add(source, f"invalid JSON (line {exc.lineno}, column {exc.colno}: {exc.msg}); skipped")
+        return None
+    except ValueError as exc:  # e.g. an integer longer than Python's 4300-digit limit
+        w.add(source, f"could not parse JSON ({text(str(exc), 200)}); skipped")
         return None
     except RecursionError:
         w.add(source, "JSON is nested too deeply; skipped")
@@ -344,6 +364,7 @@ def cell(row: list[str], i: int) -> str:
 # Collectors, one per input
 # --------------------------------------------------------------------------
 
+
 def collect_agents(root: Path, w: Warnings) -> dict:
     """Milestones, validation gates and launch strategies from AGENTS.md."""
     out = {"present": False, "milestones": [], "gates": [], "strategies": []}
@@ -360,7 +381,11 @@ def collect_agents(root: Path, w: Warnings) -> dict:
         w.add("AGENTS.md", "no table under '## Milestones'; milestones come from dashboard/status.json only")
     else:
         header, rows = table
-        c_id, c_name, c_done = column(header, "#", 0), column(header, "milestone", 1), column(header, "done", 2)
+        c_id, c_name, c_done = (
+            column(header, "#", 0),
+            column(header, "milestone", 1),
+            column(header, "done", 2),
+        )
         for row in rows:
             mid = cell(row, c_id).strip()
             if not re.fullmatch(r"\d+", mid):
@@ -385,12 +410,14 @@ def collect_agents(root: Path, w: Warnings) -> dict:
         for row in rows:
             name = cell(row, c_name).strip()
             if name:
-                out["strategies"].append({
-                    "name": name,
-                    "risk_level": cell(row, c_risk),
-                    "idea": cell(row, c_idea),
-                    "free_params": cell(row, c_free),
-                })
+                out["strategies"].append(
+                    {
+                        "name": name,
+                        "risk_level": cell(row, c_risk),
+                        "idea": cell(row, c_idea),
+                        "free_params": cell(row, c_free),
+                    }
+                )
     return out
 
 
@@ -439,15 +466,25 @@ def normalise_status_value(value, source: str, where: str, w: Warnings):
         w.add(source, f"{where}: status should be a string, found {type(value).__name__}")
         return None
     if value not in STATUS_VALUES:
-        w.add(source, f"{where}: unknown status '{text(value, 60)}' "
-                      f"(expected one of {', '.join(STATUS_VALUES)}); shown as given")
+        w.add(
+            source,
+            f"{where}: unknown status '{text(value, 60)}' "
+            f"(expected one of {', '.join(STATUS_VALUES)}); shown as given",
+        )
     return text(value, 60)
 
 
 def collect_status(root: Path, w: Warnings) -> dict:
     """The hand-edited dashboard/status.json."""
     src = "dashboard/status.json"
-    out = {"present": False, "updated": None, "note": None, "milestones": {}, "open_work": {}, "strategies": {}}
+    out = {
+        "present": False,
+        "updated": None,
+        "note": None,
+        "milestones": {},
+        "open_work": {},
+        "strategies": {},
+    }
     path = root / "dashboard" / "status.json"
     if not path.is_file():
         return out
@@ -482,13 +519,15 @@ def collect_status(root: Path, w: Warnings) -> dict:
     for name, entry in _dict_field(obj, "strategies", src, w).items():
         paper = entry.get("paper") if isinstance(entry, dict) else None
         if not isinstance(paper, dict):
-            w.add(src, f"strategies.{name}: expected {{\"paper\": {{\"status\": ...}}}}")
+            w.add(src, f'strategies.{name}: expected {{"paper": {{"status": ...}}}}')
             continue
-        out["strategies"][name] = {"paper": {
-            "status": normalise_status_value(paper.get("status"), src, f"strategies.{name}.paper", w),
-            "started": text(paper.get("started"), 40),
-            "note": text(paper.get("note")),
-        }}
+        out["strategies"][name] = {
+            "paper": {
+                "status": normalise_status_value(paper.get("status"), src, f"strategies.{name}.paper", w),
+                "started": text(paper.get("started"), 40),
+                "note": text(paper.get("note")),
+            }
+        }
     return out
 
 
@@ -649,20 +688,24 @@ def collect_mutation(root: Path, w: Warnings) -> list:
         if (counts.get("equivalent") or 0) > (counts.get("survived") or 0):
             w.add(src, "'equivalent' is larger than 'survived'; capped at 'survived'")
         score, score_ex = mutation_scores(counts)
-        entry.update({
-            "present": True,
-            "counts": counts,
-            "score": score,
-            "score_excluding_equivalent": score_ex,
-            "meets_target": None if score_ex is None else score_ex >= target,
-            "modified": mtime(path),
-        })
+        entry.update(
+            {
+                "present": True,
+                "counts": counts,
+                "score": score,
+                "score_excluding_equivalent": score_ex,
+                "meets_target": None if score_ex is None else score_ex >= target,
+                "modified": mtime(path),
+            }
+        )
     if folder.is_dir():
         known = {a[0] for a in MUTATION_AREAS}
         for path in sorted(folder.glob("*.json")):
             if path.stem not in known:
-                w.add(rel(root, path), f"unknown mutation area '{path.stem}' "
-                                       f"(expected {', '.join(sorted(known))}); ignored")
+                w.add(
+                    rel(root, path),
+                    f"unknown mutation area '{path.stem}' (expected {', '.join(sorted(known))}); ignored",
+                )
     return areas
 
 
@@ -677,7 +720,14 @@ def collect_snapshot(root: Path, w: Warnings):
         return None
     if not isinstance(obj, dict):
         w.add(src, f"expected a JSON object, found {type(obj).__name__}")
-        return {"path": src, "id": None, "recognised": False, "top_level_keys": [], "series": [], "sources": []}
+        return {
+            "path": src,
+            "id": None,
+            "recognised": False,
+            "top_level_keys": [],
+            "series": [],
+            "sources": [],
+        }
     snap_id = text(obj.get("snapshot_id"), 200) or text(obj.get("id"), 200)
     sources = obj.get("sources")
     if isinstance(sources, dict):
@@ -697,13 +747,19 @@ def collect_snapshot(root: Path, w: Warnings):
         for item in raw_series:
             if not isinstance(item, dict):
                 continue
-            series.append({k: scalar(item.get(k)) for k in
-                           ("instrument", "source", "bar", "start", "end", "rows", "gaps")})
+            series.append(
+                {
+                    k: scalar(item.get(k))
+                    for k in ("instrument", "source", "bar", "start", "end", "rows", "gaps")
+                }
+            )
     elif raw_series is not None:
         w.add(src, "'series' should be a list; not shown")
     recognised = bool(snap_id or source_names or series or obj.get("created"))
     if not recognised:
-        w.add(src, "unrecognised shape (no snapshot_id/id, sources, series or created); showing top-level keys")
+        w.add(
+            src, "unrecognised shape (no snapshot_id/id, sources, series or created); showing top-level keys"
+        )
     return {
         "path": src,
         "id": snap_id,
@@ -745,13 +801,15 @@ def collect_studies(root: Path, w: Warnings) -> list:
                     newest = t if newest is None or t > newest else newest
         except OSError as exc:
             w.add(rel(root, folder), f"could not list folder ({exc.strerror or type(exc).__name__})")
-        studies.append({
-            "name": folder.name,
-            "path": rel(root, folder),
-            "parquet_files": parquet,
-            "journal": journal,
-            "modified": utc_iso(newest) if newest is not None else mtime(folder),
-        })
+        studies.append(
+            {
+                "name": folder.name,
+                "path": rel(root, folder),
+                "parquet_files": parquet,
+                "journal": journal,
+                "modified": utc_iso(newest) if newest is not None else mtime(folder),
+            }
+        )
     return studies
 
 
@@ -798,12 +856,14 @@ def collect_reports(root: Path) -> list:
         kind = "other"
         if len(parts) > 1:
             kind = parts[0] if parts[0] in NOT_STRATEGY_REPORT_DIRS else "audit"
-        items.append({
-            "path": rel(root, path),
-            "date": stem_date or (modified or "")[:10] or None,
-            "kind": kind,
-            "group": parts[0] if len(parts) > 1 else "",
-        })
+        items.append(
+            {
+                "path": rel(root, path),
+                "date": stem_date or (modified or "")[:10] or None,
+                "kind": kind,
+                "group": parts[0] if len(parts) > 1 else "",
+            }
+        )
     items.sort(key=lambda r: (r["date"] or "", r["path"]), reverse=True)
     return items
 
@@ -815,8 +875,9 @@ def collect_git(root: Path) -> dict:
 
     def git(*args):
         try:
-            done = subprocess.run(["git", "-C", str(root), *args], capture_output=True,
-                                  text=True, timeout=5, check=False)
+            done = subprocess.run(
+                ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=5, check=False
+            )
         except (OSError, subprocess.SubprocessError, ValueError):
             return None
         out = done.stdout.strip()
@@ -830,7 +891,7 @@ def collect_git(root: Path) -> dict:
         try:
             head = (root / ".git" / "HEAD").read_text(encoding="utf-8").strip()
             if head.startswith("ref: refs/heads/"):
-                branch = head[len("ref: refs/heads/"):]
+                branch = head[len("ref: refs/heads/") :]
         except OSError:
             pass
     info["branch"] = text(branch, 200) or "unknown"
@@ -842,9 +903,18 @@ def collect_git(root: Path) -> dict:
 # Audits
 # --------------------------------------------------------------------------
 
+
 def normalise_gate(key: str, raw, source: str, w: Warnings) -> dict:
-    gate = {"key": key, "present": False, "value": None, "threshold": None, "op": None,
-            "pass": None, "note": None, "state": "missing"}
+    gate = {
+        "key": key,
+        "present": False,
+        "value": None,
+        "threshold": None,
+        "op": None,
+        "pass": None,
+        "note": None,
+        "state": "missing",
+    }
     if raw is None:
         return gate
     if not isinstance(raw, dict):
@@ -862,8 +932,10 @@ def normalise_gate(key: str, raw, source: str, w: Warnings) -> dict:
     if flag is None or isinstance(flag, bool):
         gate["pass"] = flag
     else:
-        w.add(source, f"gate '{key}': pass should be true, false or null, found '{text(flag, 40)}'; "
-                      "treated as pending")
+        w.add(
+            source,
+            f"gate '{key}': pass should be true, false or null, found '{text(flag, 40)}'; treated as pending",
+        )
     gate["state"] = {True: "pass", False: "fail", None: "pending"}[gate["pass"]]
     return gate
 
@@ -906,8 +978,10 @@ def verdict_check(verdict, state: str, reason: str, source: str, w: Warnings):
     if verdict == expected:
         return None
     if verdict == "PASS":
-        message = (f"Audit file says PASS but its gate flags give {state} ({reason}). "
-                   "Do not treat this strategy as ready for paper until the audit is corrected.")
+        message = (
+            f"Audit file says PASS but its gate flags give {state} ({reason}). "
+            "Do not treat this strategy as ready for paper until the audit is corrected."
+        )
         w.add(source, message, level="integrity")
         return {"level": "integrity", "message": message}
     message = f"Audit file says {verdict} but its gate flags give {state} ({reason})."
@@ -941,18 +1015,24 @@ def normalise_equity(raw, source: str, w: Warnings):
             w.add(source, f"equity series '{name}' has {len(values)} values for {len(dates)} dates; skipped")
             continue
         nums = [num(v) for v in values]
-        bad = sum(1 for v, n in zip(values, nums) if n is None and v is not None)
+        bad = sum(1 for v, n in zip(values, nums, strict=True) if n is None and v is not None)
         if bad:
             w.add(source, f"equity series '{name}': {bad} non-numeric value(s) shown as gaps")
         base = next((v for v in nums if v is not None), None)
         if base is None or base <= 0:
-            w.add(source, f"equity series '{name}' does not start with a positive number; "
-                          "cannot normalise to 1.0, skipped")
+            w.add(
+                source,
+                f"equity series '{name}' does not start with a positive number; "
+                "cannot normalise to 1.0, skipped",
+            )
             continue
         normalised = [None if v is None else round(v / base, 8) for v in nums]
         nonpositive = sum(1 for v in normalised if v is not None and v <= 0)
         if nonpositive:
-            w.add(source, f"equity series '{name}': {nonpositive} value(s) <= 0 cannot be drawn on the log scale")
+            w.add(
+                source,
+                f"equity series '{name}': {nonpositive} value(s) <= 0 cannot be drawn on the log scale",
+            )
         if len(out) == EQUITY_MAX_SERIES:
             w.add(source, f"equity has more than {EQUITY_MAX_SERIES} series; '{name}' and later not drawn")
             break
@@ -985,8 +1065,12 @@ def _report_link(raw, root: Path, source: str, w: Warnings):
     shown = text(raw, 300)
     if shown is None:
         return None
-    safe = (not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", shown) and not shown.startswith(("/", "\\"))
-            and ".." not in Path(shown).parts and "\\" not in shown)
+    safe = (
+        not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", shown)
+        and not shown.startswith(("/", "\\"))
+        and ".." not in Path(shown).parts
+        and "\\" not in shown
+    )
     exists = False
     if safe:
         try:
@@ -1001,11 +1085,17 @@ def _report_link(raw, root: Path, source: str, w: Warnings):
 def normalise_audit(obj: dict, strategy: str, date: str, root: Path, path: Path, w: Warnings) -> dict:
     source = rel(root, path)
     if obj.get("strategy") is not None and obj.get("strategy") != strategy:
-        w.add(source, f"'strategy' is '{text(obj.get('strategy'), 100)}' but the file is under "
-                      f"reports/{strategy}/; filed under {strategy}")
+        w.add(
+            source,
+            f"'strategy' is '{text(obj.get('strategy'), 100)}' but the file is under "
+            f"reports/{strategy}/; filed under {strategy}",
+        )
     if obj.get("date") is not None and obj.get("date") != date:
-        w.add(source, f"'date' is '{text(obj.get('date'), 40)}' but the file name says {date}; "
-                      "the file name is used for ordering")
+        w.add(
+            source,
+            f"'date' is '{text(obj.get('date'), 40)}' but the file name says {date}; "
+            "the file name is used for ordering",
+        )
     raw_gates = obj.get("gates")
     if not isinstance(raw_gates, dict):
         w.add(source, "'gates' should be an object keyed by gate name; every gate counted as missing")
@@ -1016,7 +1106,9 @@ def normalise_audit(obj: dict, strategy: str, date: str, root: Path, path: Path,
     gates = {k: normalise_gate(k, raw_gates.get(k), source, w) for k in GATE_KEYS}
     state, reason = derive_state(gates)
     verdict = obj.get("verdict")
-    verdict = verdict.strip().upper() if isinstance(verdict, str) else (None if verdict is None else text(verdict))
+    verdict = (
+        verdict.strip().upper() if isinstance(verdict, str) else (None if verdict is None else text(verdict))
+    )
     integrity = verdict_check(verdict, state, reason, source, w)
 
     window = obj.get("window") if isinstance(obj.get("window"), dict) else None
@@ -1024,7 +1116,9 @@ def normalise_audit(obj: dict, strategy: str, date: str, root: Path, path: Path,
     if not md_sibling.is_file():
         w.add(source, f"no matching audit report {rel(root, md_sibling)}")
     test_window = obj.get("test_window_opened")
-    counts = {s: sum(1 for g in gates.values() if g["state"] == s) for s in ("pass", "fail", "pending", "missing")}
+    counts = {
+        s: sum(1 for g in gates.values() if g["state"] == s) for s in ("pass", "fail", "pending", "missing")
+    }
     return {
         "date": date,
         "path": source,
@@ -1040,7 +1134,9 @@ def normalise_audit(obj: dict, strategy: str, date: str, root: Path, path: Path,
         "seed": scalar(obj.get("seed")),
         "n_trials": scalar(obj.get("n_trials")),
         "effective_trials": scalar(obj.get("effective_trials")),
-        "window": {"start": text(window.get("start"), 40), "end": text(window.get("end"), 40)} if window else None,
+        "window": {"start": text(window.get("start"), 40), "end": text(window.get("end"), 40)}
+        if window
+        else None,
         "test_window_opened": test_window if isinstance(test_window, bool) else None,
         "gates": [gates[k] for k in GATE_KEYS],
         "gate_counts": counts,
@@ -1059,7 +1155,9 @@ def _benchmarks(raw, source: str, w: Warnings) -> list:
     out = []
     for name, values in raw.items():
         if isinstance(values, dict):
-            out.append({"name": text(name, 100), "values": _scalar_map(values, source, f"benchmarks.{name}", w)})
+            out.append(
+                {"name": text(name, 100), "values": _scalar_map(values, source, f"benchmarks.{name}", w)}
+            )
         else:
             w.add(source, f"benchmarks.{text(name, 60)} should be an object; not shown")
     return out
@@ -1081,7 +1179,9 @@ def collect_audits(root: Path, w: Warnings) -> dict:
             if obj is None:
                 continue
             if obj.get("schema") != AUDIT_SCHEMA:
-                w.add(source, f"schema is '{text(obj.get('schema'), 60)}', expected '{AUDIT_SCHEMA}'; skipped")
+                w.add(
+                    source, f"schema is '{text(obj.get('schema'), 60)}', expected '{AUDIT_SCHEMA}'; skipped"
+                )
                 continue
             audits.setdefault(sub.name, []).append(normalise_audit(obj, sub.name, path.stem, root, path, w))
     for items in audits.values():
@@ -1092,6 +1192,7 @@ def collect_audits(root: Path, w: Warnings) -> dict:
 # --------------------------------------------------------------------------
 # Assembly
 # --------------------------------------------------------------------------
+
 
 def build_milestones(agents: dict, status: dict) -> list:
     rows = [dict(m) for m in agents["milestones"]]
@@ -1112,19 +1213,34 @@ def build_gate_defs(agents: dict, w: Warnings) -> list:
     rows = agents["gates"]
     use_agents = len(rows) == len(GATES)
     if rows and not use_agents:
-        w.add("AGENTS.md", f"'## Validation gates' has {len(rows)} rows, expected {len(GATES)}; "
-                           "showing built-in rule text")
-    return [{"key": k, "label": label, "short": short,
-             "rule": rows[i]["default"] if use_agents and rows[i]["default"] else rule}
-            for i, (k, label, short, rule) in enumerate(GATES)]
+        w.add(
+            "AGENTS.md",
+            f"'## Validation gates' has {len(rows)} rows, expected {len(GATES)}; showing built-in rule text",
+        )
+    return [
+        {
+            "key": k,
+            "label": label,
+            "short": short,
+            "rule": rows[i]["default"] if use_agents and rows[i]["default"] else rule,
+        }
+        for i, (k, label, short, rule) in enumerate(GATES)
+    ]
 
 
 def build_strategies(agents, folders, audits, exports, status, w: Warnings) -> list:
     launch = {s["name"]: s for s in agents["strategies"]}
     names = list(launch)
-    for extra in sorted(set(folders) | set(audits) | set(exports) | set(status["strategies"])):
+    for extra in sorted(set(folders) | set(audits) | set(exports)):
         if extra not in launch:
             names.append(extra)
+    for name in status["strategies"]:
+        if name not in names:
+            w.add(
+                "dashboard/status.json",
+                f"strategies.{name} is not in the AGENTS.md launch table, strategies/, "
+                "reports/ or exports/; not shown",
+            )
     out = []
     for name in names:
         history = audits.get(name, [])
@@ -1142,24 +1258,31 @@ def build_strategies(agents, folders, audits, exports, status, w: Warnings) -> l
         current = [key for key, _ in STAGES if reached[key]][-1]
         for later, earlier in (("exported", "ready"), ("paper", "ready")):
             if reached[later] and not reached[earlier]:
-                w.add(f"strategy {name}", f"stage '{later}' is recorded but the latest audit is not "
-                                          f"{READY}; check the audit and dashboard/status.json")
+                w.add(
+                    f"strategy {name}",
+                    f"stage '{later}' is recorded but the latest audit is not "
+                    f"{READY}; check the audit and dashboard/status.json",
+                )
         info = launch.get(name, {})
-        out.append({
-            "name": name,
-            "in_launch_table": name in launch,
-            "risk_level": info.get("risk_level") or (latest or {}).get("risk_level"),
-            "idea": info.get("idea"),
-            "free_params": info.get("free_params"),
-            "stages": [{"key": k, "label": label, "reached": reached[k]} for k, label in STAGES],
-            "stage": current,
-            "folder": folder,
-            "latest": latest,
-            "history": [{"date": a["date"], "verdict": a["verdict"], "state": a["state"], "path": a["path"]}
-                        for a in history],
-            "paper": paper,
-            "export": exports.get(name),
-        })
+        out.append(
+            {
+                "name": name,
+                "in_launch_table": name in launch,
+                "risk_level": info.get("risk_level") or (latest or {}).get("risk_level"),
+                "idea": info.get("idea"),
+                "free_params": info.get("free_params"),
+                "stages": [{"key": k, "label": label, "reached": reached[k]} for k, label in STAGES],
+                "stage": current,
+                "folder": folder,
+                "latest": latest,
+                "history": [
+                    {"date": a["date"], "verdict": a["verdict"], "state": a["state"], "path": a["path"]}
+                    for a in history
+                ],
+                "paper": paper,
+                "export": exports.get(name),
+            }
+        )
     return out
 
 
@@ -1182,8 +1305,11 @@ def _safely(w: Warnings, name: str, fn, default):
     try:
         return fn()
     except Exception as exc:  # noqa: BLE001 - the page must render whatever happens
-        w.add(name, f"internal error while reading this input ({type(exc).__name__}: {text(exc, 300)}); "
-                    "please report it")
+        w.add(
+            name,
+            f"internal error while reading this input ({type(exc).__name__}: {text(exc, 300)}); "
+            "please report it",
+        )
         return default
 
 
@@ -1191,13 +1317,31 @@ def collect(root) -> dict:
     """Read every input under `root` and return the dashboard data (JSON-safe)."""
     root = Path(root)
     w = Warnings()
-    agents = _safely(w, "AGENTS.md", lambda: collect_agents(root, w),
-                     {"present": False, "milestones": [], "gates": [], "strategies": []})
-    testing_md = _safely(w, "TESTING.md", lambda: collect_testing_md(root, w),
-                         {"present": False, "dod": [], "dod_found": False, "bug_count": None, "open_work": []})
-    status = _safely(w, "dashboard/status.json", lambda: collect_status(root, w),
-                     {"present": False, "updated": None, "note": None,
-                      "milestones": {}, "open_work": {}, "strategies": {}})
+    agents = _safely(
+        w,
+        "AGENTS.md",
+        lambda: collect_agents(root, w),
+        {"present": False, "milestones": [], "gates": [], "strategies": []},
+    )
+    testing_md = _safely(
+        w,
+        "TESTING.md",
+        lambda: collect_testing_md(root, w),
+        {"present": False, "dod": [], "dod_found": False, "bug_count": None, "open_work": []},
+    )
+    status = _safely(
+        w,
+        "dashboard/status.json",
+        lambda: collect_status(root, w),
+        {
+            "present": False,
+            "updated": None,
+            "note": None,
+            "milestones": {},
+            "open_work": {},
+            "strategies": {},
+        },
+    )
     junit = _safely(w, "results/tests/junit.xml", lambda: collect_junit(root, w), None)
     coverage = _safely(w, "results/tests/coverage.json", lambda: collect_coverage(root, w), None)
     mutation = _safely(w, "results/tests/mutation", lambda: collect_mutation(root, w), [])
@@ -1212,22 +1356,31 @@ def collect(root) -> dict:
 
     milestones = build_milestones(agents, status)
     gate_defs = build_gate_defs(agents, w)
-    strategies = _safely(w, "strategies", lambda: build_strategies(agents, folders, audits, exports, status, w), [])
-    open_work = [dict(item, **status["open_work"].get(item["id"], {"status": None, "note": None}))
-                 for item in testing_md["open_work"]]
+    strategies = _safely(
+        w, "strategies", lambda: build_strategies(agents, folders, audits, exports, status, w), []
+    )
+    open_work = [
+        dict(item, **status["open_work"].get(item["id"], {"status": None, "note": None}))
+        for item in testing_md["open_work"]
+    ]
     for key in status["open_work"]:
         if testing_md["present"] and key not in {o["id"] for o in testing_md["open_work"]}:
-            w.add("dashboard/status.json", f"open_work.{key} has no matching '### {key}' heading in TESTING.md")
+            w.add(
+                "dashboard/status.json", f"open_work.{key} has no matching '### {key}' heading in TESTING.md"
+            )
 
     data = {
         "schema": DASHBOARD_SCHEMA,
         "title": TITLE,
         "sample": (root / SAMPLE_MARKER).is_file(),
-        "generated_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_utc": dt.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "link_root": "..",
         "git": git,
-        "inputs": {"agents_md": agents["present"], "testing_md": testing_md["present"],
-                   "status_json": status["present"]},
+        "inputs": {
+            "agents_md": agents["present"],
+            "testing_md": testing_md["present"],
+            "status_json": status["present"],
+        },
         "status": {"present": status["present"], "updated": status["updated"], "note": status["note"]},
         "milestones": milestones,
         "gate_defs": gate_defs,
@@ -1257,6 +1410,7 @@ def collect(root) -> dict:
 # Rendering
 # --------------------------------------------------------------------------
 
+
 def to_script_json(data) -> str:
     """JSON safe to place inside <script type="application/json">.
 
@@ -1264,8 +1418,13 @@ def to_script_json(data) -> str:
     comment; U+2028/2029 are escaped for older JavaScript parsers.
     """
     payload = json.dumps(clean(data)[0], ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-    return (payload.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
-            .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
+    return (
+        payload.replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
 
 def page_title(data: dict) -> str:
@@ -1293,12 +1452,17 @@ def link_root(root: Path, out: Path):
 
 def summary_line(data: dict, out: Path) -> str:
     o = data["overview"]
-    tests = (f"tests {o['tests_passed']}/{o['tests_total']} passed" if o["tests_total"] is not None
-             else "no test run recorded")
-    return (f"{'SAMPLE ' if data['sample'] else ''}dashboard: {o['strategies_total']} strategies "
-            f"({o['strategies_audited']} audited, {o['strategies_ready']} ready for paper), "
-            f"milestones {o['milestones_done']}/{o['milestones_total']} done, {tests}, "
-            f"{o['warnings']} warning(s) -> {out}")
+    tests = (
+        f"tests {o['tests_passed']}/{o['tests_total']} passed"
+        if o["tests_total"] is not None
+        else "no test run recorded"
+    )
+    return (
+        f"{'SAMPLE ' if data['sample'] else ''}dashboard: {o['strategies_total']} strategies "
+        f"({o['strategies_audited']} audited, {o['strategies_ready']} ready for paper), "
+        f"milestones {o['milestones_done']}/{o['milestones_total']} done, {tests}, "
+        f"{o['warnings']} warning(s) -> {out}"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -1349,7 +1513,8 @@ def _sample_markdown() -> tuple[str, str]:
 | 4 | Search and validation on real data | Sample: first audit reports written |
 | 5 | Prediction track on real data | Sample: one model-sized variant audited |
 """
-    testing = f"""# TESTING.md (sample)
+    testing = (
+        f"""# TESTING.md (sample)
 
 {SAMPLE_NOTE}
 
@@ -1357,7 +1522,9 @@ def _sample_markdown() -> tuple[str, str]:
 
 | # | Where | Bug | Fix |
 |---|---|---|---|
-""" + "".join(f"| {i} | sample | sample bug {i} | sample fix |\n" for i in range(1, 10)) + """
+"""
+        + "".join(f"| {i} | sample | sample bug {i} | sample fix |\n" for i in range(1, 10))
+        + """
 ## 5. Open work, in order
 
 ### 5.1 Verify the refactor that was in progress
@@ -1370,14 +1537,15 @@ def _sample_markdown() -> tuple[str, str]:
 
 ## 8. Definition of done (this testing work)
 
-- [x] Full, deep and slow tiers pass
+- [ ] Full, deep and slow tiers pass
 - [x] Bug log updated, including 5.2A and 5.2B
 - [ ] Mutation targets met for every area in 5.4
-- [x] Branch coverage 100% with `fail_under = 100`
+- [ ] Branch coverage 100% with `fail_under = 100`
 - [ ] Demo rerun; the report and AGENTS.md figures updated
 - [ ] Contract suite split out and parametrized over runners
 - [x] `uv run ruff check` clean
 """
+    )
     return agents, testing
 
 
@@ -1409,20 +1577,32 @@ def _cagr(curve: list) -> float:
 def _sample_gate(rng, key, passed, budget=None):
     """A plausible gate entry on the side of its threshold that `passed` asks for."""
     specs = {
-        "wf_oos_sharpe": (1.0, ">="), "wf_oos_sharpe_2x_costs": (0.5, ">"), "dsr": (0.95, ">="),
-        "pbo": (0.25, "<="), "plateau_retention": (0.70, ">="), "regime_max_profit_share": (0.5, "<"),
+        "wf_oos_sharpe": (1.0, ">="),
+        "wf_oos_sharpe_2x_costs": (0.5, ">"),
+        "dsr": (0.95, ">="),
+        "pbo": (0.25, "<="),
+        "plateau_retention": (0.70, ">="),
+        "regime_max_profit_share": (0.5, "<"),
     }
     if key == "beats_benchmarks":
         return {"value": passed, "pass": passed}
     if key == "final_test":
         if passed is None:
             return {"value": None, "pass": None, "note": "run once at sign-off"}
-        return {"value": round(rng.uniform(0.85, 1.1), 2), "pass": passed,
-                "note": "Sharpe on the test window"}
+        return {
+            "value": round(rng.uniform(0.85, 1.1), 2),
+            "pass": passed,
+            "note": "Sharpe on the test window",
+        }
     if key == "mc_p95_max_drawdown":
         if budget is None:
-            return {"value": round(rng.uniform(0.2, 0.4), 3), "threshold": None, "op": "<=",
-                    "pass": None, "note": "risk budget TBD"}
+            return {
+                "value": round(rng.uniform(0.2, 0.4), 3),
+                "threshold": None,
+                "op": "<=",
+                "pass": None,
+                "note": "risk budget TBD",
+            }
         value = budget * (rng.uniform(0.6, 0.95) if passed else rng.uniform(1.05, 1.4))
         return {"value": round(value, 3), "threshold": budget, "op": "<=", "pass": passed}
     threshold, op = specs[key]
@@ -1431,6 +1611,8 @@ def _sample_gate(rng, key, passed, budget=None):
     good = op.startswith(">")
     side = 1 if (passed == good) else -1
     value = threshold * (1 + side * rng.uniform(0.04, 0.35))
+    if key in ("dsr", "plateau_retention"):  # probabilities / shares stay below 1
+        value = rng.uniform(threshold + 0.001, 0.995) if passed else rng.uniform(0.3, threshold - 0.01)
     return {"value": round(value, 3), "threshold": threshold, "op": op, "pass": passed}
 
 
@@ -1457,15 +1639,25 @@ def _sample_audit(rng, ctx, name, date, risk, verdict, sharpe, passes, budget=No
         "window": {"start": dates[0], "end": dates[-1]},
         "test_window_opened": gates.get("final_test", {}).get("pass") is not None,
         "gates": gates,
-        "metrics": {"wf_oos_sharpe": sharpe, "cagr": _cagr(curve), "max_drawdown": _max_drawdown(curve),
-                    "n_trades": rng.randint(40, 220), "walk_forward_efficiency": round(rng.uniform(0.4, 0.8), 2)},
+        "metrics": {
+            "wf_oos_sharpe": sharpe,
+            "cagr": _cagr(curve),
+            "max_drawdown": _max_drawdown(curve),
+            "n_trades": rng.randint(40, 220),
+            "walk_forward_efficiency": round(rng.uniform(0.4, 0.8), 2),
+        },
         "benchmarks": {
             "buy_hold_btc": {"sharpe": 0.9, "max_drawdown": _max_drawdown(btc)},
             "rebalance_50_50": {"sharpe": 0.95, "max_drawdown": _max_drawdown(mix)},
-            "random_entry": {"sharpe_median": round(rng.uniform(-0.1, 0.3), 2),
-                             "sharpe_p95": round(rng.uniform(0.5, 0.9), 2)},
+            "random_entry": {
+                "sharpe_median": round(rng.uniform(-0.1, 0.3), 2),
+                "sharpe_p95": round(rng.uniform(0.5, 0.9), 2),
+            },
         },
-        "equity": {"dates": dates, "series": {"strategy": curve, "buy_hold_btc": btc, "rebalance_50_50": mix}},
+        "equity": {
+            "dates": dates,
+            "series": {"strategy": curve, "buy_hold_btc": btc, "rebalance_50_50": mix},
+        },
         "report_md": f"reports/{name}/{date}.md",
     }
 
@@ -1478,57 +1670,111 @@ def make_sample_root(base) -> Path:
     agents_md, testing_md = _sample_markdown()
     _write(root / "AGENTS.md", agents_md)
     _write(root / "TESTING.md", testing_md)
-    _write(root / "dashboard" / "status.json", {
-        "updated": "2026-11-18",
-        "note": "Sample status. Every number on this page is synthetic.",
-        "milestones": {
-            "0": {"status": "done", "note": "Sample"}, "1": {"status": "done", "note": "Sample"},
-            "2": {"status": "done", "note": "Sample"}, "3": {"status": "in_progress", "note": "Sample"},
-            "4": {"status": "blocked", "note": "Sample: waiting on milestone 3"},
-            "5": {"status": "paused", "note": "Sample: unknown status value, to show the warning"},
+    _write(
+        root / "dashboard" / "status.json",
+        {
+            "updated": "2026-11-18",
+            "note": "Sample status. Every number on this page is synthetic.",
+            "milestones": {
+                "0": {"status": "done", "note": "Sample"},
+                "1": {"status": "done", "note": "Sample"},
+                "2": {"status": "done", "note": "Sample"},
+                "3": {"status": "in_progress", "note": "Sample"},
+                "4": {"status": "blocked", "note": "Sample: waiting on milestone 3"},
+                "5": {"status": "paused", "note": "Sample: unknown status value, to show the warning"},
+            },
+            "open_work": {
+                "5.1": "done",
+                "5.2": "done",
+                "5.3": "in_progress",
+                "5.4": "not_started",
+                "5.5": "not_started",
+                "5.6": "blocked",
+                "5.7": "not_started",
+            },
+            "strategies": {
+                "rebalance-steady": {"paper": {"status": "done", "started": "2026-09-16", "note": "Sample"}},
+                "dip-buy-balanced": {"paper": {"status": "not_started", "started": None, "note": ""}},
+                "momentum-bold": {"paper": {"status": "not_started", "started": None, "note": ""}},
+            },
         },
-        "open_work": {"5.1": "done", "5.2": "done", "5.3": "in_progress", "5.4": "not_started",
-                      "5.5": "not_started", "5.6": "blocked", "5.7": "not_started"},
-        "strategies": {
-            "rebalance-steady": {"paper": {"status": "done", "started": "2026-09-16", "note": "Sample"}},
-            "dip-buy-balanced": {"paper": {"status": "not_started", "started": None, "note": ""}},
-            "momentum-bold": {"paper": {"status": "not_started", "started": None, "note": ""}},
-        },
-    })
+    )
 
-    cases = "".join(f'<testcase classname="tests.test_sample" name="test_{i}" time="0.01"/>' for i in range(5))
-    _write(root / "results" / "tests" / "junit.xml",
-           '<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests">'
-           '<testsuite name="pytest" errors="0" failures="1" skipped="3" tests="214" time="118.4" '
-           'timestamp="2026-11-18T14:02:11.000000+00:00">' + cases +
-           '<testcase classname="tests.test_validation_exact" name="test_expected_max_sharpe_n1000">'
-           '<failure message="sample failure">sample</failure></testcase></testsuite></testsuites>')
-    files = {f"lab/{m}.py": round(rng.uniform(93, 100), 2) for m in
-             ("validation/stats", "validation/splits", "validation/montecarlo", "search/study",
-              "search/walkforward", "models/train", "runner/reference", "data/loaders")}
-    _write(root / "results" / "tests" / "coverage.json", {
-        "meta": {"version": "sample", "timestamp": "2026-11-18T14:04:00", "branch_coverage": True},
-        "files": {k: {"summary": {"percent_covered": v}} for k, v in files.items()},
-        "totals": {"percent_covered": round(sum(files.values()) / len(files), 2),
-                   "num_branches": 1240, "covered_branches": 1196},
-    })
-    for area, _path, target in MUTATION_AREAS:
+    cases = "".join(
+        f'<testcase classname="tests.test_sample" name="test_{i}" time="0.01"/>' for i in range(5)
+    )
+    _write(
+        root / "results" / "tests" / "junit.xml",
+        '<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests">'
+        '<testsuite name="pytest" errors="0" failures="1" skipped="3" tests="214" time="118.4" '
+        'timestamp="2026-11-18T14:02:11.000000+00:00">'
+        + cases
+        + '<testcase classname="tests.test_validation_exact" name="test_expected_max_sharpe_n1000">'
+        '<failure message="sample failure">sample</failure></testcase></testsuite></testsuites>',
+    )
+    files = {
+        f"lab/{m}.py": round(rng.uniform(93, 100), 2)
+        for m in (
+            "validation/stats",
+            "validation/splits",
+            "validation/montecarlo",
+            "search/study",
+            "search/walkforward",
+            "models/train",
+            "runner/reference",
+            "data/loaders",
+        )
+    }
+    _write(
+        root / "results" / "tests" / "coverage.json",
+        {
+            "meta": {"version": "sample", "timestamp": "2026-11-18T14:04:00", "branch_coverage": True},
+            "files": {k: {"summary": {"percent_covered": v}} for k, v in files.items()},
+            "totals": {
+                "percent_covered": round(sum(files.values()) / len(files), 2),
+                "num_branches": 1240,
+                "covered_branches": 1196,
+            },
+        },
+    )
+    for area, _path, _target in MUTATION_AREAS:
         killed = rng.randint(300, 600)
         survived = int(killed * rng.uniform(0.05, 0.3))
-        stats = {"killed": killed, "survived": survived, "timeout": rng.randint(0, 6), "suspicious": 0,
-                 "no_tests": rng.randint(0, 40), "skipped": 0, "total": killed + survived + 50}
+        stats = {
+            "killed": killed,
+            "survived": survived,
+            "timeout": rng.randint(0, 6),
+            "suspicious": 0,
+            "no_tests": rng.randint(0, 40),
+            "skipped": 0,
+            "total": killed + survived + 50,
+        }
         if area == "validation":
             stats["equivalent"] = min(survived, 14)
         _write(root / "results" / "tests" / "mutation" / f"{area}.json", stats)
 
-    _write(root / "data" / "catalog" / "SNAPSHOT.json", {
-        "snapshot_id": "sample-snapshot-2026-07-01",
-        "created": "2026-07-01T09:00:00Z",
-        "sources": ["kraken", "binance"],
-        "series": [{"instrument": inst, "source": src, "bar": bar, "start": "2017-01-01", "end": "2026-06-30",
-                    "rows": (3468 if bar == "1d" else 83232) - rng.randint(0, 40), "gaps": rng.randint(0, 4)}
-                   for inst in ("BTC/USD", "ETH/USD") for src in ("kraken", "binance") for bar in ("1d", "1h")],
-    })
+    _write(
+        root / "data" / "catalog" / "SNAPSHOT.json",
+        {
+            "snapshot_id": "sample-snapshot-2026-07-01",
+            "created": "2026-07-01T09:00:00Z",
+            "sources": ["kraken", "binance"],
+            "series": [
+                {
+                    "instrument": coin + ("/USD" if src == "kraken" else "/USDT"),
+                    "source": src,
+                    "bar": bar,
+                    "start": "2017-01-01",
+                    "end": "2026-06-30",
+                    "rows": (3468 if bar == "1d" else 83232) - rng.randint(0, 40),
+                    "gaps": rng.randint(0, 4),
+                }
+                for coin in ("BTC", "ETH")
+                for src in ("kraken", "binance")
+                for bar in ("1d", "1h")
+            ],
+        },
+    )
     _write(root / "reports" / "data" / "2026-07-01-quality.md", f"# Data quality (sample)\n\n{SAMPLE_NOTE}\n")
     _write(root / "reports" / "demo" / "2026-06-20.md", f"# Demo report (sample)\n\n{SAMPLE_NOTE}\n")
     for i in range(3):
@@ -1542,25 +1788,75 @@ def make_sample_root(base) -> Path:
             _write(root / "strategies" / name / f, f"# {SAMPLE_NOTE}\n")
     _write(root / "strategies" / "trend-steady" / "strategy.py", f"# {SAMPLE_NOTE}\n")
     _write(root / "strategies" / "trend-steady" / "params.yaml", f"# {SAMPLE_NOTE}\n")
-    _write(root / "exports" / "rebalance-steady" / "config.yaml", f"# {SAMPLE_NOTE}\nstrategy: rebalance-steady\n")
+    _write(
+        root / "exports" / "rebalance-steady" / "config.yaml",
+        f"# {SAMPLE_NOTE}\nstrategy: rebalance-steady\n",
+    )
 
     start = dt.date(2019, 1, 6)
     dates = [(start + dt.timedelta(weeks=i)).isoformat() for i in range(286)]
     ctx = (dates, _sample_curve(rng, len(dates), 0.9, 0.10), _sample_curve(rng, len(dates), 0.95, 0.05))
     every_pass = {k: True for k in GATE_KEYS}
     audits = [
-        ("rebalance-steady", "2026-07-20", "steady", "INCOMPLETE", 1.21,
-         dict(every_pass, plateau_retention=None, final_test=None), None, ()),
+        (
+            "rebalance-steady",
+            "2026-07-20",
+            "steady",
+            "INCOMPLETE",
+            1.21,
+            dict(every_pass, plateau_retention=None, final_test=None),
+            None,
+            (),
+        ),
         ("rebalance-steady", "2026-09-14", "steady", "PASS", 1.32, every_pass, 0.25, ()),
-        ("dip-buy-balanced", "2026-08-03", "balanced", "FAIL", 0.86,
-         dict(every_pass, wf_oos_sharpe=False, dsr=False, beats_benchmarks=False, final_test=None), 0.35, ()),
-        ("dip-buy-balanced", "2026-11-02", "balanced", "INCOMPLETE", 1.14,
-         dict(every_pass, final_test=None), 0.35, ()),
-        ("momentum-bold", "2026-10-20", "bold", "FAIL", 0.74,
-         dict(every_pass, wf_oos_sharpe=False, dsr=False, pbo=False, beats_benchmarks=False,
-              regime_max_profit_share=False, final_test=None), None, ()),
-        ("vol-sized-dip", "2026-11-10", "balanced", "PASS", 1.18, every_pass, 0.35,
-         ("regime_max_profit_share",)),
+        (
+            "dip-buy-balanced",
+            "2026-08-03",
+            "balanced",
+            "FAIL",
+            0.86,
+            dict(every_pass, wf_oos_sharpe=False, dsr=False, beats_benchmarks=False, final_test=None),
+            0.35,
+            (),
+        ),
+        (
+            "dip-buy-balanced",
+            "2026-11-02",
+            "balanced",
+            "INCOMPLETE",
+            1.14,
+            dict(every_pass, final_test=None),
+            0.35,
+            (),
+        ),
+        (
+            "momentum-bold",
+            "2026-10-20",
+            "bold",
+            "FAIL",
+            0.74,
+            dict(
+                every_pass,
+                wf_oos_sharpe=False,
+                dsr=False,
+                pbo=False,
+                beats_benchmarks=False,
+                regime_max_profit_share=False,
+                final_test=None,
+            ),
+            None,
+            (),
+        ),
+        (
+            "vol-sized-dip",
+            "2026-11-10",
+            "balanced",
+            "PASS",
+            1.18,
+            every_pass,
+            0.35,
+            ("regime_max_profit_share",),
+        ),
     ]
     for name, date, risk, verdict, sharpe, passes, budget, drop in audits:
         audit = _sample_audit(rng, ctx, name, date, risk, verdict, sharpe, passes, budget, drop)
@@ -1575,17 +1871,25 @@ def make_sample_root(base) -> Path:
 # Command line
 # --------------------------------------------------------------------------
 
+
 def parse_args(argv):
     p = argparse.ArgumentParser(
         description="Build the Osprey Strategy Lab results dashboard (one self-contained HTML file).",
-        epilog="Inputs and the audit JSON schema are described in HOWTO.md#dashboard.")
+        epilog="Inputs and the audit JSON schema are described in HOWTO.md#dashboard.",
+    )
     p.add_argument("--root", default=".", help="repo checkout to read (default: current directory)")
-    p.add_argument("--out", help="HTML file to write (default: <root>/dashboard/index.html; "
-                                 "with --sample: <tmpdir>/osprey-dashboard-sample.html)")
+    p.add_argument(
+        "--out",
+        help="HTML file to write (default: <root>/dashboard/index.html; "
+        "with --sample: <tmpdir>/osprey-dashboard-sample.html)",
+    )
     p.add_argument("--json", dest="json_out", metavar="PATH", help="also write the collected data as JSON")
-    p.add_argument("--sample", action="store_true",
-                   help="build from a synthetic repo tree generated in a temp folder (seed 7); "
-                        "the page carries a SAMPLE DATA banner")
+    p.add_argument(
+        "--sample",
+        action="store_true",
+        help="build from a synthetic repo tree generated in a temp folder (seed 7); "
+        "the page carries a SAMPLE DATA banner",
+    )
     return p.parse_args(argv)
 
 
@@ -1621,8 +1925,9 @@ def main(argv=None) -> int:
         if args.json_out:
             json_path = Path(args.json_out)
             json_path.parent.mkdir(parents=True, exist_ok=True)
-            json_path.write_text(json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
-                                 encoding="utf-8")
+            json_path.write_text(
+                json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8"
+            )
     except OSError as exc:
         print(f"build_dashboard: cannot write output ({exc.strerror or exc})", file=sys.stderr)
         return 2

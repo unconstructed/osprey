@@ -123,6 +123,7 @@ section { margin: 36px 0; }
 section > h2 { font-size: 20px; margin: 0 0 4px; }
 .lede { color: var(--ink-2); margin: 0 0 16px; font-size: 14px; max-width: 75ch; }
 h3 { font-size: 17px; margin: 0; }
+.card > h3 { margin-bottom: 10px; }
 h4 { font-size: 14px; margin: 16px 0 8px; color: var(--ink-2); text-transform: none; }
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
@@ -176,18 +177,21 @@ h4 { font-size: 14px; margin: 16px 0 8px; color: var(--ink-2); text-transform: n
 .cmd { display: block; padding: 6px 8px; background: var(--wash); border-radius: 6px; color: var(--ink); white-space: pre-wrap; }
 
 /* Tables */
-.tw { overflow-x: auto; max-width: 100%; }
+.tw { position: relative; overflow-x: auto; max-width: 100%; }
 .tw.tall { max-height: 360px; overflow-y: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
-thead th { font-size: 13px; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--axis); white-space: nowrap; background: var(--surface); }
+thead th { font-size: 13px; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--axis); background: var(--surface); vertical-align: bottom; }
 .tw.tall thead th { position: sticky; top: 0; }
 tbody th { font-weight: 600; }
 .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 tr:last-child > td, tr:last-child > th { border-bottom: 0; }
 
 /* Milestones */
-.ms-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ms-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ms-list > li { padding: 10px 0; border-top: 1px solid var(--grid); }
+.ms-list > li:first-child { border-top: 0; padding-top: 2px; }
+.ms-list > li:last-child { padding-bottom: 2px; }
 .ms { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; }
 .ms-id { font-size: 20px; font-weight: 600; color: var(--ink-2); line-height: 1.2; }
 .ms-name { font-weight: 600; }
@@ -222,7 +226,23 @@ tr:last-child > td, tr:last-child > th { border-bottom: 0; }
 .lines li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .lines .lbl { color: var(--ink-2); min-width: 9em; }
 .gate-tbl td:first-child { min-width: 11em; }
-.gate-tbl .key { display: block; font-size: 12px; color: var(--ink-2); }
+.gate-tbl .gdef { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.metrics-tbl tbody th { white-space: nowrap; }
+@media (max-width: 560px) {
+  /* gate table becomes a stacked list: name + result, then value and rule */
+  .gate-tbl thead { display: none; }
+  .gate-tbl, .gate-tbl tbody { display: block; }
+  .gate-tbl tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+  .gate-tbl tr:last-child { border-bottom: 0; }
+  .gate-tbl td { border: 0; padding: 0; min-width: 0 !important; text-align: left; white-space: normal; }
+  .gate-tbl td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 600; }
+  .gate-tbl td:nth-child(1) .gdef { font-weight: 400; }
+  .gate-tbl td:nth-child(4) { grid-column: 2; grid-row: 1; align-self: start; }
+  .gate-tbl td:nth-child(2), .gate-tbl td:nth-child(3) { grid-column: 1 / 3; font-size: 14px; }
+  .gate-tbl td:nth-child(2)::before, .gate-tbl td:nth-child(3)::before { content: attr(data-label) ": "; color: var(--ink-2); }
+  .gate-tbl td:nth-child(3) div { display: inline; }
+  .gate-tbl td:nth-child(3) div::before { content: " \00b7  "; }
+}
 
 /* Gate matrix */
 .matrix th, .matrix td { text-align: center; padding: 6px 4px; }
@@ -231,12 +251,13 @@ tr:last-child > td, tr:last-child > th { border-bottom: 0; }
 .matrix td.gc { color: var(--k); background: color-mix(in srgb, var(--k) 13%, transparent); border-left: 2px solid var(--surface); }
 .matrix td.gc .ic { width: 16px; height: 16px; }
 .matrix td.na { color: var(--ink-2); font-size: 13px; text-align: left; }
+.matrix tbody th { white-space: nowrap; position: sticky; left: 0; z-index: 1; background: var(--surface); }
 .legend-row { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; font-size: 13px; color: var(--ink-2); }
 .legend-row span { display: inline-flex; align-items: center; gap: 5px; }
 
 /* Meters (mutation score vs target) */
 .meters { display: grid; gap: 14px; }
-.meter-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 210px; gap: 4px 14px; align-items: center; }
+.meter-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 260px; gap: 4px 14px; align-items: center; }
 .m-name strong { display: block; }
 .m-bar { position: relative; height: 8px; border-radius: 4px; background: var(--track); margin-top: 14px; }
 .m-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--k); }
@@ -572,13 +593,15 @@ footer p { margin: 4px 0; }
       var label = typeof h === 'object' && h !== null && !h.nodeType ? h.label : h;
       return el('th', { scope: 'col', class: cls, title: (h && h.title) || null }, label);
     })));
+    function headerText(h) { return typeof h === 'string' ? h : (h && typeof h.label === 'string' ? h.label : null); }
     var tbody = el('tbody', null, rows.map(function (r) {
       return el('tr', null, r.map(function (c, i) {
         var numeric = headers[i] && headers[i].cls === 'num';
+        var label = headerText(headers[i]);
         if (c && typeof c === 'object' && !c.nodeType && !Array.isArray(c)) {
-          return el(c.th ? 'th' : 'td', { class: c.cls || (numeric ? 'num' : null), colspan: c.colspan, scope: c.th ? 'row' : null, title: c.title }, c.content);
+          return el(c.th ? 'th' : 'td', { class: c.cls || (numeric ? 'num' : null), colspan: c.colspan, scope: c.th ? 'row' : null, title: c.title, 'data-label': label }, c.content);
         }
-        return el(i === 0 && opts.rowHeaders ? 'th' : 'td', { class: numeric ? 'num' : null, scope: i === 0 && opts.rowHeaders ? 'row' : null }, c);
+        return el(i === 0 && opts.rowHeaders ? 'th' : 'td', { class: numeric ? 'num' : null, scope: i === 0 && opts.rowHeaders ? 'row' : null, 'data-label': label }, c);
       }));
     }));
     return el('div', { class: 'tw' + (opts.tall ? ' tall' : ''), tabindex: '0', role: 'region', 'aria-label': opts.label || 'table' },
@@ -679,9 +702,10 @@ footer p { margin: 4px 0; }
 
   // ---------------------------------------------------------------- strategies
   var SERIES_NAMES = { buy_hold_btc: 'Buy and hold BTC', rebalance_50_50: '50/50 BTC/USDC rebalance', random_entry: 'Random entry' };
+  var BENCH_SHORT = { buy_hold_btc: 'Buy & hold BTC', rebalance_50_50: '50/50 rebalance', random_entry: 'Random entry' };
   var METRIC_NAMES = {
-    wf_oos_sharpe: 'Walk-forward OOS Sharpe', cagr: 'CAGR', max_drawdown: 'Max drawdown', n_trades: 'Trades',
-    walk_forward_efficiency: 'Walk-forward efficiency', sharpe: 'Sharpe', sharpe_median: 'Sharpe (median)', sharpe_p95: 'Sharpe (p95)'
+    wf_oos_sharpe: 'WF OOS Sharpe', cagr: 'CAGR', max_drawdown: 'Max drawdown', n_trades: 'Trades',
+    walk_forward_efficiency: 'WF efficiency', sharpe: 'Sharpe', sharpe_median: 'Sharpe, median', sharpe_p95: 'Sharpe, p95'
   };
   function seriesName(name, strategy) { return name === 'strategy' ? strategy : (SERIES_NAMES[name] || name); }
   function metricName(k) { return METRIC_NAMES[k] || String(k).replace(/_/g, ' '); }
@@ -750,18 +774,20 @@ footer p { margin: 4px 0; }
       empty('No equity curve in the audit file (equity.dates and equity.series).')));
     card.appendChild(grid);
 
-    var grid2 = el('div', { class: 'grid2' });
-    grid2.appendChild(el('div', null, el('h4', null, 'Key metrics vs benchmarks'), metricsTable(latest, s.name)));
-    grid2.appendChild(el('div', null, el('h4', null, 'Audit details'), auditFacts(latest)));
-    card.appendChild(grid2);
+    card.appendChild(el('h4', null, 'Key metrics vs benchmarks'));
+    card.appendChild(metricsTable(latest, s.name));
 
-    card.appendChild(el('h4', null, 'Audit history (' + plural((s.history || []).length, 'audit') + ', oldest first)'));
-    card.appendChild(el('ol', { class: 'trail' }, (s.history || []).map(function (h, i) {
-      return el('li', null, i ? el('span', { class: 'muted', 'aria-hidden': 'true' }, '→') : null,
-        el('span', { class: 'nowrap' }, h.date), stateChip(h.state),
-        el('span', { class: 'muted small' }, '(file: ' + (h.verdict || '—') + ')'));
-    })));
-    card.appendChild(paperExport(s));
+    var grid2 = el('div', { class: 'grid2' });
+    grid2.appendChild(el('div', null, el('h4', null, 'Audit details'), auditFacts(latest)));
+    grid2.appendChild(el('div', null,
+      el('h4', null, 'Audit history (' + plural((s.history || []).length, 'audit') + ', oldest first)'),
+      el('ol', { class: 'trail' }, (s.history || []).map(function (h, i) {
+        return el('li', null, i ? el('span', { class: 'muted', 'aria-hidden': 'true' }, '→') : null,
+          el('span', { class: 'nowrap' }, h.date), stateChip(h.state),
+          el('span', { class: 'muted small' }, '(file: ' + (h.verdict || '—') + ')'));
+      })),
+      paperExport(s)));
+    card.appendChild(grid2);
     return card;
   }
 
@@ -773,7 +799,7 @@ footer p { margin: 4px 0; }
       var hasThreshold = g.threshold !== null && g.threshold !== undefined;
       var rule = hasThreshold ? (g.op ? g.op + ' ' : '') + fmt(g.threshold) : '—';
       return [
-        { content: [def.label || g.key, el('span', { class: 'key' }, 'Default: ' + (def.rule || '—'))] },
+        { content: [def.label || g.key, el('span', { class: 'gdef' }, 'Default: ' + (def.rule || '—'))] },
         { content: fmt(g.value), cls: 'num' },
         { content: [rule, g.note ? el('div', { class: 'small muted' }, g.note) : null] },
         { content: chip(GATE[g.state] || GATE.missing) }
@@ -785,7 +811,7 @@ footer p { margin: 4px 0; }
 
   function metricsTable(a, name) {
     var cols = [{ key: '__strategy', label: name, values: a.metrics || [] }].concat((a.benchmarks || []).map(function (b) {
-      return { key: b.name, label: SERIES_NAMES[b.name] || b.name, values: b.values || [] };
+      return { key: b.name, label: BENCH_SHORT[b.name] || b.name, values: b.values || [] };
     }));
     var keys = [];
     cols.forEach(function (c) { c.values.forEach(function (kv) { if (keys.indexOf(kv[0]) < 0) keys.push(kv[0]); }); });
@@ -796,8 +822,9 @@ footer p { margin: 4px 0; }
         return { content: hit ? fmt(hit[1]) : '—', cls: 'num' };
       }));
     });
-    return table(['Metric'].concat(cols.map(function (c) { return { label: c.label, cls: 'num' }; })), rows,
-      { label: 'Key metrics versus benchmarks', caption: 'Metrics as written by the auditor' });
+    return el('div', null, table(['Metric'].concat(cols.map(function (c) { return { label: c.label, cls: 'num' }; })), rows,
+      { cls: 'metrics-tbl', label: 'Key metrics versus benchmarks', caption: 'Metrics as written by the auditor' }),
+      el('p', { class: 'small muted' }, 'As written by the auditor. WF = walk-forward, out-of-sample (OOS).'));
   }
 
   function auditFacts(a) {
@@ -816,7 +843,7 @@ footer p { margin: 4px 0; }
     row('Git commit', a.git_commit ? el('code', null, a.git_commit) : '—');
     var mcNode = '—';
     if (mc && mc.present) {
-      var budget = isNum(mc.threshold) ? 'budget ' + fmt(mc.threshold) : 'budget ' + (mc.note || 'not set');
+      var budget = isNum(mc.threshold) ? 'budget ' + fmt(mc.threshold) : (mc.note || 'no budget set');
       mcNode = el('div', null, el('span', null, fmt(mc.value) + ' vs ' + budget + ' '), chip(GATE[mc.state] || GATE.missing),
         isNum(mc.value) && isNum(mc.threshold) && mc.threshold > 0 ? mcMeter(mc) : null);
     }
@@ -888,6 +915,16 @@ footer p { margin: 4px 0; }
     return best.length >= 2 ? best : linearTicks(lo, hi, 4).filter(function (v) { return v > 0; });
   }
   function tickLabel(v) { return String(Number(v.toPrecision(3))); }
+  var measureCtx = null;
+  function textWidth(str, px) {
+    try {
+      if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+      measureCtx.font = px + 'px ' + getComputedStyle(document.body).fontFamily;
+      return Math.ceil(measureCtx.measureText(str).width);
+    } catch (e) {
+      return Math.ceil(str.length * px * 0.62);
+    }
+  }
 
   function equityChart(eq, strategyName) {
     var series = eq.series || [];
@@ -964,8 +1001,9 @@ footer p { margin: 4px 0; }
       });
       var showLabels = !narrow && series.length <= 4;
       if (showLabels) {
-        labelW = Math.min(150, 12 + Math.max.apply(null, series.map(function (s) { return seriesName(s.name, strategyName).length; })) * 6.6);
-        m.r = 14 + labelW;
+        labelW = 12 + Math.max.apply(null, series.map(function (s) { return textWidth(seriesName(s.name, strategyName), 12); }));
+        if (labelW > W * 0.3) showLabels = false;
+        else m.r = 14 + labelW;
       }
       var iw = W - m.l - m.r, ih = H - m.t - m.b;
       var x0 = xval(0), x1 = xval(n - 1);
@@ -1043,7 +1081,8 @@ footer p { margin: 4px 0; }
         xhair.setAttribute('x1', x); xhair.setAttribute('x2', x);
         series.forEach(function (s, i) {
           var v = s.values[j];
-          if (ok(v)) { hoverDots[i].setAttribute('cx', x); hoverDots[i].setAttribute('cy', Y(v)); hoverDots[i].setAttribute('visibility', 'visible'); }
+          // dots inherit the group's visibility; only a gap hides one explicitly
+          if (ok(v)) { hoverDots[i].setAttribute('cx', x); hoverDots[i].setAttribute('cy', Y(v)); hoverDots[i].removeAttribute('visibility'); }
           else hoverDots[i].setAttribute('visibility', 'hidden');
         });
         while (tip.firstChild) tip.removeChild(tip.firstChild);

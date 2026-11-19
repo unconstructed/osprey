@@ -1,6 +1,6 @@
 {
   "updated": "2026-11-19",
-  "note": "Docs and dashboard only. The starter code is not in this repo yet, so every milestone is not started and no results exist.",
+  "note": "Status is kept by hand in this file. No results have been recorded yet: no test run, audit or data snapshot.",
   "milestones": {
     "0": {"status": "not_started", "note": "Starter code not yet copied into this repo"},
     "1": {"status": "not_started", "note": ""},
