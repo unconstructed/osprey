@@ -1,0 +1,26 @@
+{
+  "updated": "2026-11-19",
+  "note": "Docs and dashboard only. The starter code is not in this repo yet, so every milestone is not started and no results exist.",
+  "milestones": {
+    "0": {"status": "not_started", "note": "Starter code not yet copied into this repo"},
+    "1": {"status": "not_started", "note": ""},
+    "2": {"status": "not_started", "note": ""},
+    "3": {"status": "not_started", "note": ""},
+    "4": {"status": "not_started", "note": ""},
+    "5": {"status": "not_started", "note": ""}
+  },
+  "open_work": {
+    "5.1": "not_started",
+    "5.2": "not_started",
+    "5.3": "not_started",
+    "5.4": "not_started",
+    "5.5": "not_started",
+    "5.6": "not_started",
+    "5.7": "not_started"
+  },
+  "strategies": {
+    "rebalance-steady": {"paper": {"status": "not_started", "started": null, "note": ""}},
+    "dip-buy-balanced": {"paper": {"status": "not_started", "started": null, "note": ""}},
+    "momentum-bold": {"paper": {"status": "not_started", "started": null, "note": ""}}
+  }
+}

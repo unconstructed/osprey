@@ -1,0 +1,1420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="generator" content="scripts/build_dashboard.py">
+<title>__DASHBOARD_TITLE__</title>
+<!--
+  Template for scripts/build_dashboard.py. Do not open this file directly:
+  the builder injects the collected data below and writes dashboard/index.html.
+  Rendering rules: data strings go into the page with textContent / createElement
+  only; charts are inline SVG drawn here; no network, no external files.
+-->
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --wash: #f0efec;
+  --accent: #2a78d6;
+  --track: #cde2fb;
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --shadow: 0 4px 16px rgba(11, 11, 11, 0.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --wash: #383835;
+    --accent: #3987e5;
+    --track: #0d366b;
+    --good-text: #0ca30c;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --wash: #383835;
+  --accent: #3987e5;
+  --track: #0d366b;
+  --good-text: #0ca30c;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 64px; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; overflow-wrap: anywhere; }
+h1, h2, h3, h4 { line-height: 1.25; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; }
+.nowrap { white-space: nowrap; }
+
+/* Sample banner: unmissable, sticky, never shown for real data */
+.sample-banner {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--warning)
+    repeating-linear-gradient(135deg, rgba(11, 11, 11, 0.10) 0 10px, transparent 10px 20px);
+  color: #0b0b0b; border-bottom: 3px solid #0b0b0b;
+  text-align: center; padding: 10px 16px; font-weight: 800; letter-spacing: 0.02em;
+}
+.sample-banner small { display: block; font-weight: 600; letter-spacing: 0; }
+
+/* Header */
+.page-head { padding-top: 24px; }
+.page-head h1 { font-size: 24px; margin: 0 0 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; font-size: 13px; color: var(--ink-2); }
+.meta div { display: flex; gap: 6px; min-width: 0; }
+.meta dt { font-weight: 600; }
+.meta dd { margin: 0; overflow-wrap: anywhere; }
+.status-note { margin: 12px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0; }
+.toc { margin: 16px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.toc a {
+  font-size: 13px; text-decoration: none; color: var(--ink); padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+}
+.toc a:hover { background: var(--wash); }
+
+section { margin: 36px 0; }
+section > h2 { font-size: 20px; margin: 0 0 4px; }
+.lede { color: var(--ink-2); margin: 0 0 16px; font-size: 14px; max-width: 75ch; }
+h3 { font-size: 17px; margin: 0; }
+h4 { font-size: 14px; margin: 16px 0 8px; color: var(--ink-2); text-transform: none; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.stack > * + * { margin-top: 16px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.grid2 > * { min-width: 0; }
+@media (max-width: 920px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Integrity alert */
+.alert {
+  border: 2px solid var(--critical); border-radius: 10px; padding: 12px 14px; margin: 16px 0 0;
+  background: color-mix(in srgb, var(--critical) 8%, var(--surface));
+}
+.alert-title { display: flex; align-items: center; gap: 8px; font-weight: 700; margin: 0 0 4px; }
+.alert-title .ic { color: var(--critical); }
+.alert ul { margin: 6px 0 0; padding-left: 20px; }
+.alert p { margin: 0; }
+.alert.soft { border-width: 1px; border-color: var(--serious); background: color-mix(in srgb, var(--serious) 8%, var(--surface)); }
+.alert.soft .alert-title .ic { color: var(--serious); }
+.mt { margin-top: 14px; }
+
+/* Stat tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.t-label { font-size: 13px; color: var(--ink-2); margin: 0; }
+.t-value { font-size: 28px; font-weight: 600; line-height: 1.2; margin: 4px 0 2px; overflow-wrap: anywhere; }
+.t-value.dim { color: var(--ink-2); font-size: 20px; font-weight: 500; padding: 4px 0 3px; }
+.t-sub { font-size: 13px; color: var(--ink-2); margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Chips: colour always paired with an icon and a word */
+.k-good { --k: var(--good); }
+.k-critical { --k: var(--critical); }
+.k-warning { --k: var(--warning); }
+.k-serious { --k: var(--serious); }
+.k-info { --k: var(--accent); }
+.k-muted { --k: var(--muted); }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: 13px; line-height: 1; padding: 4px 9px 4px 7px; border-radius: 999px; color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--k) 55%, transparent);
+  background: color-mix(in srgb, var(--k) 12%, var(--surface));
+}
+.chip.big { font-size: 14px; font-weight: 600; padding: 6px 12px 6px 9px; }
+.chip .ic, .ic.k { color: var(--k); }
+.ic { width: 14px; height: 14px; flex: none; display: inline-block; vertical-align: -2px; }
+
+/* Empty state */
+.empty { border: 1px dashed var(--axis); border-radius: 10px; padding: 12px 14px; color: var(--ink-2); font-size: 14px; background: var(--surface); }
+.empty p { margin: 0; }
+.empty .hint { margin-top: 8px; display: grid; gap: 4px; }
+.cmd { display: block; padding: 6px 8px; background: var(--wash); border-radius: 6px; color: var(--ink); white-space: pre-wrap; }
+
+/* Tables */
+.tw { overflow-x: auto; max-width: 100%; }
+.tw.tall { max-height: 360px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+thead th { font-size: 13px; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--axis); white-space: nowrap; background: var(--surface); }
+.tw.tall thead th { position: sticky; top: 0; }
+tbody th { font-weight: 600; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr:last-child > td, tr:last-child > th { border-bottom: 0; }
+
+/* Milestones */
+.ms-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ms { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; }
+.ms-id { font-size: 20px; font-weight: 600; color: var(--ink-2); line-height: 1.2; }
+.ms-name { font-weight: 600; }
+.ms-done, .ms-note { grid-column: 2 / 4; font-size: 14px; color: var(--ink-2); margin: 0; }
+.ms-note { color: var(--ink); }
+@media (max-width: 560px) {
+  .ms { grid-template-columns: 28px minmax(0, 1fr); }
+  .ms > .chip { grid-column: 2; justify-self: start; }
+  .ms-done, .ms-note { grid-column: 2; }
+}
+
+/* Strategy cards */
+.strat-list { display: grid; gap: 16px; }
+.strat-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.strat-head h3 { margin-right: auto; overflow-wrap: anywhere; }
+.risk { font-size: 13px; color: var(--ink-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; }
+.idea { margin: 6px 0 0; color: var(--ink-2); font-size: 14px; }
+.track { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; padding: 0; margin: 12px 0 0; }
+.track li { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.track .step { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 6px; border-radius: 999px; border: 1px solid var(--border); }
+.track .on .step { color: var(--ink); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.track .on .ic { color: var(--accent); }
+.track .cur .step { font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent); }
+.track .sep { color: var(--axis); }
+.audit-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 14px 0 0; font-size: 14px; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 14px; }
+.facts dt { color: var(--ink-2); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.trail { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 13px; }
+.trail li { display: inline-flex; align-items: center; gap: 6px; }
+.lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.lines li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.lines .lbl { color: var(--ink-2); min-width: 9em; }
+.gate-tbl td:first-child { min-width: 11em; }
+.gate-tbl .key { display: block; font-size: 12px; color: var(--ink-2); }
+
+/* Gate matrix */
+.matrix th, .matrix td { text-align: center; padding: 6px 4px; }
+.matrix th:first-child, .matrix td:first-child { text-align: left; padding-left: 10px; }
+.matrix thead th { white-space: normal; min-width: 64px; font-size: 12px; vertical-align: bottom; }
+.matrix td.gc { color: var(--k); background: color-mix(in srgb, var(--k) 13%, transparent); border-left: 2px solid var(--surface); }
+.matrix td.gc .ic { width: 16px; height: 16px; }
+.matrix td.na { color: var(--ink-2); font-size: 13px; text-align: left; }
+.legend-row { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; font-size: 13px; color: var(--ink-2); }
+.legend-row span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Meters (mutation score vs target) */
+.meters { display: grid; gap: 14px; }
+.meter-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 210px; gap: 4px 14px; align-items: center; }
+.m-name strong { display: block; }
+.m-bar { position: relative; height: 8px; border-radius: 4px; background: var(--track); margin-top: 14px; }
+.m-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--k); }
+.m-target { position: absolute; top: -6px; width: 2px; height: 20px; background: var(--ink); border-radius: 1px; transform: translateX(-1px); }
+.m-target span { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.m-fig { font-size: 14px; }
+.m-fig .score { font-size: 18px; font-weight: 600; margin-right: 6px; }
+@media (max-width: 640px) {
+  .meter-row { grid-template-columns: minmax(0, 1fr); }
+  .m-bar { margin-top: 18px; }
+}
+
+/* Checklist */
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.checklist li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; }
+.checklist .ic { margin-top: 2px; }
+
+/* Charts */
+figure.chart { margin: 0; min-width: 0; }
+.chart-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.chart-title { font-size: 14px; font-weight: 600; margin: 0; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font: inherit; font-size: 13px; padding: 4px 12px; border: 0; background: var(--surface); color: var(--ink-2); cursor: pointer; min-height: 30px;
+}
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--wash); color: var(--ink); font-weight: 600; }
+.legend { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink); }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.key { display: inline-block; width: 16px; height: 2px; border-radius: 1px; background: var(--c); }
+.plot { position: relative; margin-top: 4px; }
+.plot svg { display: block; overflow: visible; }
+.plot svg:focus { outline: none; }
+.plot svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.c1 { --c: var(--s1); } .c2 { --c: var(--s2); } .c3 { --c: var(--s3); } .c4 { --c: var(--s4); }
+.c5 { --c: var(--s5); } .c6 { --c: var(--s6); } .c7 { --c: var(--s7); } .c8 { --c: var(--s8); }
+.gridline { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+.baseline { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
+.tick { fill: var(--ink-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.axis-title { fill: var(--ink-2); font-size: 12px; }
+.line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.dot { fill: var(--c); stroke: var(--surface); stroke-width: 2; }
+.end-label { fill: var(--ink); font-size: 12px; }
+.xhair { stroke: var(--ink-2); stroke-width: 1; shape-rendering: crispEdges; }
+.tip {
+  position: absolute; z-index: 5; pointer-events: none; min-width: 170px; max-width: 260px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow); padding: 8px 10px; font-size: 13px;
+}
+.tip .t-date { color: var(--ink-2); margin-bottom: 4px; }
+.tip .row { display: grid; grid-template-columns: 14px auto minmax(0, 1fr); align-items: center; gap: 6px; }
+.tip .row strong { font-variant-numeric: tabular-nums; }
+.tip .row span:last-child { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details > summary { cursor: pointer; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+details[open] > summary { margin-bottom: 8px; }
+.mc-meter { position: relative; height: 8px; border-radius: 4px; background: var(--track); margin: 22px 0 4px; max-width: 320px; }
+
+/* Lists */
+.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.plain li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
+.plain .date { color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 6.5em; }
+.warn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.warn-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; font-size: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.warn-list li.integrity { border: 2px solid var(--critical); }
+.warn-list .src { display: block; font-size: 13px; color: var(--ink-2); }
+.warn-list .ic { margin-top: 3px; }
+
+footer { margin: 48px auto 32px; padding-top: 16px; border-top: 1px solid var(--grid); font-size: 13px; color: var(--ink-2); }
+footer p { margin: 4px 0; }
+.fatal { margin: 32px 0; }
+
+@media (max-width: 480px) {
+  .page-head h1 { font-size: 20px; }
+  .t-value { font-size: 24px; }
+  .card { padding: 14px 12px; }
+}
+@media (forced-colors: active) {
+  .chip, .tile, .card { border: 1px solid CanvasText; }
+  .m-fill { background: Highlight; }
+}
+</style>
+</head>
+<body>
+<div id="sample-banner" class="sample-banner" role="note" hidden>SAMPLE DATA - not real results<small>Every number on this page is synthetic, generated by build_dashboard.py --sample (seed 7).</small></div>
+
+<header class="page-head wrap">
+  <h1>Osprey Strategy Lab - results dashboard</h1>
+  <dl class="meta" id="meta"></dl>
+  <p class="status-note" id="status-note" hidden></p>
+  <div id="integrity-top"></div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#overview">Overview</a>
+    <a href="#milestones">Milestones</a>
+    <a href="#strategies">Strategies</a>
+    <a href="#gate-matrix">Gate matrix</a>
+    <a href="#testing">Testing health</a>
+    <a href="#data">Data</a>
+    <a href="#search-runs">Search runs</a>
+    <a href="#reports">Reports</a>
+    <a href="#warnings" id="toc-warnings">Warnings</a>
+  </nav>
+</header>
+
+<main class="wrap" id="main">
+  <section id="overview" aria-labelledby="h-overview">
+    <h2 id="h-overview">Overview</h2>
+    <p class="lede">Headline state of the lab, read from the files listed in each section below.</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="milestones" aria-labelledby="h-milestones">
+    <h2 id="h-milestones">Milestones</h2>
+    <p class="lede">Milestones and their done-when text come from AGENTS.md; status and notes from dashboard/status.json (edited by hand).</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="strategies" aria-labelledby="h-strategies">
+    <h2 id="h-strategies">Strategies</h2>
+    <p class="lede">The launch strategies from AGENTS.md plus every strategy found in strategies/, reports/ or exports/. Gate values and thresholds are shown exactly as the audit file records them; the overall state is derived from the gates' pass flags, and a missing gate never counts as a pass. Approval for production is the owner's decision.</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="gate-matrix" aria-labelledby="h-gate-matrix">
+    <h2 id="h-gate-matrix">Gate matrix</h2>
+    <p class="lede">Latest audit per strategy against the nine validation gates.</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="testing" aria-labelledby="h-testing">
+    <h2 id="h-testing">Testing health</h2>
+    <p class="lede">From results/tests/ (git-ignored, written by the commands in HOWTO.md) and TESTING.md.</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="data" aria-labelledby="h-data">
+    <h2 id="h-data">Data</h2>
+    <p class="lede">The data catalog snapshot (data/catalog/SNAPSHOT.json, git-ignored) and committed data-quality reports (reports/data/).</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="search-runs" aria-labelledby="h-search-runs">
+    <h2 id="h-search-runs">Search runs</h2>
+    <p class="lede">Local runs, git-ignored: folders under results/ on the machine that built this page.</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="reports" aria-labelledby="h-reports">
+    <h2 id="h-reports">Reports</h2>
+    <p class="lede">Every committed reports/**/*.md, newest first.</p>
+    <div class="body"></div>
+  </section>
+
+  <section id="warnings" aria-labelledby="h-warnings">
+    <h2 id="h-warnings">Warnings</h2>
+    <p class="lede">Everything the builder could not read or that does not add up. A warning never stops the page from building.</p>
+    <div class="body"></div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>Built by scripts/build_dashboard.py from files in this repo. No number on this page is typed by hand except dashboard/status.json.</p>
+  <p id="footer-links"></p>
+</footer>
+
+<noscript><p class="wrap">This page needs JavaScript to draw the data. The raw data is in the dashboard-data block of the page source.</p></noscript>
+
+<script type="application/json" id="dashboard-data">__DASHBOARD_DATA__</script>
+<script>
+(function () {
+  'use strict';
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var D = null;
+  try {
+    D = JSON.parse(document.getElementById('dashboard-data').textContent);
+  } catch (e) {
+    D = null;
+  }
+
+  // ---------------------------------------------------------------- DOM helpers
+  // Every string from the data goes in through textContent / createTextNode.
+
+  function setAttrs(node, attrs) {
+    if (!attrs) return;
+    Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'text') node.textContent = String(v);
+      else if (k.slice(0, 2) === 'on' && typeof v === 'function') node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? '' : String(v));
+    });
+  }
+  function append(node, kids) {
+    kids.forEach(function add(k) {
+      if (k === null || k === undefined || k === false) return;
+      if (Array.isArray(k)) { k.forEach(add); return; }
+      node.appendChild(typeof k === 'string' || typeof k === 'number' ? document.createTextNode(String(k)) : k);
+    });
+  }
+  function el(tag, attrs) {
+    var node = document.createElement(tag);
+    setAttrs(node, attrs);
+    append(node, Array.prototype.slice.call(arguments, 2));
+    return node;
+  }
+  function svg(tag, attrs) {
+    var node = document.createElementNS(SVGNS, tag);
+    setAttrs(node, attrs);
+    append(node, Array.prototype.slice.call(arguments, 2));
+    return node;
+  }
+  function body(id) { return document.querySelector('#' + id + ' > .body'); }
+
+  // ---------------------------------------------------------------- formatting
+  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  function fmt(v) {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'boolean') return v ? 'yes' : 'no';
+    if (typeof v === 'string') return v === '' ? '—' : v;
+    if (!isNum(v)) return '—';
+    if (Number.isInteger(v)) return v.toLocaleString('en-US');
+    var a = Math.abs(v);
+    var s = a >= 100 ? v.toFixed(1) : a >= 1 ? v.toFixed(2) : v.toPrecision(3);
+    return Number(s).toLocaleString('en-US', { maximumFractionDigits: 6 });
+  }
+  function pct(v, digits) {
+    if (!isNum(v)) return '—';
+    return (v * 100).toFixed(digits === undefined ? 1 : digits) + '%';
+  }
+  function fmtTime(s) {
+    if (typeof s !== 'string' || !s) return '—';
+    var m = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/.exec(s);
+    if (!m) return s;
+    var utc = /(Z|[+-]00:?00)$/.test(s);
+    return m[1] + ' ' + m[2] + (utc ? ' UTC' : '');
+  }
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
+
+  // Relative links into the repo. Paths come from file listings made by the
+  // builder; anything that looks like a URL scheme or absolute path is not linked.
+  function href(path) {
+    if (typeof path !== 'string' || !path) return null;
+    if (D.link_root === null || D.link_root === undefined) return null;
+    if (/^[a-z][a-z0-9+.\-]*:/i.test(path) || path.charAt(0) === '/' || path.charAt(0) === '\\') return null;
+    var parts = path.split('#');
+    var enc = parts[0].split('/').map(encodeURIComponent).join('/');
+    var base = D.link_root === '.' || D.link_root === '' ? '' :
+      String(D.link_root).split('/').map(encodeURIComponent).join('/') + '/';
+    return base + enc + (parts[1] ? '#' + encodeURIComponent(parts[1]) : '');
+  }
+  function fileLink(path, label) {
+    var h = href(path);
+    return h ? el('a', { href: h }, el('code', null, label || path)) : el('code', null, label || path);
+  }
+
+  // ---------------------------------------------------------------- icons
+  var ICONS = {
+    check: ['path', { d: 'M3 8.5l3.2 3.2L13 4.8', fill: 'none', 'stroke-width': 2.2 }],
+    cross: ['path', { d: 'M4 4l8 8M12 4l-8 8', fill: 'none', 'stroke-width': 2.2 }],
+    clock: ['g', null, ['circle', { cx: 8, cy: 8, r: 5.8, fill: 'none', 'stroke-width': 1.8 }],
+      ['path', { d: 'M8 4.8V8l2.3 1.6', fill: 'none', 'stroke-width': 1.8 }]],
+    triangle: ['path', { d: 'M8 2.2l6.2 11H1.8z', fill: 'none', 'stroke-width': 1.8, 'stroke-linejoin': 'round' }],
+    half: ['g', null, ['circle', { cx: 8, cy: 8, r: 5.8, fill: 'none', 'stroke-width': 1.8 }],
+      ['path', { d: 'M8 2.2a5.8 5.8 0 0 1 0 11.6z', stroke: 'none', fill: 'currentColor' }]],
+    square: ['rect', { x: 3, y: 3, width: 10, height: 10, rx: 1.5, stroke: 'none', fill: 'currentColor' }],
+    ring: ['circle', { cx: 8, cy: 8, r: 5.8, fill: 'none', 'stroke-width': 1.8 }],
+    dot: ['circle', { cx: 8, cy: 8, r: 5, stroke: 'none', fill: 'currentColor' }],
+    dash: ['path', { d: 'M4 8h8', fill: 'none', 'stroke-width': 2 }],
+    question: ['g', null, ['path', { d: 'M5.6 5.6a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.6', fill: 'none', 'stroke-width': 1.9, 'stroke-linecap': 'round' }],
+      ['circle', { cx: 8, cy: 12.6, r: 1.1, stroke: 'none', fill: 'currentColor' }]],
+    alert: ['g', null, ['path', { d: 'M8 1.8l6.6 11.7H1.4z', fill: 'none', 'stroke-width': 1.7, 'stroke-linejoin': 'round' }],
+      ['path', { d: 'M8 6.2v3.6', fill: 'none', 'stroke-width': 1.8 }], ['circle', { cx: 8, cy: 11.7, r: 0.95, stroke: 'none', fill: 'currentColor' }]],
+    box: ['rect', { x: 2.5, y: 2.5, width: 11, height: 11, rx: 2, fill: 'none', 'stroke-width': 1.6 }],
+    boxcheck: ['g', null, ['rect', { x: 2.5, y: 2.5, width: 11, height: 11, rx: 2, fill: 'none', 'stroke-width': 1.6 }],
+      ['path', { d: 'M5 8.3l2 2L11.2 6', fill: 'none', 'stroke-width': 1.9 }]]
+  };
+  function buildIcon(spec) {
+    var node = svg(spec[0], spec[1]);
+    for (var i = 2; i < spec.length; i++) node.appendChild(buildIcon(spec[i]));
+    return node;
+  }
+  function icon(name, cls) {
+    var s = svg('svg', { viewBox: '0 0 16 16', class: 'ic' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true',
+      stroke: 'currentColor', 'stroke-linecap': 'round', focusable: 'false' });
+    s.appendChild(buildIcon(ICONS[name] || ICONS.dot));
+    return s;
+  }
+
+  // ---------------------------------------------------------------- chips
+  var STATUS = {
+    done: ['good', 'check', 'Done'],
+    in_progress: ['info', 'half', 'In progress'],
+    blocked: ['critical', 'square', 'Blocked'],
+    not_started: ['muted', 'ring', 'Not started']
+  };
+  var STATE = {
+    'READY FOR PAPER': ['good', 'check', 'Ready for paper'],
+    'AWAITING FINAL TEST': ['info', 'clock', 'Awaiting final test'],
+    'INCOMPLETE': ['warning', 'triangle', 'Incomplete'],
+    'FAIL': ['critical', 'cross', 'Fail']
+  };
+  var GATE = {
+    pass: ['good', 'check', 'Pass'],
+    fail: ['critical', 'cross', 'Fail'],
+    pending: ['info', 'clock', 'Pending'],
+    missing: ['serious', 'question', 'Missing']
+  };
+  function chip(spec, opts) {
+    opts = opts || {};
+    return el('span', { class: 'chip k-' + spec[0] + (opts.big ? ' big' : ''), title: opts.title },
+      icon(spec[1]), el('span', null, opts.label || spec[2]));
+  }
+  function statusChip(s) {
+    if (s === null || s === undefined) return chip(['muted', 'dash', 'Not recorded']);
+    return STATUS[s] ? chip(STATUS[s]) : chip(['warning', 'question', 'Unknown: ' + s]);
+  }
+  function stateChip(state, big) {
+    if (!state) return chip(['muted', 'ring', 'Not audited yet'], { big: big });
+    return chip(STATE[state] || ['warning', 'question', String(state)], { big: big });
+  }
+
+  // ---------------------------------------------------------------- generic pieces
+  function empty(message, commands) {
+    return el('div', { class: 'empty' }, el('p', null, message),
+      commands && commands.length ? el('div', { class: 'hint' }, commands.map(function (c) {
+        return typeof c === 'string' ? el('code', { class: 'cmd' }, c) : c;
+      })) : null);
+  }
+  function table(headers, rows, opts) {
+    opts = opts || {};
+    var thead = el('thead', null, el('tr', null, headers.map(function (h) {
+      var cls = typeof h === 'object' && h !== null && !h.nodeType ? h.cls : null;
+      var label = typeof h === 'object' && h !== null && !h.nodeType ? h.label : h;
+      return el('th', { scope: 'col', class: cls, title: (h && h.title) || null }, label);
+    })));
+    var tbody = el('tbody', null, rows.map(function (r) {
+      return el('tr', null, r.map(function (c, i) {
+        var numeric = headers[i] && headers[i].cls === 'num';
+        if (c && typeof c === 'object' && !c.nodeType && !Array.isArray(c)) {
+          return el(c.th ? 'th' : 'td', { class: c.cls || (numeric ? 'num' : null), colspan: c.colspan, scope: c.th ? 'row' : null, title: c.title }, c.content);
+        }
+        return el(i === 0 && opts.rowHeaders ? 'th' : 'td', { class: numeric ? 'num' : null, scope: i === 0 && opts.rowHeaders ? 'row' : null }, c);
+      }));
+    }));
+    return el('div', { class: 'tw' + (opts.tall ? ' tall' : ''), tabindex: '0', role: 'region', 'aria-label': opts.label || 'table' },
+      el('table', { class: opts.cls }, opts.caption ? el('caption', { class: 'sr' }, opts.caption) : null, thead, tbody));
+  }
+  function tile(label, value, sub, opts) {
+    opts = opts || {};
+    return el('div', { class: 'tile' },
+      el('p', { class: 't-label' }, label),
+      el('p', { class: 't-value' + (opts.dim ? ' dim' : '') }, value),
+      sub ? el('p', { class: 't-sub' }, sub) : null);
+  }
+
+  // ---------------------------------------------------------------- header
+  function renderHeader() {
+    if (D.sample) document.getElementById('sample-banner').hidden = false;
+    var snap = D.data && D.data.snapshot;
+    var meta = document.getElementById('meta');
+    [['Generated', fmtTime(D.generated_utc)],
+     ['Commit', D.git ? D.git.commit : 'unknown'],
+     ['Branch', D.git ? D.git.branch : 'unknown'],
+     ['Data snapshot', snap && snap.id ? snap.id : 'no data snapshot yet'],
+     ['status.json updated', D.status && D.status.updated ? D.status.updated : (D.status && D.status.present ? 'not set' : 'no status.json')]
+    ].forEach(function (p) {
+      meta.appendChild(el('div', null, el('dt', null, p[0]), el('dd', null, p[1])));
+    });
+    if (D.status && D.status.note) {
+      var note = document.getElementById('status-note');
+      note.textContent = D.status.note;
+      note.hidden = false;
+    }
+    var integrity = (D.warnings || []).filter(function (w) { return w.level === 'integrity'; });
+    if (integrity.length) {
+      document.getElementById('integrity-top').appendChild(el('div', { class: 'alert', role: 'alert' },
+        el('p', { class: 'alert-title' }, icon('alert'), plural(integrity.length, 'integrity warning') + ': an audit file disagrees with its own gate flags'),
+        el('ul', null, integrity.map(function (w) { return el('li', null, el('code', null, w.source), ' — ', w.message); }))));
+    }
+    var n = (D.warnings || []).length;
+    document.getElementById('toc-warnings').textContent = 'Warnings (' + n + ')';
+    var links = document.getElementById('footer-links');
+    var how = href('HOWTO.md#dashboard');
+    links.appendChild(document.createTextNode('How to rebuild this page and produce each input: '));
+    links.appendChild(how ? el('a', { href: how }, 'HOWTO.md#dashboard') : el('code', null, 'HOWTO.md#dashboard'));
+    links.appendChild(document.createTextNode('. Input reference: '));
+    var readme = href('dashboard/README.md');
+    links.appendChild(readme ? el('a', { href: readme }, 'dashboard/README.md') : el('code', null, 'dashboard/README.md'));
+    links.appendChild(document.createTextNode('.'));
+  }
+
+  // ---------------------------------------------------------------- overview
+  function renderOverview() {
+    var o = D.overview || {};
+    var tiles = el('div', { class: 'tiles' });
+    tiles.appendChild(tile('Milestones done',
+      o.milestones_total ? o.milestones_done + '/' + o.milestones_total : '—',
+      o.milestones_total ? 'status from dashboard/status.json' : 'no milestones found', { dim: !o.milestones_total }));
+    tiles.appendChild(tile('Strategies ready for paper',
+      String(o.strategies_ready || 0),
+      (o.strategies_audited || 0) + ' audited · ' + (o.strategies_total || 0) + ' tracked'));
+    if (isNum(o.tests_total)) {
+      tiles.appendChild(tile('Latest test run', o.tests_passed + '/' + o.tests_total,
+        o.tests_failed ? [icon('cross', 'k k-critical'), o.tests_failed + ' failed or errored'] :
+          [icon('check', 'k k-good'), 'passed (skips excluded)']));
+    } else {
+      tiles.appendChild(tile('Latest test run', 'No run recorded', 'see Testing health for the command', { dim: true }));
+    }
+    var cov = D.testing && D.testing.coverage;
+    tiles.appendChild(isNum(o.coverage_percent) ?
+      tile('Coverage (branch)', o.coverage_percent.toFixed(1) + '%',
+        cov && isNum(cov.branches_total) && isNum(cov.branches_covered) ?
+          cov.branches_covered.toLocaleString('en-US') + ' of ' + cov.branches_total.toLocaleString('en-US') + ' branches' :
+          'coverage.py percent_covered') :
+      tile('Coverage (branch)', 'No report', 'results/tests/coverage.json', { dim: true }));
+    var nw = o.warnings || 0;
+    tiles.appendChild(tile('Warnings', String(nw),
+      o.integrity_warnings ? [icon('alert', 'k k-critical'), o.integrity_warnings + ' integrity'] :
+        (nw ? 'see the Warnings section' : [icon('check', 'k k-good'), 'every input read cleanly'])));
+    body('overview').appendChild(tiles);
+  }
+
+  // ---------------------------------------------------------------- milestones
+  function renderMilestones() {
+    var target = body('milestones');
+    var ms = D.milestones || [];
+    if (!ms.length) {
+      target.appendChild(empty('No milestones found. They are read from the "## Milestones" table in AGENTS.md, with status from dashboard/status.json.'));
+      return;
+    }
+    target.appendChild(el('div', { class: 'card' }, el('ol', { class: 'ms-list' }, ms.map(function (m) {
+      return el('li', { class: 'ms' },
+        el('span', { class: 'ms-id', 'aria-label': 'Milestone ' + m.id }, m.id),
+        el('span', { class: 'ms-name' }, m.name || 'Milestone ' + m.id),
+        statusChip(m.status),
+        m.done_when ? el('p', { class: 'ms-done' }, 'Done when: ' + m.done_when) : null,
+        m.note ? el('p', { class: 'ms-note' }, 'Note: ' + m.note) : null);
+    }))));
+  }
+
+  // ---------------------------------------------------------------- strategies
+  var SERIES_NAMES = { buy_hold_btc: 'Buy and hold BTC', rebalance_50_50: '50/50 BTC/USDC rebalance', random_entry: 'Random entry' };
+  var METRIC_NAMES = {
+    wf_oos_sharpe: 'Walk-forward OOS Sharpe', cagr: 'CAGR', max_drawdown: 'Max drawdown', n_trades: 'Trades',
+    walk_forward_efficiency: 'Walk-forward efficiency', sharpe: 'Sharpe', sharpe_median: 'Sharpe (median)', sharpe_p95: 'Sharpe (p95)'
+  };
+  function seriesName(name, strategy) { return name === 'strategy' ? strategy : (SERIES_NAMES[name] || name); }
+  function metricName(k) { return METRIC_NAMES[k] || String(k).replace(/_/g, ' '); }
+
+  function renderStrategies() {
+    var target = body('strategies');
+    var list = D.strategies || [];
+    if (!list.length) {
+      target.appendChild(empty('No strategies found. They come from the "## Strategies to build first" table in AGENTS.md, strategies/<name>/, reports/<name>/<date>.json and exports/<name>/.'));
+      return;
+    }
+    var wrap = el('div', { class: 'strat-list' });
+    list.forEach(function (s) { wrap.appendChild(strategyCard(s)); });
+    target.appendChild(wrap);
+  }
+
+  function stageTrack(s) {
+    var ol = el('ol', { class: 'track', 'aria-label': 'Lifecycle stage' });
+    (s.stages || []).forEach(function (st, i) {
+      if (i) ol.appendChild(el('li', { class: 'sep', 'aria-hidden': 'true' }, '›'));
+      var cur = st.key === s.stage;
+      ol.appendChild(el('li', { class: (st.reached ? 'on' : '') + (cur ? ' cur' : '') },
+        el('span', { class: 'step' }, icon(st.reached ? 'check' : 'ring'), st.label,
+          el('span', { class: 'sr' }, st.reached ? (cur ? ' (current stage)' : ' (reached)') : ' (not reached)'))));
+    });
+    return ol;
+  }
+
+  function strategyCard(s) {
+    var latest = s.latest;
+    var card = el('article', { class: 'card', id: 'strategy-' + String(s.name).replace(/[^A-Za-z0-9_-]/g, '_'), 'aria-label': 'Strategy ' + s.name });
+    card.appendChild(el('div', { class: 'strat-head' },
+      el('h3', null, s.name),
+      s.risk_level ? el('span', { class: 'risk' }, 'Risk: ' + s.risk_level) : null,
+      stateChip(latest ? latest.state : null, true)));
+    var ideaBits = [];
+    if (s.idea) ideaBits.push(s.idea);
+    if (s.free_params) ideaBits.push('Free parameters: ' + s.free_params);
+    if (!s.in_launch_table) ideaBits.push('Not in the AGENTS.md launch table.');
+    if (ideaBits.length) card.appendChild(el('p', { class: 'idea' }, ideaBits.join(' · ')));
+    card.appendChild(stageTrack(s));
+
+    if (latest && latest.integrity) {
+      var hard = latest.integrity.level === 'integrity';
+      card.appendChild(el('div', { class: hard ? 'alert' : 'alert soft', role: hard ? 'alert' : null },
+        el('p', { class: 'alert-title' }, icon('alert'), hard ? 'Integrity warning' : 'Verdict mismatch'),
+        el('p', null, latest.integrity.message)));
+    }
+
+    if (!latest) {
+      card.appendChild(el('div', { class: 'mt' }, empty(
+        'Not audited yet. backtest-auditor writes reports/' + s.name + '/<YYYY-MM-DD>.md and a JSON sidecar next to it (schema in HOWTO.md#dashboard).',
+        ['uv run python -m lab.validation.audit --strategy ' + s.name + '   # to build (milestone 4)'])));
+      card.appendChild(paperExport(s));
+      return card;
+    }
+
+    card.appendChild(el('p', { class: 'audit-line' },
+      el('span', null, 'Latest audit ', el('strong', null, latest.date)),
+      el('span', { class: 'muted' }, 'verdict in file: ', el('strong', null, latest.verdict || '—')),
+      el('span', { class: 'muted' }, 'derived: ' + latest.state_reason)));
+
+    var grid = el('div', { class: 'grid2' });
+    grid.appendChild(el('div', null, el('h4', null, 'Validation gates'), gateTable(latest)));
+    grid.appendChild(el('div', null, el('h4', null, 'Equity'), latest.equity ? equityChart(latest.equity, s.name) :
+      empty('No equity curve in the audit file (equity.dates and equity.series).')));
+    card.appendChild(grid);
+
+    var grid2 = el('div', { class: 'grid2' });
+    grid2.appendChild(el('div', null, el('h4', null, 'Key metrics vs benchmarks'), metricsTable(latest, s.name)));
+    grid2.appendChild(el('div', null, el('h4', null, 'Audit details'), auditFacts(latest)));
+    card.appendChild(grid2);
+
+    card.appendChild(el('h4', null, 'Audit history (' + plural((s.history || []).length, 'audit') + ', oldest first)'));
+    card.appendChild(el('ol', { class: 'trail' }, (s.history || []).map(function (h, i) {
+      return el('li', null, i ? el('span', { class: 'muted', 'aria-hidden': 'true' }, '→') : null,
+        el('span', { class: 'nowrap' }, h.date), stateChip(h.state),
+        el('span', { class: 'muted small' }, '(file: ' + (h.verdict || '—') + ')'));
+    })));
+    card.appendChild(paperExport(s));
+    return card;
+  }
+
+  function gateTable(a) {
+    var defs = {};
+    (D.gate_defs || []).forEach(function (g) { defs[g.key] = g; });
+    var rows = (a.gates || []).map(function (g) {
+      var def = defs[g.key] || {};
+      var hasThreshold = g.threshold !== null && g.threshold !== undefined;
+      var rule = hasThreshold ? (g.op ? g.op + ' ' : '') + fmt(g.threshold) : '—';
+      return [
+        { content: [def.label || g.key, el('span', { class: 'key' }, 'Default: ' + (def.rule || '—'))] },
+        { content: fmt(g.value), cls: 'num' },
+        { content: [rule, g.note ? el('div', { class: 'small muted' }, g.note) : null] },
+        { content: chip(GATE[g.state] || GATE.missing) }
+      ];
+    });
+    return table(['Gate', { label: 'Value', cls: 'num' }, 'Rule used', 'Result'], rows,
+      { cls: 'gate-tbl', label: 'Validation gates', caption: 'Validation gates for the latest audit' });
+  }
+
+  function metricsTable(a, name) {
+    var cols = [{ key: '__strategy', label: name, values: a.metrics || [] }].concat((a.benchmarks || []).map(function (b) {
+      return { key: b.name, label: SERIES_NAMES[b.name] || b.name, values: b.values || [] };
+    }));
+    var keys = [];
+    cols.forEach(function (c) { c.values.forEach(function (kv) { if (keys.indexOf(kv[0]) < 0) keys.push(kv[0]); }); });
+    if (!keys.length) return empty('No metrics or benchmarks in the audit file.');
+    var rows = keys.map(function (k) {
+      return [{ content: metricName(k), th: true }].concat(cols.map(function (c) {
+        var hit = c.values.filter(function (kv) { return kv[0] === k; })[0];
+        return { content: hit ? fmt(hit[1]) : '—', cls: 'num' };
+      }));
+    });
+    return table(['Metric'].concat(cols.map(function (c) { return { label: c.label, cls: 'num' }; })), rows,
+      { label: 'Key metrics versus benchmarks', caption: 'Metrics as written by the auditor' });
+  }
+
+  function auditFacts(a) {
+    var mc = (a.gates || []).filter(function (g) { return g.key === 'mc_p95_max_drawdown'; })[0];
+    var dl = el('dl', { class: 'facts' });
+    function row(k, v) { dl.appendChild(el('dt', null, k)); dl.appendChild(el('dd', null, v)); }
+    row('Audit file', fileLink(a.path));
+    var report = a.report_md && a.report_md.path ? fileLink(a.report_md.path) :
+      a.md_path ? fileLink(a.md_path) : (a.report_md ? el('span', null, a.report_md.text, el('span', { class: 'muted' }, ' (no such file)')) : '—');
+    row('Report', report);
+    row('Window', a.window ? (a.window.start || '?') + ' to ' + (a.window.end || '?') : '—');
+    row('Test window opened', fmt(a.test_window_opened));
+    row('Trials', [fmt(a.n_trials), isNum(a.effective_trials) ? el('span', { class: 'muted' }, ' (effective ' + fmt(a.effective_trials) + ')') : null]);
+    row('Seed', fmt(a.seed));
+    row('Data snapshot', a.data_snapshot ? el('code', null, a.data_snapshot) : '—');
+    row('Git commit', a.git_commit ? el('code', null, a.git_commit) : '—');
+    var mcNode = '—';
+    if (mc && mc.present) {
+      var budget = isNum(mc.threshold) ? 'budget ' + fmt(mc.threshold) : 'budget ' + (mc.note || 'not set');
+      mcNode = el('div', null, el('span', null, fmt(mc.value) + ' vs ' + budget + ' '), chip(GATE[mc.state] || GATE.missing),
+        isNum(mc.value) && isNum(mc.threshold) && mc.threshold > 0 ? mcMeter(mc) : null);
+    }
+    row('MC p95 max drawdown', mcNode);
+    return dl;
+  }
+
+  function mcMeter(mc) {
+    var max = Math.max(mc.value, mc.threshold) * 1.15;
+    var kind = mc.state === 'pass' ? 'k-info' : mc.state === 'fail' ? 'k-critical' : 'k-muted';
+    var bar = el('div', { class: 'mc-meter', role: 'img', 'aria-label': 'Drawdown ' + fmt(mc.value) + ' against budget ' + fmt(mc.threshold) });
+    var fill = el('div', { class: 'm-fill ' + kind });
+    fill.style.width = Math.min(100, mc.value / max * 100) + '%';
+    var mark = el('div', { class: 'm-target' }, el('span', null, 'budget'));
+    mark.style.left = Math.min(100, mc.threshold / max * 100) + '%';
+    bar.appendChild(fill);
+    bar.appendChild(mark);
+    return bar;
+  }
+
+  function paperExport(s) {
+    var p = s.paper;
+    var ul = el('ul', { class: 'lines' });
+    ul.appendChild(el('li', null, el('span', { class: 'lbl' }, 'Paper model account'),
+      p ? statusChip(p.status) : statusChip(null),
+      p && p.started ? el('span', { class: 'muted small' }, 'started ' + p.started) : null,
+      p && p.note ? el('span', { class: 'small' }, p.note) : null));
+    ul.appendChild(el('li', null, el('span', { class: 'lbl' }, 'Export'),
+      s.export ? [chip(['good', 'check', 'Exported']), fileLink(s.export.path), el('span', { class: 'muted small' }, 'modified ' + fmtTime(s.export.modified))] :
+        el('span', { class: 'muted' }, 'Not exported (risk-officer writes exports/' + s.name + '/config.yaml after the owner approves)')));
+    ul.appendChild(el('li', null, el('span', { class: 'lbl' }, 'Strategy folder'),
+      s.folder ? ['strategy.py', 'params.yaml', 'README.md'].map(function (f) {
+        var ok = s.folder.files && s.folder.files[f];
+        return el('span', { class: 'nowrap' }, icon(ok ? 'check' : 'cross', 'k ' + (ok ? 'k-good' : 'k-muted')), ' ', f, el('span', { class: 'sr' }, ok ? ' present' : ' missing'));
+      }) : el('span', { class: 'muted' }, 'No strategies/' + s.name + '/ folder yet')));
+    return el('div', null, el('h4', null, 'Paper and export'), ul);
+  }
+
+  // ---------------------------------------------------------------- equity chart
+  var redraws = [];
+
+  function niceStep(span, count) {
+    var raw = span / Math.max(1, count);
+    var p = Math.pow(10, Math.floor(Math.log10(raw)));
+    var f = raw / p;
+    return (f >= 7.5 ? 10 : f >= 3.5 ? 5 : f >= 1.5 ? 2 : 1) * p;
+  }
+  function linearTicks(lo, hi, count) {
+    var step = niceStep(hi - lo || Math.abs(hi) || 1, count);
+    var out = [];
+    for (var v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(Number(v.toPrecision(12)));
+    return out;
+  }
+  function logTicks(lo, hi) {
+    var e0 = Math.floor(Math.log10(lo)), e1 = Math.ceil(Math.log10(hi));
+    var sets = [[1], [1, 2, 5], [1, 1.5, 2, 3, 5, 7]];
+    var best = [];
+    for (var s = 0; s < sets.length; s++) {
+      var out = [];
+      for (var e = e0; e <= e1; e++) {
+        sets[s].forEach(function (m) {
+          var v = Number((m * Math.pow(10, e)).toPrecision(6));
+          if (v >= lo && v <= hi) out.push(v);
+        });
+      }
+      if (out.length >= 3 && out.length <= 9) return out;
+      if (out.length > best.length && out.length <= 9) best = out;
+    }
+    return best.length >= 2 ? best : linearTicks(lo, hi, 4).filter(function (v) { return v > 0; });
+  }
+  function tickLabel(v) { return String(Number(v.toPrecision(3))); }
+
+  function equityChart(eq, strategyName) {
+    var series = eq.series || [];
+    var dates = eq.dates || [];
+    var n = dates.length;
+    var times = dates.map(function (d) {
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || '');
+      return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN;
+    });
+    var useIndex = times.some(function (t, i) { return !isFinite(t) || (i && t < times[i - 1]); });
+    function xval(i) { return useIndex ? i : times[i]; }
+    var mode = 'log';
+    var nonpos = series.reduce(function (a, s) { return a + (s.nonpositive || 0); }, 0);
+
+    var fig = el('figure', { class: 'chart' });
+    var btnLog = el('button', { type: 'button', 'aria-pressed': 'true' }, 'Log');
+    var btnLin = el('button', { type: 'button', 'aria-pressed': 'false' }, 'Linear');
+    function setMode(m) {
+      mode = m;
+      btnLog.setAttribute('aria-pressed', String(m === 'log'));
+      btnLin.setAttribute('aria-pressed', String(m === 'linear'));
+      draw();
+    }
+    btnLog.addEventListener('click', function () { setMode('log'); });
+    btnLin.addEventListener('click', function () { setMode('linear'); });
+    fig.appendChild(el('div', { class: 'chart-top' },
+      el('figcaption', { class: 'chart-title' }, 'Growth of 1.0, strategy vs benchmarks'),
+      el('div', { class: 'seg', role: 'group', 'aria-label': 'Y-axis scale' }, btnLog, btnLin)));
+    fig.appendChild(el('ul', { class: 'legend', 'aria-label': 'Legend' }, series.map(function (s, i) {
+      return el('li', null, el('span', { class: 'key c' + (i + 1), 'aria-hidden': 'true' }), seriesName(s.name, strategyName));
+    })));
+    var plot = el('div', { class: 'plot' });
+    var tip = el('div', { class: 'tip', hidden: true });
+    plot.appendChild(tip);
+    fig.appendChild(plot);
+    var notes = [];
+    if (nonpos) notes.push(plural(nonpos, 'value') + ' at or below 0 cannot be drawn on the log scale; switch to Linear to see them.');
+    if (eq.thinned_every > 1) notes.push('Thinned to every ' + eq.thinned_every + 'th point for drawing.');
+    if (useIndex) notes.push('Dates are not all YYYY-MM-DD in order, so points are spaced evenly.');
+    if (notes.length) fig.appendChild(el('p', { class: 'small muted' }, notes.join(' ')));
+    fig.appendChild(dataTable(eq, strategyName));
+
+    function draw() {
+      while (plot.lastChild && plot.lastChild !== tip) plot.removeChild(plot.lastChild);
+      if (plot.firstChild !== tip) plot.insertBefore(tip, plot.firstChild);
+      tip.hidden = true;
+      var W = Math.max(260, Math.floor(plot.clientWidth || 560));
+      var narrow = W < 520;
+      var H = narrow ? 230 : 280;
+      var labelW = 0;
+      var m = { t: 10, r: 14, b: 42, l: 52 };
+      var ok = function (v) { return isNum(v) && (mode === 'linear' || v > 0); };
+      var lo = Infinity, hi = -Infinity;
+      series.forEach(function (s) { s.values.forEach(function (v) { if (ok(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }); });
+      if (!isFinite(lo)) {
+        plot.appendChild(empty('No values can be drawn on this scale.'));
+        return;
+      }
+      lo = Math.min(lo, 1); hi = Math.max(hi, 1);
+      var ticks;
+      if (mode === 'log') {
+        var l0 = Math.log10(lo), l1 = Math.log10(hi), pad = Math.max((l1 - l0) * 0.05, 0.01);
+        lo = Math.pow(10, l0 - pad); hi = Math.pow(10, l1 + pad);
+        ticks = logTicks(lo, hi);
+      } else {
+        var span = hi - lo || 1;
+        lo = lo - span * 0.05; hi = hi + span * 0.05;
+        ticks = linearTicks(lo, hi, narrow ? 4 : 5);
+      }
+      // End labels sit right of the plot when there is room and they do not collide.
+      var lastPts = series.map(function (s, i) {
+        for (var j = n - 1; j >= 0; j--) if (ok(s.values[j])) return { i: i, j: j, v: s.values[j] };
+        return null;
+      });
+      var showLabels = !narrow && series.length <= 4;
+      if (showLabels) {
+        labelW = Math.min(150, 12 + Math.max.apply(null, series.map(function (s) { return seriesName(s.name, strategyName).length; })) * 6.6);
+        m.r = 14 + labelW;
+      }
+      var iw = W - m.l - m.r, ih = H - m.t - m.b;
+      var x0 = xval(0), x1 = xval(n - 1);
+      if (x1 === x0) x1 = x0 + 1;
+      function X(i) { return m.l + (xval(i) - x0) / (x1 - x0) * iw; }
+      function Y(v) {
+        var f = mode === 'log' ? (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo)) : (v - lo) / (hi - lo);
+        return m.t + ih - f * ih;
+      }
+      if (showLabels) {
+        var ys = lastPts.filter(Boolean).map(function (p) { return Y(p.v); }).sort(function (a, b) { return a - b; });
+        for (var k = 1; k < ys.length; k++) if (ys[k] - ys[k - 1] < 14) showLabels = false;
+        if (!showLabels) { m.r = 14; iw = W - m.l - m.r; }
+      }
+
+      var root = svg('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, role: 'img', tabindex: '0',
+        'aria-label': 'Equity of ' + strategyName + ' and benchmarks, normalised to 1.0 at the start, ' + mode + ' scale. ' +
+          lastPts.filter(Boolean).map(function (p) { return seriesName(series[p.i].name, strategyName) + ' ends at ' + fmt(p.v); }).join('; ') +
+          '. Use the left and right arrow keys to read values; the data table below has every point.' });
+
+      ticks.forEach(function (t) {
+        var y = Math.round(Y(t)) + 0.5;
+        root.appendChild(svg('line', { class: Math.abs(t - 1) < 1e-9 ? 'baseline' : 'gridline', x1: m.l, x2: m.l + iw, y1: y, y2: y }));
+        root.appendChild(svg('text', { class: 'tick', x: m.l - 6, y: y + 4, 'text-anchor': 'end' }, tickLabel(t)));
+      });
+      xTicks(narrow).forEach(function (t) {
+        var x = m.l + (t.x - x0) / (x1 - x0) * iw;
+        if (x < m.l - 0.5 || x > m.l + iw + 0.5) return;
+        root.appendChild(svg('line', { class: 'gridline', x1: Math.round(x) + 0.5, x2: Math.round(x) + 0.5, y1: m.t + ih, y2: m.t + ih + 4 }));
+        root.appendChild(svg('text', { class: 'tick', x: x, y: m.t + ih + 17, 'text-anchor': 'middle' }, t.label));
+      });
+      root.appendChild(svg('line', { class: 'baseline', x1: m.l, x2: m.l + iw, y1: m.t + ih + 0.5, y2: m.t + ih + 0.5 }));
+      root.appendChild(svg('text', { class: 'axis-title', x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle' }, 'Date'));
+      root.appendChild(svg('text', { class: 'axis-title', transform: 'translate(13,' + (m.t + ih / 2) + ') rotate(-90)', 'text-anchor': 'middle' },
+        'Growth of 1.0 (' + mode + ')'));
+
+      series.forEach(function (s, i) {
+        var d = '', pen = false;
+        for (var j = 0; j < n; j++) {
+          var v = s.values[j];
+          if (!ok(v)) { pen = false; continue; }
+          d += (pen ? 'L' : 'M') + X(j).toFixed(1) + ' ' + Y(v).toFixed(1);
+          pen = true;
+        }
+        root.appendChild(svg('path', { class: 'line c' + (i + 1), d: d }));
+      });
+      lastPts.forEach(function (p) {
+        if (!p) return;
+        root.appendChild(svg('circle', { class: 'dot c' + (p.i + 1), cx: X(p.j), cy: Y(p.v), r: 4 }));
+        if (showLabels) {
+          root.appendChild(svg('text', { class: 'end-label', x: X(p.j) + 9, y: Y(p.v) + 4 },
+            seriesName(series[p.i].name, strategyName)));
+        }
+      });
+
+      var hover = svg('g', { 'pointer-events': 'none', visibility: 'hidden' });
+      var xhair = svg('line', { class: 'xhair', y1: m.t, y2: m.t + ih });
+      hover.appendChild(xhair);
+      var hoverDots = series.map(function (s, i) { var c = svg('circle', { class: 'dot c' + (i + 1), r: 4 }); hover.appendChild(c); return c; });
+      root.appendChild(hover);
+      var hit = svg('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', 'pointer-events': 'all' });
+      root.appendChild(hit);
+      var cur = n - 1;
+
+      function nearest(px) {
+        var target = x0 + (px - m.l) / iw * (x1 - x0);
+        var a = 0, b = n - 1;
+        while (b - a > 1) { var mid = (a + b) >> 1; if (xval(mid) < target) a = mid; else b = mid; }
+        return Math.abs(xval(a) - target) <= Math.abs(xval(b) - target) ? a : b;
+      }
+      function show(j) {
+        cur = j;
+        var x = X(j);
+        hover.setAttribute('visibility', 'visible');
+        xhair.setAttribute('x1', x); xhair.setAttribute('x2', x);
+        series.forEach(function (s, i) {
+          var v = s.values[j];
+          if (ok(v)) { hoverDots[i].setAttribute('cx', x); hoverDots[i].setAttribute('cy', Y(v)); hoverDots[i].setAttribute('visibility', 'visible'); }
+          else hoverDots[i].setAttribute('visibility', 'hidden');
+        });
+        while (tip.firstChild) tip.removeChild(tip.firstChild);
+        tip.appendChild(el('div', { class: 't-date' }, dates[j] || ''));
+        series.forEach(function (s, i) {
+          tip.appendChild(el('div', { class: 'row' }, el('span', { class: 'key c' + (i + 1) }),
+            el('strong', null, isNum(s.values[j]) ? s.values[j].toFixed(3) : '—'),
+            el('span', null, seriesName(s.name, strategyName))));
+        });
+        tip.hidden = false;
+        var tw = tip.offsetWidth || 180;
+        var left = x + 14;
+        if (left + tw > W) left = x - tw - 14;
+        tip.style.left = Math.max(0, left) + 'px';
+        tip.style.top = m.t + 'px';
+      }
+      function hide() { hover.setAttribute('visibility', 'hidden'); tip.hidden = true; }
+      hit.addEventListener('pointermove', function (ev) {
+        var r = root.getBoundingClientRect();
+        show(nearest(ev.clientX - r.left));
+      });
+      hit.addEventListener('pointerleave', hide);
+      root.addEventListener('focus', function () { show(cur); });
+      root.addEventListener('blur', hide);
+      root.addEventListener('keydown', function (ev) {
+        var step = ev.shiftKey ? 10 : 1, j = cur;
+        if (ev.key === 'ArrowLeft') j = Math.max(0, cur - step);
+        else if (ev.key === 'ArrowRight') j = Math.min(n - 1, cur + step);
+        else if (ev.key === 'Home') j = 0;
+        else if (ev.key === 'End') j = n - 1;
+        else if (ev.key === 'Escape') { hide(); return; }
+        else return;
+        ev.preventDefault();
+        show(j);
+      });
+      plot.appendChild(root);
+    }
+
+    function xTicks(narrow) {
+      var out = [];
+      if (useIndex) {
+        var k = narrow ? 3 : 5;
+        for (var i = 0; i <= k; i++) { var j = Math.round(i * (n - 1) / k); out.push({ x: j, label: String(dates[j] || '').slice(0, 10) }); }
+        return out;
+      }
+      var t0 = times[0], t1 = times[n - 1];
+      var years = (t1 - t0) / (365.25 * 864e5);
+      var maxTicks = narrow ? 4 : 7;
+      var y0 = new Date(t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear();
+      if (years >= 2) {
+        var step = Math.max(1, Math.ceil((y1 - y0 + 1) / maxTicks));
+        for (var y = y0; y <= y1 + 1; y++) if (y % step === 0) out.push({ x: Date.UTC(y, 0, 1), label: String(y) });
+        return out;
+      }
+      var months = Math.max(1, Math.round((t1 - t0) / (30.44 * 864e5)));
+      var mstep = [1, 2, 3, 6, 12].filter(function (s) { return months / s <= maxTicks; })[0] || 12;
+      var d = new Date(t0);
+      var yy = d.getUTCFullYear(), mm = d.getUTCMonth() + 1;
+      for (var guard = 0; guard < 200; guard++, mm++) {
+        if (mm > 11) { mm = 0; yy++; }
+        var t = Date.UTC(yy, mm, 1);
+        if (t > t1) break;
+        if (mm % mstep === 0) out.push({ x: t, label: yy + '-' + String(mm + 1).padStart(2, '0') });
+      }
+      return out;
+    }
+
+    // Draw once the figure is in the document (it needs a width).
+    redraws.push(draw);
+    return fig;
+  }
+
+  function dataTable(eq, strategyName) {
+    var details = el('details', null, el('summary', null, 'Data table (' + plural(eq.dates.length, 'row') + ')'));
+    var built = false;
+    details.addEventListener('toggle', function () {
+      if (!details.open || built) return;
+      built = true;
+      var rows = eq.dates.map(function (d, j) {
+        return [{ content: d, th: true, cls: 'nowrap' }].concat(eq.series.map(function (s) {
+          return { content: isNum(s.values[j]) ? s.values[j].toFixed(4) : '—', cls: 'num' };
+        }));
+      });
+      details.appendChild(table(['Date'].concat(eq.series.map(function (s) { return { label: seriesName(s.name, strategyName), cls: 'num' }; })),
+        rows, { tall: true, label: 'Equity data', caption: 'Equity, normalised to 1.0 at the start' }));
+    });
+    return details;
+  }
+
+  // ---------------------------------------------------------------- gate matrix
+  function renderGateMatrix() {
+    var target = body('gate-matrix');
+    var list = D.strategies || [];
+    var defs = D.gate_defs || [];
+    if (!list.length) {
+      target.appendChild(empty('No strategies yet.'));
+      return;
+    }
+    var headers = [{ label: 'Strategy' }].concat(defs.map(function (g) {
+      return { label: g.short, title: g.label + ' (default: ' + g.rule + ')' };
+    })).concat([{ label: 'State' }]);
+    var rows = list.map(function (s) {
+      var row = [{ content: el('a', { href: '#strategy-' + String(s.name).replace(/[^A-Za-z0-9_-]/g, '_') }, s.name), th: true }];
+      if (!s.latest) {
+        row.push({ content: 'Not audited yet', colspan: defs.length, cls: 'na' });
+      } else {
+        var byKey = {};
+        (s.latest.gates || []).forEach(function (g) { byKey[g.key] = g; });
+        defs.forEach(function (d) {
+          var g = byKey[d.key] || { state: 'missing' };
+          var spec = GATE[g.state] || GATE.missing;
+          row.push({ content: [icon(spec[1]), el('span', { class: 'sr' }, spec[2])], cls: 'gc k-' + spec[0],
+            title: d.label + ': ' + spec[2] + (g.present ? ' (value ' + fmt(g.value) + ')' : '') });
+        });
+      }
+      row.push({ content: stateChip(s.latest ? s.latest.state : null) });
+      return row;
+    });
+    target.appendChild(el('div', { class: 'card' },
+      table(headers, rows, { cls: 'matrix', label: 'Gate matrix', caption: 'Latest audit result per gate and strategy' }),
+      el('div', { class: 'legend-row', 'aria-label': 'Key' },
+        ['pass', 'fail', 'pending', 'missing'].map(function (k) {
+          var spec = GATE[k];
+          return el('span', null, icon(spec[1], 'k k-' + spec[0]), spec[2] + (k === 'missing' ? ' (counts as not passed)' : ''));
+        })),
+      el('p', { class: 'small muted' }, 'Column headings are short names; hover them, or see the gate tables in each strategy card, for the full gate and its default rule.')));
+  }
+
+  // ---------------------------------------------------------------- testing
+  function renderTesting() {
+    var target = body('testing');
+    var t = D.testing || {};
+    var grid = el('div', { class: 'grid2' });
+    grid.appendChild(el('div', { class: 'card' }, el('h3', null, 'Latest test run'), junitBlock(t.junit)));
+    grid.appendChild(el('div', { class: 'card' }, el('h3', null, 'Coverage'), coverageBlock(t.coverage)));
+    var stack = el('div', { class: 'stack' });
+    target.appendChild(stack);
+    stack.appendChild(grid);
+    stack.appendChild(el('div', { class: 'card' }, el('h3', null, 'Mutation score by area'),
+      el('p', { class: 'small muted' }, 'Score = (killed + timed out) / (killed + timed out + survived), with documented equivalent mutants (tests/MUTATION_NOTES.md) taken out of the survivors. Targets from TESTING.md 5.3 and 5.4. Marker = target.'),
+      mutationBlock(t.mutation || [])));
+    var grid2 = el('div', { class: 'grid2' });
+    grid2.appendChild(el('div', { class: 'card' }, el('h3', null, 'Definition of done (TESTING.md section 8)'), dodBlock(t)));
+    grid2.appendChild(el('div', { class: 'card' }, el('h3', null, 'Open work (TESTING.md section 5)'), openWorkBlock(t)));
+    stack.appendChild(grid2);
+  }
+
+  function junitBlock(j) {
+    if (!j) {
+      return empty('No test results yet. Write them with:', ['uv run pytest -n auto --junitxml=results/tests/junit.xml']);
+    }
+    var wrap = el('div', null);
+    wrap.appendChild(el('p', { class: 't-value' }, j.passed + '/' + j.total + ' passed'));
+    var dl = el('dl', { class: 'facts' });
+    [['Failed', j.failed], ['Errors', j.errors], ['Skipped', j.skipped], ['Duration', isNum(j.time_s) ? j.time_s.toFixed(1) + ' s' : '—'],
+     ['Run at', fmtTime(j.timestamp)], ['File', fileLink(j.path)]].forEach(function (r) {
+      dl.appendChild(el('dt', null, r[0]));
+      dl.appendChild(el('dd', null, typeof r[1] === 'number' ? fmt(r[1]) : r[1]));
+    });
+    wrap.appendChild(dl);
+    if (j.failing_tests && j.failing_tests.length) {
+      wrap.appendChild(el('h4', null, 'Failing tests'));
+      wrap.appendChild(el('ul', { class: 'plain' }, j.failing_tests.map(function (name) {
+        return el('li', null, icon('cross', 'k k-critical'), el('code', null, name));
+      }), j.failing_more ? el('li', { class: 'muted' }, '… and ' + j.failing_more + ' more') : null));
+    }
+    return wrap;
+  }
+
+  function coverageBlock(c) {
+    if (!c) {
+      return empty('No coverage report yet. Write it with:', ['uv run pytest -n auto --cov --cov-branch --cov-report=json:results/tests/coverage.json']);
+    }
+    var wrap = el('div', null);
+    wrap.appendChild(el('p', { class: 't-value' }, isNum(c.percent) ? c.percent.toFixed(1) + '%' : '—'));
+    wrap.appendChild(el('p', { class: 'small muted' },
+      c.branch_measured === false ? 'Lines only: this report was made without --cov-branch.' :
+        'coverage.py percent_covered (lines and branches)' +
+        (isNum(c.branches_total) && isNum(c.branches_covered) ? '; ' + fmt(c.branches_covered) + ' of ' + fmt(c.branches_total) + ' branches covered' : '') + '.',
+      ' Target: 100% with fail_under = 100 (TESTING.md 5.7).'));
+    if (c.lowest_files && c.lowest_files.length) {
+      wrap.appendChild(el('h4', null, 'Lowest-covered files (' + c.lowest_files.length + ' of ' + c.n_files + ')'));
+      wrap.appendChild(table(['File', { label: 'Covered', cls: 'num' }], c.lowest_files.map(function (f) {
+        return [el('code', null, f.file), isNum(f.percent) ? f.percent.toFixed(1) + '%' : '—'];
+      }), { label: 'Lowest-covered files' }));
+    }
+    wrap.appendChild(el('p', { class: 'small muted' }, 'Run at ' + fmtTime(c.timestamp) + ' · ', fileLink(c.path)));
+    return wrap;
+  }
+
+  function mutationBlock(areas) {
+    var any = areas.some(function (a) { return a.present; });
+    var wrap = el('div', { class: 'meters' });
+    if (!any) {
+      wrap.appendChild(empty('No mutation results yet. After each area run, export the stats and copy them into results/tests/mutation/<area>.json:', [
+        'uv run mutmut run', 'uv run mutmut export-cicd-stats', 'cp mutants/mutmut-cicd-stats.json results/tests/mutation/<area>.json',
+        el('span', { class: 'small' }, 'Areas: validation, runner, search, models, data. Baseline in TESTING.md 5.3: 492 killed, 3 timed out, 123 survived (80%).')]));
+    }
+    areas.forEach(function (a) {
+      var fill = el('div', { class: 'm-fill' });
+      var bar = el('div', { class: 'm-bar', role: 'img',
+        'aria-label': a.area + ': ' + (a.present ? pct(a.score_excluding_equivalent) : 'no result') + ', target ' + pct(a.target, 0) });
+      var mark = el('div', { class: 'm-target' }, el('span', null, 'target ' + pct(a.target, 0)));
+      mark.style.left = (a.target * 100) + '%';
+      var fig;
+      if (a.present && isNum(a.score_excluding_equivalent)) {
+        var meets = a.meets_target;
+        fill.className = 'm-fill ' + (meets ? 'k-info' : 'k-serious');
+        fill.style.width = Math.max(0, Math.min(100, a.score_excluding_equivalent * 100)) + '%';
+        bar.appendChild(fill);
+        var cnt = a.counts || {};
+        var parts = [fmt(cnt.killed || 0) + ' killed', fmt(cnt.timeout || 0) + ' timed out', fmt(cnt.survived || 0) + ' survived'];
+        if (cnt.equivalent) parts.push(fmt(cnt.equivalent) + ' equivalent');
+        if (cnt.no_tests) parts.push(fmt(cnt.no_tests) + ' no tests');
+        fig = el('div', { class: 'm-fig' },
+          el('span', { class: 'score' }, pct(a.score_excluding_equivalent)),
+          chip(meets ? ['good', 'check', 'Meets ' + pct(a.target, 0)] : ['serious', 'cross', 'Below ' + pct(a.target, 0)]),
+          el('div', { class: 'small muted' }, parts.join(' · ') +
+            (cnt.equivalent && isNum(a.score) ? ' · raw score ' + pct(a.score) : '')));
+      } else {
+        fig = el('div', { class: 'm-fig muted' }, a.present ? 'No score (no killed or survived mutants)' : 'No result yet',
+          el('div', { class: 'small' }, a.path));
+      }
+      bar.appendChild(mark);
+      wrap.appendChild(el('div', { class: 'meter-row' },
+        el('div', { class: 'm-name' }, el('strong', null, a.area), el('code', { class: 'small muted' }, a.code_path)),
+        bar, fig));
+    });
+    return wrap;
+  }
+
+  function dodBlock(t) {
+    if (!t.dod || !t.dod.length) {
+      return empty(t.dod_found ? 'The Definition of done section has no checkboxes.' : 'TESTING.md not found, or it has no "Definition of done" section.');
+    }
+    var done = t.dod.filter(function (d) { return d.done; }).length;
+    return el('div', null,
+      el('p', { class: 'small muted' }, done + ' of ' + t.dod.length + ' checked' +
+        (isNum(t.bug_count) ? ' · bug log (section 4): ' + plural(t.bug_count, 'entry', 'entries') : '')),
+      el('ul', { class: 'checklist' }, t.dod.map(function (d) {
+        return el('li', null, icon(d.done ? 'boxcheck' : 'box', 'k ' + (d.done ? 'k-good' : 'k-muted')),
+          el('span', null, d.text, el('span', { class: 'sr' }, d.done ? ' (done)' : ' (not done)')));
+      })));
+  }
+
+  function openWorkBlock(t) {
+    if (!t.open_work || !t.open_work.length) {
+      return empty('TESTING.md not found, or it has no "### 5.N" open-work headings.');
+    }
+    return el('ul', { class: 'plain' }, t.open_work.map(function (w) {
+      return el('li', null, el('strong', { class: 'nowrap' }, w.id), el('span', null, w.title), statusChip(w.status),
+        w.note ? el('span', { class: 'small muted' }, w.note) : null);
+    }));
+  }
+
+  // ---------------------------------------------------------------- data
+  function renderData() {
+    var target = body('data');
+    var d = D.data || {};
+    var s = d.snapshot;
+    var card = el('div', { class: 'card' }, el('h3', null, 'Catalog snapshot'));
+    if (!s) {
+      card.appendChild(empty('No data snapshot yet. Milestone 1 builds the catalog and writes data/catalog/SNAPSHOT.json:',
+        ['uv run python -m lab.data.build --sources kraken,binance   # to build (milestone 1)']));
+    } else {
+      var dl = el('dl', { class: 'facts' });
+      [['Snapshot id', s.id ? el('code', null, s.id) : '—'], ['Created', s.created || '—'],
+       ['Sources', s.sources && s.sources.length ? s.sources.join(', ') : '—'], ['File', el('code', null, s.path)],
+       ['Modified', fmtTime(s.modified)]].forEach(function (r) {
+        dl.appendChild(el('dt', null, r[0])); dl.appendChild(el('dd', null, r[1]));
+      });
+      card.appendChild(dl);
+      if (!s.recognised) {
+        card.appendChild(el('p', { class: 'small' }, 'Unrecognised format. Top-level keys: ', el('code', null, (s.top_level_keys || []).join(', ') || '(none)')));
+      }
+      if (s.series && s.series.length) {
+        card.appendChild(el('h4', null, 'Series (' + s.series.length + ')'));
+        card.appendChild(table(['Instrument', 'Source', 'Bar', 'Start', 'End', { label: 'Rows', cls: 'num' }, { label: 'Gaps', cls: 'num' }],
+          s.series.map(function (r) { return [fmt(r.instrument), fmt(r.source), fmt(r.bar), fmt(r.start), fmt(r.end), fmt(r.rows), fmt(r.gaps)]; }),
+          { label: 'Snapshot series', tall: s.series.length > 12 }));
+      }
+    }
+    var reports = el('div', { class: 'card' }, el('h3', null, 'Data-quality reports'));
+    if (!d.quality_reports || !d.quality_reports.length) {
+      reports.appendChild(empty('No data-quality report committed yet (reports/data/*.md, milestone 1).'));
+    } else {
+      reports.appendChild(el('ul', { class: 'plain' }, d.quality_reports.map(function (r) {
+        return el('li', null, fileLink(r.path), el('span', { class: 'muted small' }, 'modified ' + fmtTime(r.modified)));
+      })));
+    }
+    target.appendChild(el('div', { class: 'grid2' }, card, reports));
+  }
+
+  // ---------------------------------------------------------------- search runs
+  function renderStudies() {
+    var target = body('search-runs');
+    var list = D.studies || [];
+    if (!list.length) {
+      target.appendChild(empty('No search runs on this machine. Optuna studies log every trial to results/<study>/ (lab/search/study.py). The milestone 4 command:',
+        ['uv run python -m lab.search.study --strategy dip-buy-balanced --trials 2000 --workers 8   # to build']));
+      return;
+    }
+    target.appendChild(el('div', { class: 'card' }, table(['Study folder', { label: 'Parquet files', cls: 'num' }, 'Optuna journal', 'Last modified'],
+      list.map(function (s) {
+        return [el('code', null, s.path), fmt(s.parquet_files),
+          s.journal ? [icon('check', 'k k-good'), ' found'] : [icon('dash', 'k k-muted'), ' none'], fmtTime(s.modified)];
+      }), { label: 'Search runs' })));
+  }
+
+  // ---------------------------------------------------------------- reports
+  function renderReports() {
+    var target = body('reports');
+    var list = D.reports || [];
+    if (!list.length) {
+      target.appendChild(empty('No reports committed yet. Audit reports go to reports/<strategy>/<YYYY-MM-DD>.md; the demo writes reports/demo/<date>.md (TESTING.md 5.5).'));
+      return;
+    }
+    var KIND = { audit: 'audit', demo: 'demo', data: 'data quality', other: 'other' };
+    target.appendChild(el('div', { class: 'card' }, el('ul', { class: 'plain' }, list.map(function (r) {
+      return el('li', null, el('span', { class: 'date' }, r.date || '—'), fileLink(r.path),
+        el('span', { class: 'muted small' }, KIND[r.kind] || r.kind));
+    }))));
+  }
+
+  // ---------------------------------------------------------------- warnings
+  function renderWarnings() {
+    var target = body('warnings');
+    var list = (D.warnings || []).slice().sort(function (a, b) {
+      return (a.level === 'integrity' ? 0 : 1) - (b.level === 'integrity' ? 0 : 1);
+    });
+    if (!list.length) {
+      target.appendChild(el('div', { class: 'empty' }, el('p', null, icon('check', 'k k-good'), ' No warnings: every input that exists was read cleanly.')));
+      return;
+    }
+    target.appendChild(el('ul', { class: 'warn-list' }, list.map(function (w) {
+      var integrity = w.level === 'integrity';
+      return el('li', { class: integrity ? 'integrity' : null },
+        icon('alert', 'k ' + (integrity ? 'k-critical' : 'k-serious')),
+        el('div', null, el('span', { class: 'src' }, (integrity ? 'Integrity · ' : '') + w.source), w.message));
+    })));
+  }
+
+  // ---------------------------------------------------------------- boot
+  function fatal(message) {
+    var main = document.getElementById('main');
+    while (main.firstChild) main.removeChild(main.firstChild);
+    main.appendChild(el('div', { class: 'fatal empty' }, el('p', null, message)));
+  }
+
+  if (!D || typeof D !== 'object') {
+    fatal('The dashboard data could not be read. Rebuild the page with: python3 scripts/build_dashboard.py');
+    return;
+  }
+  [renderHeader, renderOverview, renderMilestones, renderStrategies, renderGateMatrix, renderTesting,
+   renderData, renderStudies, renderReports, renderWarnings].forEach(function (fn) {
+    try {
+      fn();
+    } catch (e) {
+      // A rendering bug in one section must not blank the page.
+      if (window.console) console.warn('dashboard: section failed to render', fn.name, e);
+    }
+  });
+  redraws.forEach(function (fn) { fn(); });
+  var pending = null, lastW = window.innerWidth;
+  window.addEventListener('resize', function () {
+    if (window.innerWidth === lastW) return;
+    lastW = window.innerWidth;
+    clearTimeout(pending);
+    pending = setTimeout(function () { redraws.forEach(function (fn) { fn(); }); }, 120);
+  });
+})();
+</script>
+</body>
+</html>
