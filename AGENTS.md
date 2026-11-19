@@ -2,7 +2,7 @@
 
 Instructions for the coding agent team that builds and tests our trading strategies.
 
-This repo is where strategies are **built, simulated at scale, validated and approved**. It feeds the app described in the [app docs](../caas-app/README.md): approved strategies are exported as pinned configs and run in production as NautilusTrader strategy nodes on paper "model accounts". User trades never happen here.
+This repo is where strategies are **built, simulated at scale, validated and approved**. It feeds the app described in the [app docs](docs/app/README.md): approved strategies are exported as pinned configs and run in production as NautilusTrader strategy nodes on paper "model accounts". User trades never happen here.
 
 **Read first:** [research-methods.md](research-methods.md) explains *why* the pipeline below looks the way it does. [TESTING.md](TESTING.md) is the testing standard and the **first work order**: finish its open items before building anything new.
 
@@ -14,7 +14,7 @@ This repo is where strategies are **built, simulated at scale, validated and app
 | Build strategies as NautilusTrader strategies | Touch user wallets, the app backend or production infrastructure |
 | Run thousands of backtests and parameter searches | Put an LLM in any strategy logic or trade path |
 | Validate results against overfitting and luck | Use leverage, short selling, market making or arbitrage |
-| Train and evaluate prediction models offline | Send network traffic anywhere except the data sources listed in `lab/data/` |
+| Train and evaluate prediction models offline | Send network traffic anywhere except the data sources listed in `lab/data/` (the `director` may also read public web pages for research) |
 | Export approved strategy configs for production | Approve its own work for production (the owner does that) |
 
 ## Setup
@@ -47,28 +47,24 @@ Where to look in the clone:
 - `docs/`: concepts (backtesting, data catalog, fee and fill models)
 - `RELEASES.md`: breaking changes between versions; read before every upgrade
 
-### 2. Create the strategy-lab repo and environment
+### 2. Get the repo and build the environment
+
+The repo is private on GitHub: `unconstructed/osprey`. The same agents, docs, code and tests come down on every machine.
 
 ```bash
 cd ~/code
-uv init --app --python 3.13 strategy-lab   # also creates the git repo
-cd strategy-lab
+git clone https://github.com/unconstructed/osprey.git
+cd osprey
 
-# Engine: pin an exact v2 version. A plain install resolves to the old 1.x line.
-uv add "nautilus_trader[visualization]==2.0.0rc9"
-
-# Data, search, tracking, statistics, models
-uv add polars pyarrow duckdb optuna mlflow scipy scikit-learn lightgbm joblib pyyaml httpx tabulate
-
-# If you start from the starter code instead, its pyproject.toml already lists all of
-# this: copy it in and run `uv sync`.
-
-# Dev tools (testing standard in TESTING.md)
-uv add --dev pytest pytest-cov pytest-xdist hypothesis mutmut ruff
+# Installs everything in pyproject.toml, dev tools included. The engine is pinned to an
+# exact v2 version (nautilus_trader==2.0.0rc9); a plain install would resolve to old 1.x.
+uv sync
 
 # Confirm the engine version starts with "2."
 uv run python -c "import nautilus_trader as nt; print(nt.__version__)"
 ```
+
+Commit `uv.lock` after the first `uv sync` so every machine gets identical package versions.
 
 Optional, added only when needed (ask the owner first):
 - `ray[tune]`: multi-machine sweeps (see [research-methods.md: Compute plan](research-methods.md#compute-plan))
@@ -84,9 +80,11 @@ Optional, added only when needed (ask the owner first):
 .venv/
 __pycache__/
 .ipynb_checkpoints/
-data/
-results/
-mlruns/
+.pytest_cache/
+.ruff_cache/
+/data/          # leading slash: ignore only the top-level folder, not lab/data/
+/results/
+/mlruns/
 *.parquet
 .hypothesis/
 mutants/
@@ -97,7 +95,9 @@ htmlcov/
 ## Repo layout
 
 ```
-strategy-lab/
+osprey/
+├── CLAUDE.md                    # tells Claude Code to read AGENTS.md and TESTING.md first
+├── docs/app/                    # the Osprey app plan: features, product, technical, business
 ├── AGENTS.md
 ├── TESTING.md                   # testing standard, bug log, open test work
 ├── .claude/agents/              # role files (see Desk roles)
@@ -117,7 +117,7 @@ strategy-lab/
 ├── strategies/<name>/           # strategy.py, params.yaml, README.md
 ├── research/                    # notebooks and scratch; never imported by lab/ or strategies/
 ├── exports/<name>/              # approved, pinned configs for production
-├── reports/<name>/<date>.md     # audit reports (committed)
+├── reports/<name>/<date>.md     # audit reports (committed); director reviews in reports/director/
 ├── data/                        # git-ignored: raw downloads and the Nautilus catalog
 ├── results/                     # git-ignored: trial results (Parquet), Optuna journals
 └── tests/                       # property, leakage, known-answer, calibration and contract tests
@@ -320,8 +320,11 @@ Owned by `ml-researcher`. Full approach in [research-methods.md: Prediction mode
 | `ml-researcher` | `lab/models/`, features, labels, model training and evaluation | Put a model in a strategy without an audit; use future data |
 | `backtest-auditor` | `lab/validation/`, audit reports, the one-time test-window run | Write or tune strategy logic |
 | `risk-officer` | `config/risk_levels.yaml`, drawdown budgets, exports | Loosen a limit without the owner's written approval |
+| `director` | Reviewing how the desk works; researching better methods and tools; proposing improvements to agent files and docs on a branch for the owner | Change gates, `config/` or test tolerances to make things pass; approve strategies; merge its own changes |
 
 Handoff for any new strategy: `quant-researcher` (or `ml-researcher`) → `backtest-auditor` → `risk-officer` → paper model account → owner → export.
+
+The `director` reviews the desk after every milestone and after any failed audit, and proposes changes on a `director/<date>` branch. The owner merges what they agree with.
 
 ## Milestones
 
