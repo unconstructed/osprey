@@ -16,6 +16,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from lab.config import CONFIG_DIR
+from lab.runner.interface import validate_result
 from lab.runner.reference import Costs, buy_and_hold, constant_mix, dip_buy, random_entry
 
 # ------------------------------------------------------------------------------------------ values by hand
@@ -188,10 +189,18 @@ def test_from_yaml_reads_another_file_and_sorts_the_table(tmp_path):
     [
         (GOOD_YAML, "costs.yml", r"must be a \.yaml file"),
         ("pool_fee_bps: 5\n", "costs.yaml", r"missing \['aggregator_fee_bps', 'slippage_bps'"),
-        (GOOD_YAML.replace('{"5000": 40, "50": 3, "500": 8}', "[10, 15]"), "costs.yaml", "must map trade size"),
+        (
+            GOOD_YAML.replace('{"5000": 40, "50": 3, "500": 8}', "[10, 15]"),
+            "costs.yaml",
+            "must map trade size",
+        ),
         (GOOD_YAML.replace('"5000"', '"lots"'), "costs.yaml", "sizes must be numbers"),
         (GOOD_YAML.replace("pool_fee_bps: 1", "pool_fee_bps: -1"), "costs.yaml", "pool_fee_bps must be in"),
-        (GOOD_YAML.replace("gas_usd_per_trade: 0.5", "gas_usd_per_trade: null"), "costs.yaml", "must be a number"),
+        (
+            GOOD_YAML.replace("gas_usd_per_trade: 0.5", "gas_usd_per_trade: null"),
+            "costs.yaml",
+            "must be a number",
+        ),
         (GOOD_YAML.replace('"50": 3', '"50": -3'), "costs.yaml", r"slippage \(bps\) must be in"),
     ],
 )
@@ -236,13 +245,29 @@ def test_costs_accept_sequences_and_normalise_to_float_tuples():
 
 RULES = [
     (dip_buy, {"drop": 0.05, "lookback": 5, "hold": 6}),
-    (dip_buy, {"drop": 0.04, "lookback": 5, "stop": 0.05, "hold": 9, "weight": 0.9, "vol_target": 0.6, "vol_lookback": 10}),
+    (
+        dip_buy,
+        {
+            "drop": 0.04,
+            "lookback": 5,
+            "stop": 0.05,
+            "hold": 9,
+            "weight": 0.9,
+            "vol_target": 0.6,
+            "vol_lookback": 10,
+        },
+    ),
     (buy_and_hold, {"weight": 0.7}),
     (constant_mix, {}),
     (constant_mix, {"weight": 0.3, "every": 7, "band": 0.02}),
     (random_entry, {"n_trades": 3, "hold": 5, "seed": 4}),
 ]
-COST_MODELS = [Costs(), Costs().stressed(), Costs(capital_usd=500.0), Costs(capital_usd=1e7, aggregator_fee_bps=4.0)]
+COST_MODELS = [
+    Costs(),
+    Costs().stressed(),
+    Costs(capital_usd=500.0),
+    Costs(capital_usd=1e7, aggregator_fee_bps=4.0),
+]
 
 
 @given(
@@ -281,7 +306,24 @@ def test_trade_size_in_usd_sets_the_slippage(make_bars, capital, slippage_bps):
     assert result["cost"].iloc[1] == pytest.approx((5.0 + slippage_bps) / 1e4, rel=1e-12)
 
 
-def test_a_cost_the_portfolio_cannot_pay_raises(make_bars):
+GAS_ONLY = {"pool_fee_bps": 0.0, "slippage_bps": ((1.0, 0.0),), "capital_usd": 10_000.0}
+
+
+@pytest.mark.parametrize(
+    "costs",
+    [Costs(gas_usd_per_trade=20_000.0), Costs(gas_usd_per_trade=10_000.0, **GAS_ONLY)],
+    ids=["gas_twice_the_portfolio", "cost_exactly_100pct"],
+)
+def test_a_cost_the_portfolio_cannot_pay_raises(make_bars, costs):
+    """A fill costing 100% or more of the portfolio would leave ret <= -1: refused, never silently clipped."""
     bars = make_bars([100.0, 100.0, 101.0])
     with pytest.raises(ValueError, match="cannot pay them"):
-        buy_and_hold({}, bars, Costs(gas_usd_per_trade=20_000.0))
+        buy_and_hold({}, bars, costs)
+
+
+def test_a_cost_just_below_100pct_is_paid(make_bars):
+    bars = make_bars([100.0, 100.0, 101.0])
+    result = buy_and_hold({}, bars, Costs(gas_usd_per_trade=9_999.0, **GAS_ONLY))
+    validate_result(result, bars)
+    assert result["cost"].iloc[1] == pytest.approx(0.9999, rel=1e-12)
+    assert result["ret"].iloc[1] == pytest.approx((1.0 - 0.9999) * (1.0 + 0.0) - 1.0, rel=1e-12)

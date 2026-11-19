@@ -19,6 +19,8 @@ from scipy import integrate
 from scipy import stats as scipy_stats
 
 from lab.validation.stats import (
+    _REL_SD_TOL,
+    _is_flat,
     annualized_sharpe,
     column_sharpes,
     cscv_splits,
@@ -78,6 +80,64 @@ def psr_var_term(r) -> float:
     sr = x.mean() / x.std(ddof=1)
     skew, kurt = m3 / m2**1.5, m4 / m2**2
     return float((1 - skew * sr / 2) ** 2 + (kurt - 1 - skew**2) * sr**2 / 4)
+
+
+# --------------------------------------------------------------------------------------------------------
+# flatness (_is_flat, TESTING.md 5.2A)
+# --------------------------------------------------------------------------------------------------------
+
+
+def test_is_flat_is_a_relative_test_with_no_absolute_floor():
+    assert _REL_SD_TOL == 1e-9
+    assert _is_flat(0.0, 0.0)  # all-zero data: scale 0, sd 0
+    assert _is_flat(1e-9, 1.0)  # the boundary itself counts as flat (<=)
+    assert not _is_flat(1.0000001e-9, 1.0)
+    assert not _is_flat(1e-300, 0.0)  # any spread at zero scale is not flat
+    # Pure ratio: the same decision at any power-of-two scale (no absolute floor such as the old 1e-12).
+    for k in (-1000, -40, 0, 40, 1000):
+        assert _is_flat(1e-9 * 2.0**k, 2.0**k)
+        assert not _is_flat(1.1e-9 * 2.0**k, 2.0**k)
+    out = _is_flat(np.array([0.0, 1e-9, 2e-9, 2e-9]), np.array([1.0, 1.0, 1.0, 4.0]))
+    assert out.tolist() == [True, True, False, True]  # elementwise, per-element scale
+
+
+# [1, 1 + e]: sd (ddof=1) / max|r| = e / ((1 + e) * sqrt(2)). Flat iff that is <= 1e-9, so e = 1.3e-9 is flat
+# (0.92e-9) and e = 1.5e-9 is not (1.06e-9): pins the tolerance to within +/-15% and its relative nature.
+NEAR_FLAT_E, JUST_VARIED_E = 1.3e-9, 1.5e-9
+
+
+@pytest.mark.parametrize("scale", [1.0, 1e-15, 1e5, 2.0**-1000])
+def test_sharpe_flatness_threshold_is_relative_at_every_scale(scale):
+    assert sharpe(np.array([1.0, 1.0 + NEAR_FLAT_E]) * scale) == 0.0
+    varied = np.array([1.0, 1.0 + JUST_VARIED_E])
+    # Exact rational mean / stdev of the unscaled pair. Representing e next to 1 costs ~1e-7 relative, so
+    # rel=1e-6 is the conditioning of the input, not slack in the code.
+    expected = statistics.mean(varied.tolist()) / statistics.stdev(varied.tolist())
+    assert expected == pytest.approx(9.43e8, rel=1e-3)
+    assert sharpe(varied * scale) == pytest.approx(expected, rel=1e-6)
+
+
+def test_psr_flatness_threshold_is_relative():
+    # [1, 1, 1 + e]: sd / max = e / (sqrt(3) * (1 + e)); flat iff e <= ~1.732e-9.
+    assert probabilistic_sharpe_ratio([1.0, 1.0, 1.0 + 1.6e-9]) == 0.0
+    r = [1.0, 1.0, 1.0 + 1.9e-9]
+    value = probabilistic_sharpe_ratio(r)
+    # Huge SR: z -> 2 * sqrt(n - 1) / skew = 4, so PSR is Phi(4), not 1 (the skew term dominates var_term).
+    assert value == pytest.approx(psr_by_hand(r), rel=1e-6)
+    assert value == pytest.approx(_ND.cdf(4.0), rel=1e-6)
+    assert probabilistic_sharpe_ratio(np.array(r) * 1e-14) == pytest.approx(value, rel=1e-6)
+
+
+def test_column_sharpes_flatness_threshold_is_per_column_and_relative():
+    m = np.array([[1.0, 1.0, 10.0], [1.0 + NEAR_FLAT_E, 1.0 + JUST_VARIED_E, -5.0]])
+    out = column_sharpes(m)
+    assert out[0] == 0.0
+    assert out[1] == pytest.approx(sharpe(m[:, 1]), rel=1e-12)
+    assert out[1] == pytest.approx(9.43e8, rel=1e-3)
+    assert out[2] == pytest.approx(2.5 / (15 / math.sqrt(2)), rel=1e-12)
+    scaled = column_sharpes(m * np.array([1e-15, 1e-15, 1e5]))
+    assert scaled[0] == 0.0
+    assert scaled[1:] == pytest.approx(out[1:], rel=1e-6)
 
 
 # --------------------------------------------------------------------------------------------------------
@@ -266,13 +326,20 @@ def test_psr_with_zero_sharpe_variance_is_a_step_at_the_benchmark(n, k):
 
 def test_psr_variance_guard_is_reachable():
     """TESTING.md said the var_term <= 0 guard can never fire. It can: equality is reachable and rounding
-    makes var_term negative (-8.9e-16 for [0.022996598285221187, 0.012996598285221187, 0.012996598285221187])."""
+    makes var_term negative (-4.4e-16 in the code's unit scale, -8.9e-16 in raw units, for
+    [0.022996598285221187, 0.012996598285221187, 0.012996598285221187]). Without the guard: sqrt of a
+    negative number, a RuntimeWarning (an error under our filterwarnings) and NaN."""
     samples = [
         two_point_zero_variance_sample(n, k) for n, k in [(3, 1), (4, 1), (6, 1), (7, 3), (9, 4), (11, 5)]
     ]
     assert any(psr_var_term(r) < 0 for r in samples)
     regression = [0.022996598285221187, 0.012996598285221187, 0.012996598285221187]
-    assert probabilistic_sharpe_ratio(regression) == 1.0
+    assert psr_var_term(regression) < 0
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert probabilistic_sharpe_ratio(regression) == 1.0
+        assert probabilistic_sharpe_ratio(regression, sr_benchmark=sharpe(regression)) == 0.5
+        assert probabilistic_sharpe_ratio(regression, sr_benchmark=3.0) == 0.0
 
 
 def test_psr_variance_term_can_be_exactly_zero():
@@ -442,6 +509,13 @@ def test_column_sharpes_judges_flatness_per_column():
     assert column_sharpes(m)[0] == pytest.approx(1 / math.sqrt(3), rel=1e-12)
 
 
+def test_column_sharpes_of_two_rows():
+    # Two observations are enough, as for sharpe: [0.01, 0.03] -> mean 0.02 / sd 0.01*sqrt(2) = sqrt(2).
+    out = column_sharpes(np.array([[0.01, 0.0, -0.01], [0.03, 0.0, -0.03]]))
+    assert out == pytest.approx([math.sqrt(2), 0.0, -math.sqrt(2)], rel=1e-12)
+    assert out[1] == 0.0
+
+
 def test_column_sharpes_with_fewer_than_two_rows_are_zero():
     assert column_sharpes(np.array([[0.01, -0.02]])).tolist() == [0.0, 0.0]
     assert column_sharpes(np.zeros((0, 3))).tolist() == [0.0, 0.0, 0.0]
@@ -490,6 +564,13 @@ def test_cscv_splits_capped_is_a_distinct_seeded_subset_of_exact_size(n_blocks, 
     assert cscv_splits(n_blocks, cap, seed=2) != splits
 
 
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_cscv_splits_with_a_cap_of_one_is_a_single_half(seed):
+    splits = cscv_splits(4, 1, seed=seed)
+    assert len(splits) == 1
+    assert splits[0] in list(itertools.combinations(range(4), 2))
+
+
 def test_cscv_splits_accepts_numpy_integers():
     assert cscv_splits(np.int64(4), np.int64(6), seed=0) == list(itertools.combinations(range(4), 2))
 
@@ -502,9 +583,14 @@ def test_cscv_splits_accepts_numpy_integers():
         (-2, 10, "n_blocks must be an even integer >= 2, got -2"),
         (4.0, 10, "n_blocks must be an even integer >= 2, got 4.0"),
         (True, 10, "n_blocks must be an even integer >= 2, got True"),
+        (False, 10, "n_blocks must be an even integer >= 2, got False"),
+        (np.True_, 10, "n_blocks must be an even integer >= 2, got np.True_"),
+        (4, np.True_, "max_combinations must be an integer >= 1, got np.True_"),
         (4, 0, "max_combinations must be an integer >= 1, got 0"),
         (4, 2.5, "max_combinations must be an integer >= 1, got 2.5"),
         (4, True, "max_combinations must be an integer >= 1, got True"),
+        (4, -1, "max_combinations must be an integer >= 1, got -1"),
+        (np.float64(4.0), 10, "n_blocks must be an even integer >= 2, got np.float64(4.0)"),
     ],
 )
 def test_cscv_splits_rejects_bad_arguments(n_blocks, cap, message):
@@ -656,6 +742,20 @@ def test_pbo_default_is_16_blocks_capped_at_4000_combinations():
     assert np.array_equal(out["logits"], explicit["logits"])
 
 
+def test_pbo_with_exactly_one_row_per_block():
+    m = np.random.default_rng(6).normal(0.001, 0.01, size=(4, 3))
+    out = pbo(m, n_blocks=4)
+    assert out["n_combinations"] == 6
+    assert out["logits"] == pytest.approx(pbo_reference(m, 4), rel=1e-12, abs=1e-15)
+
+
+def test_pbo_with_a_cap_of_one_scores_a_single_split():
+    m = np.random.default_rng(8).normal(0.001, 0.01, size=(16, 3))
+    out = pbo(m, n_blocks=4, max_combinations=1, seed=3)
+    assert out["n_combinations"] == 1 and out["logits"].shape == (1,)
+    assert out["logits"] == pytest.approx(pbo_reference(m, 4, combos=cscv_splits(4, 1, seed=3)), rel=1e-12)
+
+
 def test_pbo_uses_uneven_blocks_when_rows_do_not_divide():
     m = np.random.default_rng(2).normal(0, 0.01, size=(13, 3))
     out = pbo(m, n_blocks=4)
@@ -668,6 +768,12 @@ def test_pbo_uses_uneven_blocks_when_rows_do_not_divide():
     [
         (np.zeros((32, 1)), {}, "returns_matrix needs at least 2 trials (columns) for PBO, got 1"),
         (np.zeros((10, 3)), {}, "returns_matrix needs at least n_blocks=16 rows, got 10"),
+        (np.zeros((3, 3)), {"n_blocks": 4}, "returns_matrix needs at least n_blocks=4 rows, got 3"),
+        (
+            np.zeros((32, 0)),
+            {"n_blocks": 2},
+            "returns_matrix needs at least 2 trials (columns) for PBO, got 0",
+        ),
         (np.zeros((10, 3)), {"n_blocks": 3}, "n_blocks must be an even integer >= 2, got 3"),
         (
             np.zeros((10, 3)),

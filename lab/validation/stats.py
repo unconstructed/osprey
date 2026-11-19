@@ -122,13 +122,14 @@ def probabilistic_sharpe_ratio(r, sr_benchmark: float = 0.0) -> float:
     sr = float(x.mean() / sd)
     skew = float(_st.skew(x))
     kurt = float(_st.kurtosis(x, fisher=False))
-    # Written as a square plus a term that is >= 0 because kurt >= 1 + skew**2 (Pearson's inequality),
-    # so var_term >= 0 in exact arithmetic.
+    # TESTING.md's proof: var_term = (1 - skew*SR/2)**2 + (kurt - 1 - skew**2)*SR**2/4 >= 0 because
+    # kurt >= skew**2 + 1 (Pearson's inequality), so in exact arithmetic it is never negative.
     var_term = (1 - skew * sr / 2) ** 2 + (kurt - 1 - skew**2) * sr**2 / 4
     if var_term <= 0:
-        # Reachable, so NOT pragma'd (TESTING.md said it could never fire): equality holds for a two-valued
-        # sample (kurt == 1 + skew**2) with skew * SR == 2, and rounding then lands on either side of 0,
-        # e.g. var_term = -8.9e-16 for [0.022996598285221187, 0.012996598285221187, 0.012996598285221187].
+        # NOT pragma'd: that proof only holds in exact arithmetic, so this line can run. Both terms are 0 for
+        # a two-valued sample (kurt == 1 + skew**2 exactly) with skew * SR == 2. In floating point, var_term
+        # then comes out as exactly 0.0 or rounds to either side of 0, e.g. -4.4e-16 for
+        # [0.022996598285221187, 0.012996598285221187, 0.012996598285221187] (tests pin both cases).
         # The SR estimate's asymptotic variance is 0 there, so PSR is the z -> +/-inf limit of the formula:
         # 1 above the benchmark, 0 below, 0.5 at it (the same values a tiny positive var_term gives).
         return float(0.5 * (1.0 + np.sign(sr - sr_benchmark)))
@@ -170,8 +171,9 @@ def effective_trials(returns_matrix) -> float:
     if live.shape[1] < 2:
         return 1.0
     corr = np.corrcoef(live, rowvar=False)
-    eig = np.clip(np.linalg.eigvalsh(corr), 0.0, None)  # clip -1e-16 rounding noise
-    p = eig[eig > 0] / eig.sum()
+    eig = np.linalg.eigvalsh(corr)
+    p = eig[eig > 0]  # zero eigenvalues add nothing to the entropy; drops -1e-16 rounding noise too
+    p = p / p.sum()
     return float(np.exp(-np.sum(p * np.log(p))))
 
 
@@ -215,12 +217,8 @@ def column_sharpes(m) -> np.ndarray:
 
 
 def _check_cscv(n_blocks, max_combinations) -> None:
-    if (
-        isinstance(n_blocks, bool)
-        or not isinstance(n_blocks, (int, np.integer))
-        or n_blocks < 2
-        or n_blocks % 2
-    ):
+    # bool is an int subclass: True/False are rejected by the >= 2 test (and explicitly for max_combinations).
+    if not isinstance(n_blocks, (int, np.integer)) or n_blocks < 2 or n_blocks % 2:
         raise ValueError(f"n_blocks must be an even integer >= 2, got {n_blocks!r}")
     if (
         isinstance(max_combinations, bool)

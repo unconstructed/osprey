@@ -17,6 +17,7 @@ Input strategies
 from __future__ import annotations
 
 import math
+import statistics
 import warnings
 
 import numpy as np
@@ -97,6 +98,18 @@ def test_sharpe_power_of_two_scaling_is_bit_exact(r, k):
 def test_sharpe_of_tiny_returns_is_not_zero():
     assert sharpe([1e-12, 0.0, 0.0]) == pytest.approx(1 / math.sqrt(3), rel=1e-12)
     assert sharpe([1e-300, 0.0, 0.0]) == pytest.approx(1 / math.sqrt(3), rel=1e-12)
+
+
+@given(
+    ints=st.lists(st.integers(-1000, 1000), min_size=2, max_size=60).filter(lambda a: len(set(a)) > 1),
+    c=st.floats(-5, 5),
+    s=st.floats(1e-6, 1.0),
+)
+def test_sharpe_known_answer_for_a_standardised_series(ints, c, s):
+    # z has mean 0 and sample sd 1 exactly (rational statistics), so r = c*s + s*z has Sharpe c by construction.
+    mean, sd = statistics.mean(ints), statistics.stdev(ints)
+    z = (np.asarray(ints, dtype=float) - mean) / sd
+    assert sharpe(c * s + s * z) == pytest.approx(c, rel=1e-9, abs=1e-9)
 
 
 @given(r=raw_returns)
@@ -210,6 +223,17 @@ def test_expected_max_sharpe_is_finite_and_non_negative(n, v):
     assert math.isfinite(value) and value >= 0.0
 
 
+_ND = statistics.NormalDist()
+GAMMA = 0.5772156649
+
+
+@given(n=st.floats(2, 1e6), v=st.floats(0, 10))
+def test_expected_max_sharpe_matches_the_bailey_formula(n, v):
+    # Known answer for any N >= 2 (where the formula is positive), with the stdlib quantile, not scipy.
+    z = (1 - GAMMA) * _ND.inv_cdf(1 - 1 / n) + GAMMA * _ND.inv_cdf(1 - 1 / (n * math.e))
+    assert expected_max_sharpe(n, v) == pytest.approx(math.sqrt(v) * z, rel=1e-9, abs=1e-12)
+
+
 @given(n1=st.floats(0, 1e6), n2=st.floats(0, 1e6), v=st.floats(0, 10))
 def test_expected_max_sharpe_never_decreases_with_more_trials(n1, n2, v):
     lo, hi = min(n1, n2), max(n1, n2)
@@ -300,6 +324,13 @@ def test_dsr_is_a_probability_that_never_beats_the_psr(best, trials, n_trials):
     assert out["n_trials"] == (len(trials) if n_trials is None else n_trials)
 
 
+@given(value=finite, n=st.integers(0, 200), trials=trial_sharpe_lists, n_trials=st.floats(1, 1e5))
+def test_dsr_of_a_flat_best_series_is_zero(value, n, trials, n_trials):
+    # Bugs #1 and #2 through the DSR: a strategy with no variation has no evidence of skill.
+    out = _no_warnings(deflated_sharpe_ratio, np.full(n, value), trials, n_trials)
+    assert out["dsr"] == 0.0 and out["best_sharpe_per_period"] == 0.0
+
+
 @given(best=nice_returns, trials=trial_sharpe_lists, n1=st.floats(1, 1e5), n2=st.floats(1, 1e5))
 def test_dsr_never_increases_with_more_trials(best, trials, n1, n2):
     lo, hi = min(n1, n2), max(n1, n2)
@@ -349,6 +380,19 @@ def test_column_sharpes_are_finite_bounded_and_zero_for_flat_columns(m):
     for j in range(m.shape[1]):
         if len(set(m[:, j].tolist())) <= 1:
             assert out[j] == 0.0
+
+
+@given(
+    values=st.lists(finite, min_size=1, max_size=6),
+    noise=hnp.arrays(
+        np.float64, st.tuples(st.integers(2, 60), st.just(6)), elements=st.integers(-1000, 1000)
+    ),
+)
+def test_column_sharpes_of_near_constant_columns_are_zero(values, noise):
+    # Bug #1 in PBO's per-block Sharpe: a relative wiggle of <= 1000 ulps is rounding noise, not variation.
+    v = np.asarray(values, dtype=float)
+    m = v * (1.0 + noise[:, : len(v)] * np.finfo(float).eps)
+    assert _no_warnings(column_sharpes, m).tolist() == [0.0] * len(v)
 
 
 # --------------------------------------------------------------------------------------------------------
@@ -425,6 +469,25 @@ def test_pbo_ignores_trial_order_and_per_trial_power_of_two_scale(relabel):
     b = pbo((m * 2.0 ** np.asarray(ks, dtype=float))[:, list(perm)], n_blocks, cap, seed)
     assert b["pbo"] == a["pbo"]
     assert np.array_equal(b["logits"], a["logits"])
+
+
+@given(
+    case=pbo_cases(),
+    level=st.floats(-0.05, 0.05).filter(lambda x: x != 0),
+    noise_seed=st.integers(0, 2**32 - 1),
+)
+def test_a_near_constant_trial_counts_as_flat_in_pbo(case, level, noise_seed):
+    # Bug #1: a near-constant trial (constant return plus rounding noise) had a Sharpe of ~1e13 in every half,
+    # so it was always the IS winner and the OOS winner. It must behave exactly like a constant trial.
+    m, n_blocks, cap, seed = case
+    noise = np.random.default_rng(noise_seed).integers(-1000, 1001, size=m.shape[0])
+    near, flat = m.copy(), m.copy()
+    near[:, 0] = level * (1.0 + noise * np.finfo(float).eps)
+    flat[:, 0] = level
+    a = _no_warnings(pbo, near, n_blocks, cap, seed)
+    b = pbo(flat, n_blocks, cap, seed)
+    assert a["pbo"] == b["pbo"]
+    assert np.array_equal(a["logits"], b["logits"])
 
 
 @given(

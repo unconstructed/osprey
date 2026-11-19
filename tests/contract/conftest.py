@@ -65,7 +65,15 @@ RUNNERS: tuple[Runner, ...] = (
     Runner(
         "ref_dip_buy_stop_hold_vol",
         reference.dip_buy,
-        {"drop": 0.04, "lookback": 5, "stop": 0.03, "hold": 4, "weight": 0.8, "vol_target": 0.5, "vol_lookback": 5},
+        {
+            "drop": 0.04,
+            "lookback": 5,
+            "stop": 0.03,
+            "hold": 4,
+            "weight": 0.8,
+            "vol_target": 0.5,
+            "vol_lookback": 5,
+        },
         bad_params=(
             {"drop": 0.04, "lookback": 5, "stop": 1.0},
             {"drop": 0.04, "lookback": 5, "hold": 0},

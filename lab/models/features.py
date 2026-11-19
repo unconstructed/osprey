@@ -14,12 +14,17 @@ Conventions
 - All features are invariant to rescaling prices (open, high, low, close by one factor) and to
   rescaling volume.
 
-Bit-exact reproducibility (batch vs. live) needs two precautions, both used by every helper here:
-- Logs are taken with the scalar ``math.log``. numpy's SIMD ``np.log`` can return a different last
-  bit for the same number depending on where it sits in the array (measured on AVX-512), and the
-  live buffer sees much shorter arrays than the batch.
-- Window sums add the window's values left to right (:func:`row_sum`), so a window's result depends
-  only on its own values, not on how many other windows are computed alongside it.
+Bit-exact reproducibility (batch vs. live) needs every window's value to depend only on that window's
+numbers, so every helper here follows two rules:
+- Window statistics are computed per window from its own values (:func:`rolling_windows` plus
+  :func:`row_sum`, which adds left to right), never with pandas ``rolling``. pandas keeps running
+  sums whose round-off carries over from every earlier bar: on the test market a 101-bar buffer and
+  the full history disagree in the last bits on a third to three quarters of the bars.
+- Logs are taken element by element with the scalar ``math.log``: one code path for every array
+  length, so a value never depends on numpy's SIMD dispatch (vector body vs. remainder loop). numpy's
+  ``np.log`` and ``math.log`` differ in the last bit on about 4% of daily returns, so the batch and the
+  live code must use the same one; position-dependent ``np.log`` results were not observed on
+  numpy 2.5 (AVX-512), and ``math.log`` makes the question moot.
 """
 
 from __future__ import annotations
@@ -89,7 +94,7 @@ _PARKINSON_DENOM = 4.0 * math.log(2.0)
 
 
 def log_array(x: np.ndarray) -> np.ndarray:
-    """Natural log of each element with the scalar ``math.log`` (bit-identical however long ``x`` is)."""
+    """Natural log of each element with the scalar ``math.log`` (same code path however long ``x`` is)."""
     return np.fromiter(map(math.log, np.asarray(x, dtype=float).tolist()), dtype=float, count=len(x))
 
 

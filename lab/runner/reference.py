@@ -38,9 +38,10 @@ Bars are daily: annualised volatility uses sqrt(365) (crypto trades every day). 
 dict. Unknown keys, missing required keys and out-of-range values raise ``ValueError``, so a typo
 such as ``stop_loss`` cannot be silently ignored.
 
-pandas caveat: ``attrs`` holds arrays and a DataFrame. Before you ``pd.concat`` columns taken from two
-different results, or write a result to Parquet, drop the attrs (``frame.attrs = {}``) or build a new
-frame from ``.to_numpy()``. pandas 3 raises on both otherwise.
+pandas caveat: ``attrs`` holds arrays and a DataFrame, and pandas copies ``attrs`` onto every column or
+slice taken from the result. ``pd.concat`` of such pieces raises ValueError (it compares the attrs, even for
+two columns of the same result) and ``to_parquet`` raises TypeError (it JSON-encodes them). Drop the attrs
+first (``piece.attrs = {}``) or build a new frame from ``.to_numpy()``.
 """
 
 from __future__ import annotations
@@ -58,7 +59,15 @@ from numpy.lib.stride_tricks import sliding_window_view
 from lab.config import load_yaml
 from lab.runner.interface import validate_bars
 
-__all__ = ["PERIODS_PER_YEAR", "Costs", "buy_and_hold", "constant_mix", "dip_buy", "random_entry", "realised_vol"]
+__all__ = [
+    "PERIODS_PER_YEAR",
+    "Costs",
+    "buy_and_hold",
+    "constant_mix",
+    "dip_buy",
+    "random_entry",
+    "realised_vol",
+]
 
 PERIODS_PER_YEAR = 365  # daily crypto bars: annualised volatility = per-bar volatility * sqrt(365)
 _BPS = 1e4
@@ -148,7 +157,9 @@ class Costs:
         except TypeError:
             points = []
         if not points or any(len(point) != 2 for point in points):
-            raise ValueError(f"slippage_bps must be a non-empty sequence of (trade_usd, bps) pairs, got {self.slippage_bps!r}")
+            raise ValueError(
+                f"slippage_bps must be a non-empty sequence of (trade_usd, bps) pairs, got {self.slippage_bps!r}"
+            )
         sizes = [_real(size, "slippage trade size (USD)", 0.0, low_inclusive=False) for size, _ in points]
         bps = [_real(b, "slippage (bps)", 0.0, low_inclusive=True) for _, b in points]
         if any(b <= a for a, b in zip(sizes, sizes[1:], strict=False)):
@@ -191,7 +202,9 @@ class Costs:
     @classmethod
     def zero(cls) -> Costs:
         """No fees, no slippage, no gas: for identities only (a zero-cost backtest is not a result)."""
-        return cls(pool_fee_bps=0.0, aggregator_fee_bps=0.0, slippage_bps=((1.0, 0.0),), gas_usd_per_trade=0.0)
+        return cls(
+            pool_fee_bps=0.0, aggregator_fee_bps=0.0, slippage_bps=((1.0, 0.0),), gas_usd_per_trade=0.0
+        )
 
     def slippage(self, trade_usd: float) -> float:
         """Slippage in bps for a trade of ``trade_usd``: piecewise-linear in log10(size) between the table
@@ -251,7 +264,11 @@ Decide = Callable[[int, _State], float | None]
 
 
 def _simulate(bars: pd.DataFrame, costs: Costs, decide: Decide) -> pd.DataFrame:
-    """Run ``decide`` (called at the close of bars 0..n-2; returns a target weight or None for no order)."""
+    """Run ``decide`` at every close (it returns a target weight, or None for no order).
+
+    The order decided at close t fills at the open of t+1, so the decision at the last close is never filled:
+    the loop ends before it is used.
+    """
     o = bars["open"].to_numpy(dtype=float).tolist()
     c = bars["close"].to_numpy(dtype=float).tolist()
     n = len(c)
@@ -279,7 +296,8 @@ def _simulate(bars: pd.DataFrame, costs: Costs, decide: Decide) -> pd.DataFrame:
             pos[t] = target * (1.0 + h) / (1.0 + target * h)
             turnover[t], cost[t] = traded, k
             fills.append((t, o[t], drifted, target, traded, k))
-            if w0 == 0.0:  # out of a flat book: a round trip starts; value at the open == value at the last close
+            if w0 == 0.0:
+                # out of a flat book: a round trip starts; value at the open == value at the last close
                 entry_value = value
                 state.entry_bar, state.entry_price = t, o[t]
         else:
@@ -292,7 +310,7 @@ def _simulate(bars: pd.DataFrame, costs: Costs, decide: Decide) -> pd.DataFrame:
             trade_returns.append(value / entry_value - 1.0)
             state.entry_bar, state.exit_bar = None, t
         state.position = pos[t]
-        target = decide(t, state) if t < n - 1 else None
+        target = decide(t, state)
     if state.entry_bar is not None:  # still open: marked to market at the last close, no exit cost
         trade_returns.append(value / entry_value - 1.0)
     result = pd.DataFrame(
@@ -399,7 +417,9 @@ def dip_buy(params: Mapping, bars: pd.DataFrame, costs: Costs | None = None) -> 
     stop = None if _is_off(p.get("stop")) else _param_float(p, "stop", low=0.0, low_inclusive=False, high=1.0)
     hold = None if p.get("hold") is None else _param_int(p, "hold")
     weight = _param_float(p, "weight", 1.0, low=0.0, low_inclusive=False, high=1.0, high_inclusive=True)
-    vol_target = None if p.get("vol_target") is None else _param_float(p, "vol_target", low=0.0, low_inclusive=False)
+    vol_target = (
+        None if p.get("vol_target") is None else _param_float(p, "vol_target", low=0.0, low_inclusive=False)
+    )
     vol_lookback = _param_int(p, "vol_lookback", 20, minimum=2)
     costs = _prepare(bars, costs)
 

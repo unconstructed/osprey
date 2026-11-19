@@ -161,7 +161,8 @@ def test_no_look_ahead(runner, case, tamper_seed):
     if "trades" in a.attrs:
         known = bars.index[cut]
         pd.testing.assert_frame_equal(
-            a.attrs["trades"][a.attrs["trades"]["ts"] <= known], b.attrs["trades"][b.attrs["trades"]["ts"] <= known]
+            a.attrs["trades"][a.attrs["trades"]["ts"] <= known],
+            b.attrs["trades"][b.attrs["trades"]["ts"] <= known],
         )
 
 
@@ -209,7 +210,9 @@ def test_fill_log_lists_every_fill_at_the_open(runner, bars):
     np.testing.assert_allclose(trades["turnover"].to_numpy(), turnover[at], rtol=0, atol=runner.tol)
     np.testing.assert_allclose(trades["cost"].to_numpy(), cost[at], rtol=0, atol=runner.tol)
     w0, gi, hi = pos[at - 1], g[at - 1], h[at - 1]
-    np.testing.assert_allclose(trades["weight_before"].to_numpy(), w0 * (1 + gi) / (1 + w0 * gi), atol=runner.tol)
+    np.testing.assert_allclose(
+        trades["weight_before"].to_numpy(), w0 * (1 + gi) / (1 + w0 * gi), atol=runner.tol
+    )
     target = pos[at] / (1 + hi * (1 - pos[at]))
     np.testing.assert_allclose(trades["weight_after"].to_numpy(), target, rtol=0, atol=runner.tol)
     buys = trades["weight_after"].to_numpy() > trades["weight_before"].to_numpy()

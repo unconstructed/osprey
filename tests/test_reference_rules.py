@@ -51,6 +51,21 @@ def test_entry_fills_at_the_open_after_the_drop_bar(make_bars):
     assert result.attrs["trade_returns"] == pytest.approx([95.0 / 85.0 - 1.0], rel=1e-12)
 
 
+def test_a_drop_exactly_at_the_threshold_signals(make_bars):
+    """The rule is close / peak - 1 <= -drop: 50 / 100 - 1 == -0.5 exactly, so drop 0.5 triggers; 51 doesn't."""
+    exact = dip_buy({"drop": 0.5, "lookback": 5}, make_bars([100.0] * 6 + [50.0, 50.0]), ZERO)
+    assert fill_bars(exact) == [7]
+    short = dip_buy({"drop": 0.5, "lookback": 5}, make_bars([100.0] * 6 + [51.0, 51.0]), ZERO)
+    assert fill_bars(short) == []
+
+
+def test_a_signal_on_the_last_bar_is_never_filled(make_bars):
+    bars = make_bars([100.0] * 6 + [80.0])  # the dip closes on the last bar: there is no next open
+    result = dip_buy({"drop": 0.1, "lookback": 5}, bars, ZERO)
+    assert fill_bars(result) == [] and result.attrs["n_trades"] == 0
+    assert (result.to_numpy() == 0.0).all() and len(result.attrs["trade_returns"]) == 0
+
+
 def test_entry_needs_a_full_lookback_window(make_bars):
     bars = make_bars([100.0, 100.0, 100.0, 80.0, 80.0, 80.0, 80.0])
     result = dip_buy({"drop": 0.1, "lookback": 5}, bars, ZERO)
@@ -66,6 +81,19 @@ def test_stop_loss_exits_at_the_open_after_the_stop_bar(make_bars):
     assert result.attrs["trades"]["price"].tolist() == [85.0, 80.0]
     assert result["position"].iloc[10] == 0.0
     assert result.attrs["trade_returns"] == pytest.approx([80.0 / 85.0 - 1.0], rel=1e-12)
+
+
+def test_a_close_exactly_at_the_stop_level_exits(make_bars):
+    """Exit when close <= fill * (1 - stop): entry fills at 80, stop 0.25 -> level 60.0 exactly."""
+    exact = dip_buy(
+        {"drop": 0.1, "lookback": 5, "stop": 0.25}, make_bars([100.0] * 6 + [80.0, 60.0, 60.0]), ZERO
+    )
+    assert fill_bars(exact) == [7, 8]
+    assert exact.attrs["trade_returns"] == pytest.approx([60.0 / 80.0 - 1.0], rel=1e-12)
+    above = dip_buy(
+        {"drop": 0.1, "lookback": 5, "stop": 0.25}, make_bars([100.0] * 6 + [80.0, 60.01, 60.01]), ZERO
+    )
+    assert fill_bars(above) == [7]
 
 
 def test_stop_is_measured_from_the_entry_fill_price(make_bars):
@@ -156,7 +184,13 @@ def test_realised_vol_by_hand():
 def test_short_bars_never_signal(make_bars):
     bars = make_bars([100.0, 50.0, 25.0])
     assert fill_bars(dip_buy({"drop": 0.1, "lookback": 5}, bars, ZERO)) == []
-    assert fill_bars(dip_buy({"drop": 0.1, "lookback": 1, "vol_target": 0.5, "vol_lookback": 5}, bars, ZERO)) == []
+    assert (
+        fill_bars(dip_buy({"drop": 0.1, "lookback": 3}, bars, ZERO)) == []
+    )  # exactly lookback bars: no window
+    assert (
+        fill_bars(dip_buy({"drop": 0.1, "lookback": 1, "vol_target": 0.5, "vol_lookback": 5}, bars, ZERO))
+        == []
+    )
 
 
 def test_flat_prices_never_trade_and_the_fill_log_is_empty(make_bars):
@@ -165,7 +199,15 @@ def test_flat_prices_never_trade_and_the_fill_log_is_empty(make_bars):
     assert result.attrs["n_trades"] == 0 and len(result.attrs["trade_returns"]) == 0
     trades = result.attrs["trades"]
     assert trades.empty
-    assert list(trades.columns) == ["ts", "side", "price", "weight_before", "weight_after", "turnover", "cost"]
+    assert list(trades.columns) == [
+        "ts",
+        "side",
+        "price",
+        "weight_before",
+        "weight_after",
+        "turnover",
+        "cost",
+    ]
 
 
 def test_off_values_for_optional_params(btc):
@@ -227,7 +269,9 @@ def test_constant_mix_rebalances_every_bar_and_pays_for_it(make_bars):
     k2 = (w_drift - 0.5) * (5.0 + 10.0 + 5.0 * math.log10(trade / 100.0)) / 1e4 + 0.10 / v1
     assert paid["turnover"].iloc[2] == pytest.approx(w_drift - 0.5, rel=1e-12)
     assert paid["cost"].iloc[2] == pytest.approx(k2, rel=1e-12)
-    assert paid["position"].iloc[2] == pytest.approx(0.5 * (110 / 105) / (1 + 0.5 * (110 / 105 - 1)), rel=1e-12)
+    assert paid["position"].iloc[2] == pytest.approx(
+        0.5 * (110 / 105) / (1 + 0.5 * (110 / 105 - 1)), rel=1e-12
+    )
     # paying for every rebalance costs exactly prod(1 - cost)
     end_paid = np.prod(1.0 + paid["ret"].to_numpy())
     end_free = np.prod(1.0 + free["ret"].to_numpy())
@@ -307,9 +351,13 @@ def test_random_entry_tight_fit_has_one_layout(make_bars):
 
 def test_random_entry_reaches_every_layout(make_bars):
     bars = make_bars([100.0 + i for i in range(12)])
-    singles = {fill_bars(random_entry({"n_trades": 1, "hold": 2, "seed": s}, bars, ZERO))[0] for s in range(300)}
+    singles = {
+        fill_bars(random_entry({"n_trades": 1, "hold": 2, "seed": s}, bars, ZERO))[0] for s in range(300)
+    }
     assert singles == set(range(1, 10))  # entry e needs its exit e + 2 <= 11
-    pairs = {tuple(fill_bars(random_entry({"n_trades": 2, "hold": 2, "seed": s}, bars, ZERO))) for s in range(600)}
+    pairs = {
+        tuple(fill_bars(random_entry({"n_trades": 2, "hold": 2, "seed": s}, bars, ZERO))) for s in range(600)
+    }
     assert len(pairs) == math.comb(7, 2)  # 2 blocks of 3 bars in 11 slots: C(11 - 6 + 2, 2) layouts
     assert all(b[2] > b[1] for b in pairs)
 
@@ -322,13 +370,20 @@ def test_random_entry_zero_trades_and_too_many(make_bars):
         random_entry({"n_trades": 3, "hold": 3}, bars, ZERO)
 
 
-@given(start=st.integers(0, 1100), length=st.integers(40, 400), costs=st.sampled_from([Costs(), Costs().stressed()]))
+@given(
+    start=st.integers(0, 1100),
+    length=st.integers(40, 400),
+    costs=st.sampled_from([Costs(), Costs().stressed()]),
+)
 def test_trade_log_matches_the_portfolio_with_costs_on(btc, start, length, costs):
     """Reference only (the contract asks for zero cost): every round trip starts and ends flat, so the
     trade log compounds to the portfolio return with costs on as well."""
     bars = btc.iloc[start : start + length]
     cases = [
-        (dip_buy, {"drop": 0.04, "lookback": 5, "stop": 0.05, "hold": 7, "vol_target": 0.8, "vol_lookback": 10}),
+        (
+            dip_buy,
+            {"drop": 0.04, "lookback": 5, "stop": 0.05, "hold": 7, "vol_target": 0.8, "vol_lookback": 10},
+        ),
         (buy_and_hold, {"weight": 0.6}),
         (constant_mix, {"weight": 0.4, "every": 5}),
         (random_entry, {"n_trades": 4, "hold": 5, "seed": start}),
@@ -365,7 +420,11 @@ BAD_PARAMS = [
     (dip_buy, {"drop": 0.1, "lookback": 5, "weight": 1.01}, r"weight must be in \(0.0, 1.0\]"),
     (dip_buy, {"drop": 0.1, "lookback": 5, "vol_target": 0.0}, r"vol_target must be in \(0.0, inf\)"),
     (dip_buy, {"drop": 0.1, "lookback": 5, "vol_target": math.inf}, r"vol_target must be in \(0.0, inf\)"),
-    (dip_buy, {"drop": 0.1, "lookback": 5, "vol_target": 0.5, "vol_lookback": 1}, "vol_lookback must be >= 2"),
+    (
+        dip_buy,
+        {"drop": 0.1, "lookback": 5, "vol_target": 0.5, "vol_lookback": 1},
+        "vol_lookback must be >= 2",
+    ),
     (buy_and_hold, {"weight": 2.0}, r"weight must be in \(0.0, 1.0\]"),
     (buy_and_hold, {"size": 1.0}, r"buy_and_hold: unknown params \['size'\]"),
     (constant_mix, {"weight": 0.0}, r"weight must be in \(0.0, 1.0\]"),
@@ -383,7 +442,9 @@ BAD_PARAMS = [
 ]
 
 
-@pytest.mark.parametrize(("fn", "params", "match"), BAD_PARAMS, ids=[f"{f.__name__}-{m}" for f, _, m in BAD_PARAMS])
+@pytest.mark.parametrize(
+    ("fn", "params", "match"), BAD_PARAMS, ids=[f"{f.__name__}-{m}" for f, _, m in BAD_PARAMS]
+)
 def test_bad_params_raise_with_a_clear_message(btc, fn, params, match):
     with pytest.raises(ValueError, match=match):
         fn(params, btc.iloc[:50], Costs())

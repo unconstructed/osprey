@@ -15,18 +15,28 @@ every feature reads a fixed trailing window, so the last ``WARMUP`` bars are all
         feats = self.features.latest()
         if feats is None:
             return  # still warming up
+
+``ModelPredictor`` loads a saved model read-only (:func:`lab.models.artifact.load_model`, which refuses a
+tampered file) and turns one ``{feature: value}`` dict, such as ``FeatureBuffer.latest()``, into one
+forecast::
+
+        self.vol_model = ModelPredictor("models/vol_20d")
+        forecast_vol = self.vol_model.predict(feats)
 """
 
 from __future__ import annotations
 
 import math
 from collections import deque
+from collections.abc import Mapping
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 
+from lab.models.artifact import load_model
 from lab.models.features import FEATURES, WARMUP, feature_matrix
+from lab.models.train import predict_values
 
 
 def _utc(ts: pd.Timestamp | datetime | np.datetime64 | int | str) -> pd.Timestamp:
@@ -99,3 +109,31 @@ class FeatureBuffer:
             row = feature_matrix(*arrays)[-1]
             self._latest = dict(zip(FEATURES, row.tolist(), strict=True))
         return dict(self._latest)
+
+
+class ModelPredictor:
+    """A saved model, loaded read-only, that forecasts from one ``{feature: value}`` mapping.
+
+    ``path`` is a directory written by :func:`lab.models.artifact.save_model`; loading refuses a tampered
+    model file. ``predict`` builds the model's input row by feature NAME in the order recorded in the
+    metadata, so the mapping's key order never matters and extra keys are ignored. By kind:
+
+    - ``"vol"``: the EWMA-anchored volatility forecast ``feats[anchor] * exp(correction)``
+      (:class:`lab.models.train.VolModel`).
+    - ``"classification"``: the probability of class 1 (e.g. P(trend) for a regime model).
+    - ``"regression"``: the regressor's prediction (e.g. a cross-sectional rank).
+    """
+
+    def __init__(self, path) -> None:
+        self.model, self.metadata = load_model(path)
+        self.kind: str = self.metadata["kind"]
+        self.features: tuple[str, ...] = tuple(self.metadata["features"])
+        self.horizon: int = self.metadata["horizon"]
+
+    def predict(self, feats: Mapping[str, float]) -> float:
+        """One forecast from ``feats`` (missing features raise ValueError; values must be numbers)."""
+        missing = [f for f in self.features if f not in feats]
+        if missing:
+            raise ValueError(f"missing features for the model: {missing}")
+        row = pd.DataFrame([[float(feats[f]) for f in self.features]], columns=list(self.features))
+        return float(predict_values(self.model, row)[0])
