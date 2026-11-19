@@ -228,12 +228,12 @@ The smart search, validation statistics and prediction pipeline already exist, w
 | `lab/data/loaders.py` | Kraken OHLCVT and Binance kline CSV loaders (verify against real files) |
 | `lab/data/synthetic.py` | Regime-switching, volatility-clustering synthetic bars for tests and demos only |
 
-**What the demo taught us (synthetic data).** These figures predate the backtester accounting fixes; rerun the demo and update them ([TESTING.md 5.5](TESTING.md#55-rerun-the-demo-and-update-the-docs)).
-- **Anchor volatility models to EWMA.** The model predicts a correction on top of an EWMA forecast, with a log-normal bias fix. A from-scratch model lost to EWMA.
+**What the demo taught us (synthetic data).** Rerun on 2026-11-19 after the backtester fixes and the starter merge (fills at the next open, costs from `config/costs.yaml`): [reports/demo/2026-11-19.md](reports/demo/2026-11-19.md).
+- **Anchor volatility models to EWMA.** The model predicts a correction on top of an EWMA forecast, with a log-normal bias fix. A from-scratch model lost to EWMA. The saved model is now the anchored one that was validated (TESTING.md bug #17).
 - **Regularize hard.** Small trees, large minimum leaf size, strong L2. The default settings in `make_model` reflect this.
-- **Horizon matters.** The model beat EWMA in 80% of CPCV splits at 20 days and in only 27% at 5 days. Use the horizon that wins.
-- **Volatility forecasts are most useful for sizing.** Sizing dip buys by forecast volatility cut the worst drawdown from about 69% to 19% in the demo, but the strategy still failed the luck gates.
-- **The luck control works.** Shuffled data with no pattern still produced an in-sample Sharpe of about 1.5; the out-of-sample, DSR and PBO checks rejected it.
+- **Horizon matters.** The model beat EWMA in 80% of CPCV splits at 20 days and in 60% at 5 days (QLIKE 0.320 vs. 0.383 at 20 days; 0.523 vs. 0.519 at 5 days, a tie). Use the horizon that wins.
+- **Sizing by forecast volatility did not help in the rerun.** The older demo showed the worst drawdown falling from about 69% to 19%. After the fixes, the vol-targeted dip buy did worse than the plain one: out-of-sample Sharpe -0.15 vs. 0.32 and max drawdown -53.1% vs. -33.5%. Both failed every gate, and both trailed buy-and-hold (Sharpe 0.83) and the 50/50 monthly rebalance (0.84). Treat model sizing as unproven until real data says otherwise.
+- **The luck control works.** Shuffled data with no pattern still produced an in-sample Sharpe of 1.30; out of sample it was -0.75, with DSR 0.00 and PBO 0.70, so the checks rejected it.
 - **Parallel searches aren't bit-reproducible.** Every trial is logged, and re-running logged parameters is exact. Run important searches twice with different seeds; a large difference flags a fragile strategy.
 
 ### What's left to build
