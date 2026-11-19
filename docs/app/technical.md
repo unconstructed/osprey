@@ -244,6 +244,8 @@ Users never see the engine; they see strategies.
 
 ## Database
 
+Full design: [database.md](database.md) explains it in plain English; [schema.sql](schema.sql) is the schema, ready to become the first migration.
+
 ### Multi-tenancy model
 
 This is a consumer (B2C) app, so each customer is a **user**, not a separate tenant. Use **one shared database** with a `user_id` on every customer-owned row, enforced by **Postgres Row-Level Security** so one user's query can never return another's data.

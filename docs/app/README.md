@@ -12,6 +12,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | [Product](product.md) | Concept, who holds what, how a trade flows, trading modes, the auto-trading permission, strategies by risk level, ranked features, features by phase, mobile app |
 | [Technical](technical.md) | Architecture, trade router, auto-trading permission, launch chain, wallets, rule engine, Nautilus engine, database, phased AWS hosting, agent team rules |
 | [Business](business.md) | Partners and call questions, revenue, app store rules, regulation, accepted risks, compliance checklist, later brokerage track |
+| [Database](database.md) | One Postgres database in 12 schemas: what each holds, built-in safety rules, how a trade moves through the tables, build steps and required tests ([schema.sql](schema.sql)) |
 | [Strategy Lab](../../AGENTS.md) | Guide for the coding agents (repo root): NautilusTrader setup, data, mass simulation, validation gates, prediction models ([research methods](../../research-methods.md)) |
 
 ## Decisions
