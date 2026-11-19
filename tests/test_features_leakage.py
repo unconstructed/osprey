@@ -197,14 +197,18 @@ def test_price_scale_invariance(btc, features, k):
     scaled = btc.copy()
     scaled[PRICE_COLS] = scaled[PRICE_COLS] * k
     # any factor: equal up to round-off in the price ratios
-    np.testing.assert_allclose(compute_features(scaled).to_numpy(), features.to_numpy(), rtol=1e-9, atol=1e-12)
+    np.testing.assert_allclose(
+        compute_features(scaled).to_numpy(), features.to_numpy(), rtol=1e-9, atol=1e-12
+    )
 
 
 @given(k=st.floats(1e-4, 1e4, allow_nan=False, allow_infinity=False))
 def test_volume_scale_invariance(btc, features, k):
     scaled = btc.copy()
     scaled["volume"] = scaled["volume"] * k
-    np.testing.assert_allclose(compute_features(scaled).to_numpy(), features.to_numpy(), rtol=1e-9, atol=1e-12)
+    np.testing.assert_allclose(
+        compute_features(scaled).to_numpy(), features.to_numpy(), rtol=1e-9, atol=1e-12
+    )
 
 
 # ---------------------------------------------------------------- known answers
@@ -393,7 +397,9 @@ def test_buffer_state_and_timestamps(btc):
     buffer.update(datetime(2020, 9, 14), row.open, row.high, row.low, row.close, row.volume)  # naive = UTC
     assert buffer.last_ts == pd.Timestamp("2020-09-14", tz="UTC")
     eastern = timezone(timedelta(hours=-5))
-    buffer.update(datetime(2020, 9, 14, 1, tzinfo=eastern), row.open, row.high, row.low, row.close, row.volume)
+    buffer.update(
+        datetime(2020, 9, 14, 1, tzinfo=eastern), row.open, row.high, row.low, row.close, row.volume
+    )
     assert buffer.last_ts == pd.Timestamp("2020-09-14 06:00", tz="UTC")
     assert len(buffer) == 3
 
@@ -403,7 +409,9 @@ def test_buffer_accepts_price_objects(btc):
     plain, objects = FeatureBuffer(), FeatureBuffer()
     for ts, row in btc.iloc[: WARMUP + 2].iterrows():
         plain.update(ts, row.open, row.high, row.low, row.close, row.volume)
-        objects.update(ts, *(Decimal(repr(float(x))) for x in (row.open, row.high, row.low, row.close, row.volume)))
+        objects.update(
+            ts, *(Decimal(repr(float(x))) for x in (row.open, row.high, row.low, row.close, row.volume))
+        )
     assert objects.latest() == plain.latest()
 
 
@@ -441,6 +449,14 @@ def test_buffer_rejects_bad_bars_and_stays_unchanged(bar, message):
     assert len(buffer) == 1 and buffer.last_ts == pd.Timestamp("2024-01-01", tz="UTC")
 
 
+@pytest.mark.parametrize("ts", [None, pd.NaT, "NaT"])
+def test_buffer_rejects_a_missing_timestamp(ts):
+    buffer = FeatureBuffer()
+    with pytest.raises(ValueError, match="timestamp is missing"):
+        buffer.update(ts, 10.0, 11.0, 9.0, 10.0, 1.0)
+    assert len(buffer) == 0 and buffer.last_ts is None
+
+
 @pytest.mark.parametrize("ts", ["2024-01-01", "2023-12-31"])
 def test_buffer_rejects_out_of_order_bars(ts):
     buffer = FeatureBuffer()
@@ -462,7 +478,9 @@ def test_cross_sectional_ranks_known_answer():
     }
     ranks = cross_sectional_ranks(frames, ["f"])
     assert list(ranks["A"].columns) == [f"f{RANK_SUFFIX}"] == ["f_xs_rank"]
-    np.testing.assert_allclose(ranks["A"]["f_xs_rank"], [1 / 3, 2.5 / 3, np.nan])  # tie averaged; NaN unranked
+    np.testing.assert_allclose(
+        ranks["A"]["f_xs_rank"], [1 / 3, 2.5 / 3, np.nan]
+    )  # tie averaged; NaN unranked
     np.testing.assert_allclose(ranks["B"]["f_xs_rank"], [2 / 3, 2.5 / 3, 1.0])
     np.testing.assert_allclose(ranks["C"]["f_xs_rank"], [1.0, 1 / 3, 0.5])  # only 2 assets ranked on day 3
 
@@ -485,7 +503,10 @@ def test_cross_sectional_ranks_align_different_indexes():
     a_idx = pd.date_range("2024-01-01", periods=3, freq="D", tz="UTC", name="ts")
     b_idx = pd.date_range("2024-01-02", periods=3, freq="D", tz="UTC", name="ts")
     ranks = cross_sectional_ranks(
-        {"A": pd.DataFrame({"f": [1.0, 1.0, 3.0]}, index=a_idx), "B": pd.DataFrame({"f": [2.0, 2.0, 2.0]}, index=b_idx)},
+        {
+            "A": pd.DataFrame({"f": [1.0, 1.0, 3.0]}, index=a_idx),
+            "B": pd.DataFrame({"f": [2.0, 2.0, 2.0]}, index=b_idx),
+        },
         ["f"],
     )
     assert ranks["A"].index.equals(a_idx) and ranks["B"].index.equals(b_idx)

@@ -1,8 +1,9 @@
 """CSV loaders for the free bar sources, normalised to the lab's bar conventions.
 
 Output of every loader: a DataFrame indexed by bar CLOSE time (tz-aware UTC ``DatetimeIndex`` named
-``ts``, strictly increasing) with float64 ``open, high, low, close, volume`` plus ``trades`` (number
-of trades in the bar, NaN where the file has none), ready for ``validate_bars``.
+``ts``, microsecond resolution like every bar index in the lab, strictly increasing) with float64
+``open, high, low, close, volume`` plus ``trades`` (number of trades in the bar, NaN where the file
+has none), ready for ``validate_bars``.
 
 Cleaning, in this order:
 1. A header row (first field not a number) is skipped; lines with more fields than the first line are
@@ -60,8 +61,8 @@ _EPOCH_RE = r"\d{1,18}|[0-8]\d{18}|9[01]\d{17}"
 _MAX_NS = 9_200_000_000_000_000_000
 
 
-def epoch_to_ns(values: pd.Series) -> pd.Series:
-    """Epoch integers in s, ms, us or ns (unit detected per value) -> nullable Int64 nanoseconds.
+def _epoch(values: pd.Series) -> tuple[pd.Series, np.ndarray]:
+    """Epoch integers (unit detected per value) -> (nullable Int64 nanoseconds, ns per unit of each value).
 
     Anything that is not a non-negative integer, or lies beyond 2262 in its unit, becomes <NA>.
     Parsed from the text, never through float, so 16-digit microsecond stamps stay exact.
@@ -69,10 +70,18 @@ def epoch_to_ns(values: pd.Series) -> pd.Series:
     text = values.astype("str").str.strip()
     ok = text.str.fullmatch(_EPOCH_RE).fillna(False).to_numpy(dtype=bool)
     raw = text.where(ok, "0").astype("int64").to_numpy()
-    factor = np.select([raw < 1e11, raw < 1e14, raw < 1e17], [1_000_000_000, 1_000_000, 1_000], 1)
-    ok &= raw <= _MAX_NS // factor
-    ns = np.where(ok, raw, 0) * factor
-    return pd.Series(ns, index=values.index, dtype="Int64").where(ok)
+    unit = np.select([raw < 1e11, raw < 1e14, raw < 1e17], [1_000_000_000, 1_000_000, 1_000], 1)
+    ok = ok & (raw <= _MAX_NS // unit)  # not in place: pandas 3 hands out read-only arrays
+    ns = pd.Series(np.where(ok, raw, 0) * unit, index=values.index, dtype="Int64").where(ok)
+    return ns, unit
+
+
+def epoch_to_ns(values: pd.Series) -> pd.Series:
+    """Epoch integers in s, ms, us or ns (unit detected per value) -> nullable Int64 nanoseconds.
+
+    Anything that is not a non-negative integer, or lies beyond 2262 in its unit, becomes <NA>.
+    """
+    return _epoch(values)[0]
 
 
 def _read_fields(path: Path, min_fields: int) -> tuple[pd.DataFrame, str]:
@@ -122,7 +131,9 @@ def _finish(bars: pd.DataFrame, close_ns: pd.Series, good: np.ndarray, source: s
     """Drop bad rows, sort (stable), de-duplicate keeping the last row, index by close time."""
     rows_read = len(bars)
     bars = bars.loc[good].copy()
-    bars["ts"] = pd.to_datetime(close_ns.loc[bars.index].to_numpy(dtype="int64"), unit="ns", utc=True)
+    # microsecond resolution, like every other bar index in the lab (pandas 3 default); no source has finer
+    stamps = pd.to_datetime(close_ns.loc[bars.index].to_numpy(dtype="int64"), unit="ns", utc=True)
+    bars["ts"] = stamps.as_unit("us")
     bars = bars.sort_values("ts", kind="stable")
     duplicate = bars["ts"].duplicated(keep="last")
     bars = bars.loc[~duplicate].set_index("ts")
@@ -177,19 +188,20 @@ _SECOND_NS = 1_000_000_000
 def load_binance_klines(path: str | Path) -> pd.DataFrame:
     """Load a data.binance.vision kline CSV (columns in ``BINANCE_COLUMNS`` order, header optional).
 
-    ``close_time`` is the last moment of the bar (open + interval - 1 ms, or - 1 us), so the bar
-    length is ``close_time - open_time`` rounded to the nearest second (which also accepts files whose
-    ``close_time`` is the exact bar end) and the index is ``open_time + length``. A row whose length
-    rounds to zero or less is bad. ``trades`` is Binance's ``count``.
+    ``close_time`` is the last moment of the bar, ``open_time + interval - 1 unit`` (1 ms, or 1 us in
+    the newer files; the unit is detected per value). The bar length is therefore
+    ``close_time + 1 unit - open_time``, rounded to the nearest second (so a file whose ``close_time``
+    is the exact bar end in ms or us also loads correctly), and the index is ``open_time + length``.
+    A row whose length rounds to zero or less is bad. ``trades`` is Binance's ``count``.
     """
     path = Path(path)
     raw, source = _read_fields(path, 7)
     open_ns = epoch_to_ns(raw[0])
-    close_ns = epoch_to_ns(raw[6])
+    close_ns, close_unit = _epoch(raw[6])
     bars = _numbers(raw, {name: i for i, name in enumerate(BAR_COLUMNS, start=1)})
     bars["trades"] = pd.to_numeric(raw[8], errors="coerce").astype(float) if raw.shape[1] > 8 else np.nan
-    # integer round-half-up to whole seconds (the 1 ms / 1 us end mark is far below half a second)
-    length = (close_ns - open_ns + _SECOND_NS // 2) // _SECOND_NS * _SECOND_NS
+    # integer round-half-up to whole seconds
+    length = (close_ns + close_unit - open_ns + _SECOND_NS // 2) // _SECOND_NS * _SECOND_NS
     ts_ok = (length > 0).fillna(False).to_numpy(dtype=bool)
     good = _good_rows(bars, ts_ok)
     _require_rows(good, source)

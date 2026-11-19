@@ -399,13 +399,30 @@ def test_pbo_is_a_probability_with_one_bounded_logit_per_split(case):
     assert out["pbo"] == np.mean(out["logits"] <= 0)
 
 
-@given(case=pbo_cases(), data=st.data())
-def test_pbo_ignores_trial_order_and_per_trial_power_of_two_scale(case, data):
-    m, n_blocks, cap, seed = case
-    perm = list(data.draw(st.permutations(range(m.shape[1]))))
-    ks = data.draw(hnp.arrays(np.int64, m.shape[1], elements=st.integers(0, 20))).astype(float)
+@st.composite
+def pbo_relabellings(draw):
+    """A PBO case plus a column permutation and per-column power-of-two exponents."""
+    case = draw(pbo_cases())
+    cols = case[0].shape[1]
+    return (
+        case,
+        draw(st.permutations(range(cols))),
+        draw(st.lists(st.integers(0, 20), min_size=cols, max_size=cols)),
+    )
+
+
+@given(relabel=pbo_relabellings())
+@example(  # found by hypothesis: a 1-row IS half ties every trial; "first column wins" made PBO order-dependent
+    relabel=(
+        (np.array([[0.0017573, -0.00082105], [0.00690423, 0.001549], [-0.00485669, 0.00411595]]), 2, 1, 0),
+        [1, 0],
+        [0, 0],
+    )
+)
+def test_pbo_ignores_trial_order_and_per_trial_power_of_two_scale(relabel):
+    (m, n_blocks, cap, seed), perm, ks = relabel
     a = pbo(m, n_blocks, cap, seed)
-    b = pbo((m * 2.0**ks)[:, perm], n_blocks, cap, seed)
+    b = pbo((m * 2.0 ** np.asarray(ks, dtype=float))[:, list(perm)], n_blocks, cap, seed)
     assert b["pbo"] == a["pbo"]
     assert np.array_equal(b["logits"], a["logits"])
 

@@ -70,6 +70,8 @@ class FeatureBuffer:
     def update(self, ts, open, high, low, close, volume) -> None:
         """Add the bar that closed at ``ts``."""
         stamp = _utc(ts)
+        if pd.isna(stamp):
+            raise ValueError("bar timestamp is missing (NaT)")
         if self._last_ts is not None and stamp <= self._last_ts:
             raise ValueError(
                 f"bars must arrive in strictly increasing time order: {stamp} after {self._last_ts}"

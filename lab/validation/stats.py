@@ -255,11 +255,14 @@ def cscv_splits(n_blocks: int, max_combinations: int, seed=0) -> list[tuple[int,
 def pbo(returns_matrix, n_blocks: int = 16, max_combinations: int = 4000, seed=0) -> dict:
     """Probability of backtest overfitting by combinatorially symmetric cross-validation (CSCV).
 
-    Rows are split into ``n_blocks`` contiguous blocks (``np.array_split``: sizes differ by at most 1). For each
-    in-sample half from ``cscv_splits``: the trial with the best in-sample Sharpe (first on ties) gets its
-    out-of-sample rank r among the N trials (1 = worst; ties share the average rank), w = r / (N + 1),
-    logit = ln(w / (1 - w)). PBO = share of logits <= 0: an IS winner that is only median out of sample
-    (logit 0) counts as overfit. Keys: pbo, logits (np.ndarray, one per split), n_combinations, n_trials.
+    Rows are split into ``n_blocks`` contiguous blocks (``np.array_split``: sizes differ by at most 1, the first
+    blocks get the extra rows). For each in-sample half from ``cscv_splits``: the trial with the best in-sample
+    Sharpe gets its out-of-sample rank r among the N trials (1 = worst; OOS ties share the average rank),
+    w = r / (N + 1), logit = ln(w / (1 - w)). PBO = share of logits <= 0: an IS winner that is only median out
+    of sample (logit 0) counts as overfit. When several trials tie for the best in-sample Sharpe (e.g. trials
+    that never trade in that half), the one with the worst out-of-sample rank is scored: conservative, and
+    PBO does not depend on the order of the trial columns.
+    Keys: pbo, logits (np.ndarray, one per split), n_combinations, n_trials.
     """
     _check_cscv(n_blocks, max_combinations)
     m = _matrix(returns_matrix, "returns_matrix")
@@ -277,7 +280,7 @@ def pbo(returns_matrix, n_blocks: int = 16, max_combinations: int = 4000, seed=0
         in_sample = np.isin(block_of_row, combo)
         sr_is = _column_sharpes(m[in_sample])
         sr_oos = _column_sharpes(m[~in_sample])
-        best = sr_oos[int(np.argmax(sr_is))]
+        best = sr_oos[sr_is == sr_is.max()].min()  # IS ties: score the worst OOS candidate
         rank = np.sum(sr_oos < best) + (np.sum(sr_oos == best) + 1) / 2
         w = rank / (n + 1)
         logits[k] = np.log(w / (1 - w))

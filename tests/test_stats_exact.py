@@ -16,6 +16,7 @@ import warnings
 import numpy as np
 import pytest
 from scipy import integrate
+from scipy import stats as scipy_stats
 
 from lab.validation.stats import (
     annualized_sharpe,
@@ -248,7 +249,9 @@ def test_psr_at_its_own_sharpe_is_one_half():
     assert probabilistic_sharpe_ratio(r, sr_benchmark=sharpe(r)) == 0.5
 
 
-@pytest.mark.parametrize(("n", "k"), [(3, 1), (4, 1), (5, 1), (6, 1), (7, 2), (7, 3), (9, 4), (11, 5)])
+@pytest.mark.parametrize(
+    ("n", "k"), [(3, 1), (4, 1), (5, 1), (6, 1), (7, 2), (7, 3), (9, 4), (11, 5), (20, 4)]
+)
 def test_psr_with_zero_sharpe_variance_is_a_step_at_the_benchmark(n, k):
     """Two-point samples with skew * SR == 2: var_term is 0 up to rounding (either sign). PSR is the limit of
     the formula, never NaN and never a warning: 1 above the benchmark, 0 below, 0.5 at it."""
@@ -267,9 +270,16 @@ def test_psr_variance_guard_is_reachable():
     samples = [
         two_point_zero_variance_sample(n, k) for n, k in [(3, 1), (4, 1), (6, 1), (7, 3), (9, 4), (11, 5)]
     ]
-    assert any(psr_var_term(r) <= 0 for r in samples)
+    assert any(psr_var_term(r) < 0 for r in samples)
     regression = [0.022996598285221187, 0.012996598285221187, 0.012996598285221187]
     assert probabilistic_sharpe_ratio(regression) == 1.0
+
+
+def test_psr_variance_term_can_be_exactly_zero():
+    # (n=20, k=4) gives var_term == 0.0 exactly: a "< 0" guard would divide by zero here.
+    r = two_point_zero_variance_sample(20, 4)
+    assert psr_var_term(r) == 0.0
+    assert probabilistic_sharpe_ratio(r) == 1.0
 
 
 @pytest.mark.parametrize("bench", [float("nan"), float("inf"), float("-inf")])
@@ -553,12 +563,66 @@ def test_pbo_when_the_in_sample_winner_is_out_of_sample_worst():
     assert out["pbo"] == 1.0
 
 
-def test_pbo_out_of_sample_ties_share_the_average_rank():
-    # Block 1: X and Y tie (level 2) above Z. IS block 0 -> X with OOS rank (2 + 3) / 2 = 2.5, w = 2.5 / 4.
-    # IS block 1 -> X (first of the tied pair), OOS block 0 rank 3, w = 3/4.
-    out = pbo(blocks_matrix([[3, 2, 1], [2, 2, 1]]), n_blocks=2)
-    assert out["logits"] == pytest.approx([math.log(2.5 / 1.5), math.log(3)], rel=1e-12)
-    assert out["pbo"] == 0.0
+def test_pbo_ties_out_of_sample_share_the_average_rank_and_in_sample_take_the_worst_candidate():
+    # Block 0 levels (3, 2, 1), block 1 levels (2, 2, 1): X and Y tie in block 1.
+    # IS block 0 -> X; OOS block 1: X ties Y above Z, average rank (2 + 3) / 2 = 2.5, w = 2.5 / 4.
+    # IS block 1 -> X and Y tie in sample; score the worse OOS candidate, Y (rank 2 of 3 in block 0): logit 0.
+    for m in (blocks_matrix([[3, 2, 1], [2, 2, 1]]), blocks_matrix([[3, 2, 1], [2, 2, 1]])[:, [1, 0, 2]]):
+        out = pbo(m, n_blocks=2)
+        assert out["logits"] == pytest.approx([math.log(2.5 / 1.5), 0.0], rel=1e-12, abs=1e-15)
+        assert out["pbo"] == 0.5
+
+
+def test_pbo_does_not_depend_on_the_order_of_tied_in_sample_winners():
+    # Regression (found by hypothesis): with a 1-row in-sample half every IS Sharpe is 0, so all trials tie.
+    # Picking the first column made PBO 0.0 in one column order and 1.0 in the other.
+    m = np.array([[0.0017573, -0.00082105], [0.00690423, 0.001549], [-0.00485669, 0.00411595]])
+    for cols in ([0, 1], [1, 0]):
+        out = pbo(m[:, cols], n_blocks=2)
+        # IS rows 0-1 -> trial 0 (Sharpe 1.19 vs 0.22); OOS row 2 alone: all 0, average rank 1.5, w = 1/2.
+        # IS row 2 alone: tie -> worse OOS candidate on rows 0-1 is trial 1: rank 1 of 2, w = 1/3.
+        assert out["logits"] == pytest.approx([0.0, math.log(0.5)], rel=1e-12, abs=1e-15)
+        assert out["pbo"] == 1.0
+
+
+def pbo_reference(m: np.ndarray, n_blocks: int, combos=None) -> list[float]:
+    """Slow, independent CSCV: explicit row lists (first blocks get the extra rows), ``sharpe`` per column,
+    scipy average ranks, the worst OOS rank among tied IS winners."""
+    t, n = m.shape
+    sizes = [t // n_blocks + (1 if i < t % n_blocks else 0) for i in range(n_blocks)]
+    starts = np.cumsum([0, *sizes])
+    blocks = [list(range(starts[i], starts[i + 1])) for i in range(n_blocks)]
+    if combos is None:
+        combos = itertools.combinations(range(n_blocks), n_blocks // 2)
+    logits = []
+    for combo in combos:
+        is_rows = sorted(r for b in combo for r in blocks[b])
+        oos_rows = sorted(set(range(t)) - set(is_rows))
+        sr_is = [sharpe(m[is_rows, j]) for j in range(n)]
+        sr_oos = [sharpe(m[oos_rows, j]) for j in range(n)]
+        ranks = scipy_stats.rankdata(sr_oos, method="average")
+        rank = min(ranks[j] for j in range(n) if sr_is[j] == max(sr_is))
+        w = rank / (n + 1)
+        logits.append(math.log(w / (1 - w)))
+    return logits
+
+
+@pytest.mark.parametrize(
+    ("t", "n_blocks", "n", "seed"), [(7, 4, 3, 0), (9, 2, 4, 1), (3, 2, 3, 2), (13, 6, 5, 3)]
+)
+def test_pbo_matches_an_independent_cscv_with_uneven_blocks(t, n_blocks, n, seed):
+    m = np.random.default_rng(seed).normal(0.001, 0.01, size=(t, n))
+    out = pbo(m, n_blocks=n_blocks)
+    expected = pbo_reference(m, n_blocks)
+    assert out["logits"] == pytest.approx(expected, rel=1e-12, abs=1e-15)
+    assert out["pbo"] == np.mean(np.array(expected) <= 0)
+
+
+def test_pbo_capped_matches_the_independent_cscv_on_the_same_splits():
+    m = np.random.default_rng(4).normal(0.001, 0.01, size=(70, 6))
+    out = pbo(m, n_blocks=16, max_combinations=50, seed=9)
+    expected = pbo_reference(m, 16, combos=cscv_splits(16, 50, seed=9))
+    assert out["logits"] == pytest.approx(expected, rel=1e-12, abs=1e-15)
 
 
 def test_pbo_with_a_trial_that_never_trades():
