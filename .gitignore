@@ -1,0 +1,13 @@
+.env
+.env.*
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+data/
+results/
+mlruns/
+*.parquet
+.hypothesis/
+mutants/
+.coverage
+htmlcov/
