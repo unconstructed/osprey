@@ -579,7 +579,7 @@ costs:
     proceeds, records both file hashes, a Deviations row is written, and G6 keeps its train-start value (never
     rescored).
 
-**Amendments.** Dated, written in this section and committed by the lead before the run they affect. All three
+**Amendments.** Dated, written in this section and committed by the lead before the run they affect. All five
 below were made on 2026-11-20, after the reviews and **before any run on real data**.
 - **A1, N (from the throughput rule, section 7).** N = 200 trials per study. Measured by `quant-researcher` with
   [throughput.py](throughput.py) (synthetic only; output to a scratch directory), on the synthetic panel of section 7,
@@ -606,6 +606,52 @@ below were made on 2026-11-20, after the reviews and **before any run on real da
   `3f8088a9729586753b000dd911437336ef3cdfd2f14e24b9102d67cccd6fc597` and `lab/data/panel.py`
   `a3e672b5bd95f7557308df93664ec4f7c26705579a3f47d298444c772bd786f9` as of this amendment (the run records the
   hashes it actually uses).
+- **A4, script clarifications (2026-11-20, before any run on real data).** Made while building `study.py`,
+  `run_train.py`, `freeze.py` and `run_validate.py` (part-1 open items 4, 5 and 9):
+  - **Writers.** `run_train.py` writes `research/rebalance-steady/trials.csv` (every trial of every study of runs
+    0..k) and `evaluations.csv` (every evaluation of runs 0..k), rewriting both at the end of each real run.
+    `run_validate.py` writes `validate.csv`; `freeze.py` writes the `FROZEN.json` copy. Synthetic dry runs write
+    these to `<out>/tracked/`, never into the repo.
+  - **Dirty.** A git tree is dirty when `git status --porcelain --untracked-files=all` prints anything: modified,
+    staged, deleted and untracked files count; git-ignored files (`results/`, `data/`, caches) do not.
+  - **Commit between runs.** A real `run_train.py` run appends to the tracked `RUNLOG.jsonl` and rewrites
+    `trials.csv` and `evaluations.csv`, so the tree is dirty after it. The lead commits them before an amendment
+    run or the look (the dirty-tree refusal enforces it), and commits the `FROZEN.json` copy before the look
+    (section 11).
+  - **Amendment row.** Stop rule 7's row for amendment run k is a line in this section that starts with
+    `- **Amendment run k` and gives the date, the reason, how the bug was found and the regression test.
+    `run_train.py --amendment k` refuses on real data without it.
+  - **G6 with amendment runs** (open item 5). G6 uses run 0's train-start reading of `config/risk_levels.yaml`
+    for the whole study, amendment runs included. An amendment run records its own reading and uses its
+    `min_cash` and `max_coin` for the rule, but never its budget for G6.
+  - **Seed B** (open item 9). Seed B's E1 and E2 use its own k_i, its own targets and its own book for B3
+    (seeds 10·j + i) and B4, and the same paired bootstrap (rng seed 0); its 2x run and its plateau are its own.
+    It differs from seed A only in its chosen parameters.
+  - The scripts' other readings, where this plan is loosely worded, are listed in `study.py` (`INTERPRETATIONS`),
+    which the config hash covers.
+- **A5, review fixes to the scripts (2026-11-20, before any run on real data).** From the code review of part 2
+  (TESTING.md bug log #45-#47). None of them changes the rule, a comparator, a criterion or a gate threshold; they
+  enforce what sections 4, 11, 12 and 13 already say, or pin a reading:
+  - **Folders.** A real run uses the pinned folders only: `--out-dir` `results/rebalance-steady/`, `--config-dir`
+    unset (`config/`), `--catalog-dir` `data/catalog/`; all three scripts refuse anything else, so every run reads
+    `config/costs.yaml`, `splits.yaml` and `risk_levels.yaml` and the look's marker is
+    `results/rebalance-steady/validate/STARTED`. A synthetic dry run refuses `results/rebalance-steady/` and any
+    folder inside the repo (section 12).
+  - **Amendment runs** continue the same study: `--amendment k` refuses unless every earlier run has the same data
+    (real or synthetic) and the same `--fast` setting. Only a `- **Amendment run k` row in this section's list of
+    amendments counts (the lines from the Amendments heading to the Deviations heading).
+  - **RUNLOG as a guard.** `run_train.py` refuses a run number the RUNLOG already holds for the same data, and
+    `run_validate.py` refuses when it holds a look (stop rules 6, 7 and 9): a deleted or copied results folder
+    reopens neither a run nor the look.
+  - **The reported run** is the highest-numbered run, and it must be complete. A crashed or stopped last run blocks
+    the freeze (stop rules 5-7 rerun it as an amendment run); the run it superseded is never frozen.
+  - **Triage before the freeze** (stop rule 4). `freeze.py` refuses a run with failed trials unless it is given
+    `--triaged "<note>"` (no code bug: the run stands), and FROZEN.json records the note.
+  - **The look's own checks.** FROZEN.json's θ_final, per-fold parameters, E1-E5, train verdict, gates and train
+    Sharpes must equal the reported run's `summary.json`, whose SHA-256 FROZEN.json holds. B3's kept fills must
+    equal k at the look and on Binance in the train phase (E5's "same count"), as on Kraken; otherwise stop.
+  - **Gates** are computed by `study.gate_table` from the numbers recorded next to them (`gate_inputs` in
+    `summary.json`); a gate with any NaN number is MISSING (G7 has three: S, B1 and B2).
 
 **Deviations.** Every departure from this plan, however small, goes in a Deviations table in RESULTS.md. Each row
 says what changed, why, and when relative to which result, with its effect on any number.
