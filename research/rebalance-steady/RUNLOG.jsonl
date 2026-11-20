@@ -1,0 +1,1 @@
+{"commit": "9fdaa4d4de7849c3e0c02d1b17e9260bae7c4987", "config_hash": "1506217f6a731f6a828595a7da183d48cb815f5df56ac4b9d6a55e63beffc638", "data": "real", "dirty": false, "out_dir": "/home/user/osprey/results/rebalance-steady", "run": 0, "script": "run_train.py", "snapshot_id": "1746a21b75683e76", "utc": "2026-11-20T18:07:16.019973+00:00"}
