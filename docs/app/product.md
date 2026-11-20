@@ -84,7 +84,7 @@ Customers choose how much risk they want, and each risk level has its own strate
 - **Levels are measured, not marketed.** Each level has a range for its worst expected drop, set from backtests and live results. A strategy whose live results move outside its level's range is halted automatically and reviewed.
 - **Guardrails are enforced twice:** by the trade router, and by the auto-trading permission's token allowlist inside the wallet provider.
 - **Bitcoin is held as cbBTC**, a token on Base backed 1:1 by bitcoin held by Coinbase. The app says this plainly.
-- **Built once, tuned by settings.** Each strategy is one Nautilus strategy plus a settings file (coins, sizes, stops), so new variants are mostly new settings, not new code.
+- **Built once, tuned by settings.** Each strategy is one Nautilus strategy plus a settings file (coins, sizes, stops), so new variants are mostly new settings, not new code. Customers can adjust a strategy's settings within the approved range (tested by the lab, approved by the owner); see [Features: Adjustable strategy settings](features.md#adjustable-strategy-settings).
 - **All costs included.** Backtests include swap fees, price slippage and gas. This matters most for Bold, which trades the most.
 - **Never at any level:** leverage, short selling, market making or arbitrage.
 
@@ -155,6 +155,7 @@ Full catalog by area, tab and phase: [Features](features.md).
 - Risk levels: customer picks Steady, Balanced or Bold; strategies grouped and labeled by level; warning and confirm to go above it
 - Strategy library: one starter strategy per risk level (rebalancing, dip buying, momentum)
 - Strategy cards: plain-English description, risk level, worst historical drop, backtest and live results shown **separately and clearly labeled**
+- Strategy settings, as ranges are approved: adjust within the approved range (tested by the lab, approved by the owner), with the backtested worst fall for the chosen settings shown and labeled hypothetical
 - Rule builder, simple mode: templates like "buy $X when BTC drops Y%," with stop-loss required
 - Trading mode per strategy and rule: Auto-trade or Approve each trade
 - Auto-trading permission screen; manage and revoke permissions in Account

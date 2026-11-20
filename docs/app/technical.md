@@ -47,9 +47,11 @@ Data: PostgreSQL · Redis · SQS · S3 (Object Lock)
 |---|---|---|
 | Runs as | One node per strategy | One service for all users |
 | Knows about | Prices and its own strategy | Users, subscriptions, modes, limits, permissions, approvals |
-| Decides | What to trade, and when | How much for each user, and whether it's allowed |
+| Decides | What to trade, and when\* | How much for each user, and whether it's allowed |
 | Trades | Its own paper model account only | Every user's wallet: inside their permission (Auto) or with their signature (Approve) |
 | Sends out | One signal per decision | One swap per user |
+
+\* *Proposed exception, needs an owner decision:* for customers off a strategy's default settings, trade timing would be decided outside Nautilus by code that must pass a decision-parity test against the Nautilus strategy. See [Strategy settings](#strategy-settings).
 
 **Why:** Nautilus is built to trade one account through one connection, not thousands of user wallets. Keeping user trades in our own code means every money path is code we write and test directly.
 
@@ -72,6 +74,38 @@ What Nautilus sends the trade router for every decision:
 | Reason | "BTC dropped 6% today" | The "why did this trade happen" line and the notification |
 | Price at decision | last price Nautilus saw | Dropping the trade if the swap quote has moved too far since |
 | Created / expires | timestamps | Dropping late signals; the approval window |
+
+### Strategy settings
+
+Customers can change a strategy's settings inside the approved range (tested by the lab, approved by the owner). See [Features: Adjustable strategy settings](features.md#adjustable-strategy-settings).
+
+**Where the ranges come from.** Each approved strategy's export from the lab lists:
+- every setting, with its default and its allowed values (the steps the controls move in);
+- the risk level's limits;
+- the backtested worst fall at each combination of settings.
+
+The app loads the export read-only. Only the owner approves a new or wider range. *(The lab side is proposed in [reports/director/2026-11-20-adjustable-settings.md](../../reports/director/2026-11-20-adjustable-settings.md). Today's export pins one set of parameters.)*
+
+**What's stored.** One small versioned record per subscription: the chosen value for each setting, the customer's loss limit, and the export version they were checked against. Editing creates a new version, and every trade records the version it used, as with rule records.
+
+**Validation.** On save:
+- every value must be one of that setting's approved values, so the combination is one the lab tested;
+- the targets must sit inside the level's limits, with the lab's margin;
+- the loss limit must be tighter than the level's drawdown budget.
+
+Anything else is refused, with no override. The risk engine checks again before each trade and fails closed.
+
+**Who decides what (proposed; needs an owner decision).** The strategy's Nautilus node runs the default settings on its model account, and that is the strategy's live record. For a customer on other settings, the decisions would follow that customer's own wallet:
+- the crypto share and split set that customer's targets;
+- the drift band and check frequency decide when their wallet is brought back to target, from their on-chain holdings.
+
+For customers off the defaults, this departs from "NautilusTrader is the only engine": their trade timing would be decided by code outside Nautilus, which must pass a decision-parity test against the Nautilus strategy. "When to trade" would then be decided per customer, like a customer rule, and the chef/waiter split above bends. Nautilus would still run once per strategy, never once per customer. The alternatives keep Nautilus as the only decision-maker: fixed settings at launch, or one Nautilus node per approved combination.
+
+The timing question also reaches customers on the defaults. A wallet that joined, or added cash, after the model account's last rebalance drifts from different weights, so a band breach on the model account is not that wallet's breach. If those customers simply follow the model account's signals, they are rebalanced on its schedule, not their own, and that differs from the backtest of their own book. The owner's decision above should cover them too.
+
+**Worst fall shown.** The app shows the export's backtested numbers for the chosen combination, labeled hypothetical. Unlike rule backtests, nothing is backtested on our servers for strategy settings.
+
+*Open:* the owner's decision above. If the per-customer check is accepted, does it run in the rules service or in the trade router? Should a second model account run the riskiest approved combination, so the live record also covers the edge of the range?
 
 ### Customer rules and advanced mode
 
@@ -137,7 +171,7 @@ Customers build their own strategies as **rules stored as data, never as code**.
 **Risk engine (four layers)**
 - *Platform:* global kill switch, max total trading volume, rate limits, stale-price guard
 - *Strategy and risk level:* auto-halt a strategy whose live results leave its risk level's range; enforce each level's guardrails (allowed coins, max per coin, cash floor)
-- *User:* their personal limits, loss limit auto-pause, Pause everything
+- *User:* their strategy settings (approved values only), personal limits, loss limit auto-pause, Pause everything
 - *Wallet permission (hard backstop):* the wallet provider refuses anything outside the user's permission, even if every layer above has a bug
 - Fails closed: any error inside a risk check rejects the trade
 
@@ -236,7 +270,7 @@ Customers build their own strategies as **rules stored as data, never as code**.
 
 **Strategies by risk level:** each strategy is one Nautilus strategy class plus a settings file (coins, sizes, stops, risk level). Launch lineup: rebalancing (Steady), dip buying (Balanced), momentum (Bold); see [Product: Strategies by risk level](product.md#strategies-by-risk-level). New variants are mostly new settings files. Backtests always include swap fees, slippage and gas.
 
-**Research and approval:** strategies are built, mass-simulated and validated in the Strategy Lab at the root of this repo; only approved, pinned configs are exported to production. See [Strategy Lab](../../AGENTS.md) and [research methods](../../research-methods.md).
+**Research and approval:** strategies are built, mass-simulated and validated in the Strategy Lab at the root of this repo; only approved configs are exported to production: pinned code and data, plus each setting's default and approved range (proposed, not in force; today AGENTS.md exports one pinned set of parameters; see [Strategy settings](#strategy-settings)). See [Strategy Lab](../../AGENTS.md) and [research methods](../../research-methods.md).
 
 **Not using:** Freqtrade, Jesse and Hummingbot, dropped to keep one engine. No leverage, short selling, market making or arbitrage at any risk level.
 
@@ -254,7 +288,7 @@ Add an `org_id` tenant layer only if we later white-label the platform for other
 
 | Store | Holds | Why |
 |---|---|---|
-| **PostgreSQL** (managed) | Users (keyed to Privy user ID and wallet address), settings, customer rules (versioned records), strategy subscriptions and modes, auto-trading permissions (policy IDs and versions), signals, approvals, trades (transaction hashes), cash in/out records, audit log | Relational, transactional, Row-Level Security; NautilusTrader also supports Postgres |
+| **PostgreSQL** (managed) | Users (keyed to Privy user ID and wallet address), settings, customer rules (versioned records), strategy subscriptions, modes and settings (versioned records), auto-trading permissions (policy IDs and versions), signals, approvals, trades (transaction hashes), cash in/out records, audit log | Relational, transactional, Row-Level Security; NautilusTrader also supports Postgres |
 | **Ledger tables in Postgres** | Every trade and cash movement, append-only | Never update or delete; corrections are new entries. Mirrors the chain; used for history and taxes |
 | **Price history tables in Postgres**, partitioned by date | Price history, candles, strategy performance | AWS's managed Postgres (RDS and Aurora) doesn't offer the TimescaleDB extension, so start with plain date-partitioned tables. Move to Timescale's own cloud or ClickHouse if chart and performance queries slow down |
 | **Redis** | Nautilus cache and message bus, the signal stream from Nautilus to the trade router, rate limits, live prices | NautilusTrader uses Redis for crash recovery |
@@ -344,7 +378,7 @@ The system is built and maintained by an AI agent team. Money bugs are silent, s
 
 - A **different agent reviews** risk, trade router and permission code than the one that wrote it
 - **Tests required on every money path:** duplicate signals, failed swaps, price moved, expired approvals, expired or revoked permissions, policy rejections, lost connections, queue redelivery
-- **No agent changes risk limits, coin allowlists, wallet policies, the authorization key** or production infrastructure without owner approval
+- **No agent changes risk limits, approved setting ranges, coin allowlists, wallet policies, the authorization key** or production infrastructure without owner approval
 - **Weeks on Base Sepolia testnet**, then small amounts on mainnet, before real users
 - **Owner personally reads** the risk engine, trade router and auto-trading permission code before launch
 

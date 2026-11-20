@@ -28,8 +28,9 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | Auto-trading permission | User-granted, revocable signer on the user's wallet, enforced by the wallet provider: swaps only, allowed coins only, amount caps, money can never leave the wallet, 90-day expiry | [Technical](technical.md#auto-trading-permission) |
 | Trading engine | **NautilusTrader only** (v2, pinned): backtest, paper and live with the same strategy code; one instance per strategy | [Technical](technical.md#engine) |
 | Strategy research | Strategy Lab (repo root): Optuna search, walk-forward and purged cross-validation, Deflated Sharpe and overfitting checks, MLflow tracking; prediction models for volatility, regime and ranking | [Strategy Lab](../../AGENTS.md) |
-| Engine vs. user trades | Nautilus decides *what* to trade on its own paper model account and sends a signal; our trade router sizes and executes each user's swap. Nautilus never touches user wallets | [Technical](technical.md#who-does-what-nautilus-vs-the-trade-router) |
+| Engine vs. user trades | Nautilus decides *what* to trade on its own paper model account and sends a signal; our trade router sizes and executes each user's swap. Nautilus never touches user wallets. For customers off a strategy's default settings, see [Strategy settings](technical.md#strategy-settings) (proposed; needs an owner decision) | [Technical](technical.md#who-does-what-nautilus-vs-the-trade-router) |
 | Customer-built strategies | Rules stored as small versioned records (data, not code), run by one shared rule engine. Simple mode at launch; advanced mode with backtests in Phase 2 (paid tier). No customer-written code | [Technical](technical.md#customer-rules-and-advanced-mode) |
+| Strategy settings | Customers can adjust a strategy's settings (for Steady: crypto share, BTC/ETH split, drift band, check frequency, loss limit). Each has a default and an approved range (tested by the lab, approved by the owner); the risk level's limits cap it; past the range it becomes the customer's own rule (proposed, not in force; today AGENTS.md exports one pinned set of parameters) | [Features](features.md#adjustable-strategy-settings) |
 | Strategy lineup | Three risk levels customers choose themselves: Steady (rebalancing), Balanced (dip buying), Bold (momentum). Coins limited to tokens with deep trading on Base. No leverage or shorting at any level | [Product](product.md#strategies-by-risk-level) |
 | Backend language | Python (FastAPI), matching NautilusTrader | [Technical](technical.md#architecture) |
 | Database | Shared PostgreSQL with per-user Row-Level Security, append-only ledger mirroring the chain, Redis; price history in date-partitioned Postgres tables | [Technical](technical.md#database) |
@@ -59,6 +60,8 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 - [ ] Ramp partners: fees, state coverage, and which to use for buying vs. cashing out (Coinbase Offramp needs a Coinbase account; MoonPay selling isn't available in Louisiana, Texas or New York)
 - [ ] Which auto-trading policy conditions Privy enforces natively (contract, calldata, token, amount, expiry)
 - [ ] Final coin list per risk level on Base
+- [ ] Steady limits and drawdown budget: together they set how much crypto a Steady customer can pick (see [Features: Adjustable strategy settings](features.md#adjustable-strategy-settings))
+- [ ] Strategy settings: accept a per-customer decision check outside Nautilus, or keep Nautilus as the only decision-maker (fixed settings at launch, or one Nautilus node per approved combination)? See [Technical: Strategy settings](technical.md#strategy-settings)
 - [ ] Subscription price, given gas sponsorship, Privy and RPC costs
 - [ ] Subscriptions: in-app purchase only, or also US web checkout?
 - [ ] Fee model: subscription only, or also a small swap fee later

@@ -16,6 +16,7 @@ import copy
 import hashlib
 import math
 import pickle
+import re
 from dataclasses import replace
 
 import numpy as np
@@ -185,6 +186,11 @@ def unit_book(panel: pd.DataFrame, target: dict[str, float], result: pd.DataFram
     exactly. So ``dust`` returns the size (as a fraction of V_open) of every leg this book did NOT trade at an order's
     next open, for the caller to check that it is round-off. Returns the result columns, the per-leg log, V_open of
     every fill, the value at every close and ``dust``.
+
+    A fill whose legs cost the whole book or more (paid >= V_open) cannot be paid: nothing would be left to swap. The
+    book stops at that bar, with its cost share (>= 1) in ``cost`` and its V_open last in the list; later rows stay 0
+    and later values NaN. The engine refuses the same fill (``run_checked``), so a run the engine completed must
+    never stop the book.
     """
     n = len(panel)
     o = {a: panel[(a, "open")].to_numpy(dtype=float) for a in ASSETS}
@@ -195,7 +201,7 @@ def unit_book(panel: pd.DataFrame, target: dict[str, float], result: pd.DataFram
     probes = {int(t) + 1 for t in result.attrs["orders"]}
     units = dict.fromkeys(ASSETS, 0.0)
     cash = costs.capital_usd
-    value = np.empty(n)
+    value = np.full(n, np.nan)
     value[0] = cash
     out = {col: np.zeros(n) for col in ALL_COLUMNS}
     legs: list[dict] = []
@@ -226,12 +232,14 @@ def unit_book(panel: pd.DataFrame, target: dict[str, float], result: pd.DataFram
                             "weight_after": target[a],
                         }
                     )
-            after = vo - paid
-            units = {a: target[a] * after / o[a][t] for a in ASSETS}
-            cash = (1.0 - sum(target.values())) * after
             out["turnover"][t] = sum(usd[a] for a in ASSETS if (t, a) in traded) / vo
             out["cost"][t] = paid / vo
             v_open.append(vo)
+            if paid >= vo:  # it cannot pay this fill: the book stops here
+                break
+            after = vo - paid
+            units = {a: target[a] * after / o[a][t] for a in ASSETS}
+            cash = (1.0 - sum(target.values())) * after
         value[t] = cash + sum(units[a] * c[a][t] for a in ASSETS)
         out["ret"][t] = value[t] / value[t - 1] - 1.0
         for a in ASSETS:
@@ -246,6 +254,50 @@ def target_of(params: dict) -> dict[str, float]:
 
 def fill_bars_of(result: pd.DataFrame) -> np.ndarray:
     return np.flatnonzero(result["turnover"].to_numpy() > 0)
+
+
+REFUSAL = re.compile(
+    r"costs of the fill on (.+) are (\d+\.\d)% of a portfolio worth (\S+) USD: it cannot pay them "
+    r"\(raise capital_usd or check the cost model\)"
+)
+
+
+def run_checked(rule, params: dict, panel: pd.DataFrame, costs: Costs) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``(panel, rule(params, panel, costs))``; or, when the engine refuses a fill it cannot pay, that refusal
+    checked against the independent book, and the engine's run on the bars before the refused fill.
+
+    A drawn case can ruin the book (a crash and daily rebalancing at 25 USD of gas per leg: TESTING.md #49), and the
+    engine raises on a fill costing the whole book or more (``test_a_fill_costing_exactly_the_whole_book_raises``).
+    The refusal is right only if ``unit_book``, replaying the rule's orders with ``costs``, can pay every earlier fill
+    and stops at the refused one: the same bar, and the message's cost share and book value are the book's to their
+    printed digits (0.1% and 4 significant digits). The orders come from a zero-cost run of the rule, which never
+    refuses (cost 0), and are the orders of the run with costs: a rule decides on the weights, which costs never
+    change (``test_costs_off_vs_on_scale_each_bar_return``). The bars before the refused fill are then rerun through
+    the engine with the same orders (the last of them, at the close before that fill, is never filled), so the
+    caller's checks still cover every bar the engine accepted; their weights and turnover are the zero-cost run's
+    bit for bit.
+    """
+    try:
+        return panel, rule(params, panel, costs)
+    except ValueError as exc:
+        match = REFUSAL.fullmatch(str(exc))
+        if match is None:
+            raise
+    t = panel.index.get_loc(pd.Timestamp(match[1]))
+    free = rule(params, panel, Costs.zero())
+    out, _, v_open, _, _ = unit_book(panel, target_of(params), free, costs)
+    paid = out["cost"]
+    # the book's first fill it cannot pay is the refused one: every earlier fill was payable
+    np.testing.assert_array_equal(np.flatnonzero(paid >= 1.0), [t])
+    assert paid[t] == pytest.approx(float(match[2]) / 100.0, abs=0.0005 + 1e-12, rel=1e-12)
+    assert v_open[-1] == pytest.approx(float(match[3]), rel=5.000001e-4, abs=0.0)
+    targets = (float(params["w_btc"]), float(params["w_eth"]))
+    orders = set(free.attrs["orders"].tolist())
+    before = pf._simulate(panel.iloc[:t], costs, lambda s, w: targets if s in orders else None)
+    np.testing.assert_array_equal(before.attrs["orders"], free.attrs["orders"][free.attrs["orders"] < t - 1])
+    for col in ("position", "turnover", *pf.WEIGHT_COLUMNS):
+        np.testing.assert_array_equal(before[col].to_numpy(), free[col].to_numpy()[:t], err_msg=col)
+    return panel.iloc[:t], before
 
 
 # --------------------------------------------------------------------------------------------- the panel
@@ -921,15 +973,42 @@ def test_no_look_ahead(case, data):
     ),
     costs=Costs(),
 )
+# a ruined book (test bug, fixed): BTC falls from 30000 to ~7500 and daily rebalancing pays 2 x 25 USD of gas, so the
+# fill on bar 98 (2021-04-09) costs 50.00 USD on a 15.86 USD book (315.2%) and the engine rightly refuses it
+@example(
+    case=(
+        random_panel(99, 168, (0.1, 0.0), (0.0, 0.0)),
+        pf.rebalance,
+        {"w_btc": 0.75, "w_eth": 0.2, "band": 0.0, "every": 1},
+    ),
+    costs=Costs(pool_fee_bps=30.0, aggregator_fee_bps=10.0, gas_usd_per_trade=25.0),
+)
+# the same with overnight gaps (V_open != the last close's value), BTC only: 25 USD a day drains the cash; bar 116
+@example(
+    case=(
+        random_panel(120, 10, (0.1, 0.0), (0.03, 0.0)),
+        pf.rebalance,
+        {"w_btc": 0.6, "w_eth": 0.0, "band": 0.0, "every": 1},
+    ),
+    costs=Costs(pool_fee_bps=30.0, aggregator_fee_bps=10.0, gas_usd_per_trade=25.0),
+)
+# the boundary: two legs of 5000 USD gas on 10000 USD and no fees cost exactly 100% at bar 1, which the book can't pay
+@example(
+    case=(random_panel(30, 6), pf.rebalance, {"w_btc": 0.5, "w_eth": 0.3, "band": 1.0, "every": 1}),
+    costs=Costs(pool_fee_bps=0.0, slippage_bps=((1.0, 0.0),), gas_usd_per_trade=5000.0),
+)
 def test_accounting_equals_an_independent_book_of_coin_units_and_cash(case, costs):
     """Per bar, recomputed from coin units and USDC cash (``unit_book``) with overnight gaps, to 1e-12: ret,
     position, turnover, cost and both weights; and the fill log leg by leg (asset, side, units, open price, USD
-    size, leg cost = usd * rate(usd) + gas, weights before and after)."""
+    size, leg cost = usd * rate(usd) + gas, weights before and after). The book can pay every fill the engine made;
+    where the engine refuses a fill, ``run_checked`` checks the refusal against the book and these checks run on
+    every bar before it."""
     panel, rule, params = case
-    result = rule(params, panel, costs)
+    panel, result = run_checked(rule, params, panel, costs)
     fills = fill_bars_of(result)
     assert set(fills) <= set(result.attrs["orders"] + 1)  # a fill is the next open of an order
     out, legs, v_open, _, dust = unit_book(panel, target_of(params), result, costs)
+    assert (out["cost"] < 1.0).all()  # the book could pay every fill the engine made
     assert (dust <= 1e-12).all()  # every leg the engine did not trade was at its target to round-off
     for col in ALL_COLUMNS:
         np.testing.assert_allclose(result[col].to_numpy(), out[col], rtol=0, atol=1e-12, err_msg=col)
@@ -986,17 +1065,29 @@ def test_only_fills_trade_and_every_fill_pays(case):
 
 
 @given(case=cases(), costs=st.sampled_from(COST_MODELS))
+@example(  # a ruined book (TESTING.md #49): the fill on bar 98 is refused; the 98 bars before it are compared
+    case=(
+        random_panel(99, 168, (0.1, 0.0), (0.0, 0.0)),
+        pf.rebalance,
+        {"w_btc": 0.75, "w_eth": 0.2, "band": 0.0, "every": 1},
+    ),
+    costs=Costs(pool_fee_bps=30.0, aggregator_fee_bps=10.0, gas_usd_per_trade=25.0),
+)
 def test_costs_off_vs_on_scale_each_bar_return(case, costs):
-    """Decisions and weights don't depend on costs, so (1 + ret_paid) == (1 + ret_free) * (1 - cost_paid)."""
+    """Decisions and weights don't depend on costs, so (1 + ret_paid) == (1 + ret_free) * (1 - cost_paid). Where
+    the engine refuses a fill the book cannot pay (``run_checked``), on every bar before it."""
     panel, rule, params = case
     free = rule(params, panel, Costs.zero())
-    paid = rule(params, panel, costs)
+    bars, paid = run_checked(rule, params, panel, costs)
+    n = len(bars)
     assert (free["cost"] == 0.0).all()
     for col in ("position", "turnover", *pf.WEIGHT_COLUMNS):
-        np.testing.assert_array_equal(paid[col].to_numpy(), free[col].to_numpy())
-    np.testing.assert_array_equal(paid.attrs["orders"], free.attrs["orders"])
-    np.testing.assert_allclose(1 + paid["ret"], (1 + free["ret"]) * (1 - paid["cost"]), rtol=0, atol=1e-15)
-    assert paid.attrs["n_trades"] == free.attrs["n_trades"]
+        np.testing.assert_array_equal(paid[col].to_numpy(), free[col].to_numpy()[:n])
+    orders = free.attrs["orders"]
+    np.testing.assert_array_equal(paid.attrs["orders"], orders[orders < n - 1])
+    gross, net = 1 + free["ret"].to_numpy()[:n], 1 + paid["ret"].to_numpy()
+    np.testing.assert_allclose(net, gross * (1 - paid["cost"].to_numpy()), rtol=0, atol=1e-15)
+    assert paid.attrs["n_trades"] == int((fill_bars_of(free) < n).sum())
     assert (paid["cost"][paid["turnover"] > 0] > 0).all()
 
 
@@ -1043,12 +1134,21 @@ def test_flat_rate_cost_is_turnover_times_rate(case, k):
 
 
 @given(case=cases(), costs=st.sampled_from((Costs.zero(), *COST_MODELS)))
+@example(  # a ruined book (TESTING.md #49): the fill on bar 98 is refused; the 98 bars before it are chained
+    case=(
+        random_panel(99, 168, (0.1, 0.0), (0.0, 0.0)),
+        pf.rebalance,
+        {"w_btc": 0.75, "w_eth": 0.2, "band": 0.0, "every": 1},
+    ),
+    costs=Costs(pool_fee_bps=30.0, aggregator_fee_bps=10.0, gas_usd_per_trade=25.0),
+)
 def test_trade_returns_chain_the_portfolio_from_fill_to_fill(case, costs):
     """trade_returns[i] = V_open(fill i+1) / V_open(fill i) - 1 (each period carries the costs of the fill that
     opens it), the last one ends at the last close; so prod(1 + trade_returns) = V[n-1] / V_open(first fill)
-    = prod(1 + ret), the book being all cash until the first fill."""
+    = prod(1 + ret), the book being all cash until the first fill. Where the engine refuses a fill the book cannot
+    pay (``run_checked``), on the bars before it."""
     panel, rule, params = case
-    result = rule(params, panel, costs)
+    panel, result = run_checked(rule, params, panel, costs)
     _, _, v_open, value, _ = unit_book(panel, target_of(params), result, costs)
     tr = result.attrs["trade_returns"]
     assert len(tr) == len(v_open) == result.attrs["n_trades"]
@@ -1380,13 +1480,30 @@ def test_static_mix_never_rebalances_after_the_first_buy():
     costs=st.sampled_from((Costs.zero(), *COST_MODELS)),
 )
 @example(panel=random_panel(60, seed=1), w_btc=0.5, every=1, band=0.0, costs=Costs())
+@example(  # a ruined book (TESTING.md #49): 25 USD of gas a day drains the cash, and both refuse the fill on bar 116
+    panel=random_panel(120, 10, (0.1, 0.0), (0.03, 0.0)),
+    w_btc=0.6,
+    every=1,
+    band=0.0,
+    costs=Costs(pool_fee_bps=30.0, aggregator_fee_bps=10.0, gas_usd_per_trade=25.0),
+)
 def test_btc_only_equals_reference_constant_mix_bit_for_bit(panel, w_btc, every, band, costs):
     """With w_eth = 0 and no limits, the portfolio equals ``reference.constant_mix`` on the BTC bars exactly (no
     tolerance) in ret, position, turnover and cost, with costs on: the same execution model, operation for
-    operation."""
-    mine = pf.rebalance({"w_btc": w_btc, "w_eth": 0.0, "band": band, "every": every}, panel, costs)
+    operation. A fill the book cannot pay is refused by both, with the same message (``run_checked`` checks it
+    against the unit book), and both runs are compared on the bars before it."""
+    params = {"w_btc": w_btc, "w_eth": 0.0, "band": band, "every": every}
+    bars, mine = run_checked(pf.rebalance, params, panel, costs)
+    if len(bars) < len(panel):
+        with pytest.raises(ValueError, match="it cannot pay them") as refused:
+            pf.rebalance(params, panel, costs)
+        with pytest.raises(ValueError, match="it cannot pay them") as ref_refused:
+            reference.constant_mix(
+                {"weight": w_btc, "every": every, "band": band}, pf.asset_bars(panel, "BTC"), costs
+            )
+        assert str(ref_refused.value) == str(refused.value)
     ref = reference.constant_mix(
-        {"weight": w_btc, "every": every, "band": band}, pf.asset_bars(panel, "BTC"), costs
+        {"weight": w_btc, "every": every, "band": band}, pf.asset_bars(bars, "BTC"), costs
     )
     for col in RESULT_COLUMNS:
         np.testing.assert_array_equal(mine[col].to_numpy(), ref[col].to_numpy(), err_msg=col)
