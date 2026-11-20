@@ -110,6 +110,8 @@ Plan pricing assuming in-app purchase fees; treat web checkout savings as upside
 
 **Owner decision (2026-11-19):** launch with auto-trading for both our strategies and customer rules, without a legal review.
 
+*Open:* "hold this mix" (a self-directed tool, owner 2026-11-20; see [Features: Hold this mix](features.md#hold-this-mix)) would also run on Auto-trade (proposed). The decision above names only our strategies and customer rules, so whether it covers the tool is the owner's call.
+
 | Risk | What could happen | How we reduce it |
 |---|---|---|
 | **Auto-trading our strategies looks like managing money** | Regulators could treat it as acting as an investment adviser or commodity trading advisor; Coinbase registered as both before offering AI-driven trading | Opt-in per strategy; the user picks the strategy and risk level; plain-English permission; the user's own limits; revocable anytime; no performance fees; honest strategy cards with backtests labeled hypothetical |
@@ -132,7 +134,7 @@ Parked for whenever a review makes sense:
 **Before beta**
 - [ ] Terms of service, privacy policy, risk disclosures (auto-trading, what each risk level means, cbBTC, network and ramp fees)
 - [ ] Auto-trading permission screen wording, reviewed against what the policy actually enforces
-- [ ] Performance claims: backtests (ours and customers' own rule backtests) labeled as hypothetical, live results shown separately
+- [ ] Performance claims: backtests (ours, customers' own rule backtests and the worst fall shown for "hold this mix") labeled as hypothetical, live results shown separately; "hold this mix" labeled as the customer's own choice, with no claim it beats anything
 - [ ] Company registered; Apple and Google developer accounts under the company name
 - [ ] Sanctions screening of wallet addresses, and geoblocking of sanctioned countries
 - [ ] Privy, ramp partner and 0x terms accepted; ramp partners' licensing evidence collected for app review

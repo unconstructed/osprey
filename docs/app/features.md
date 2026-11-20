@@ -2,7 +2,7 @@
 
 [← Hub](README.md) · [Product](product.md) · [Technical](technical.md) · [Business](business.md)
 
-*Updated 2026-11-19 for the lean self-custody direction. Adjustable strategy settings added 2026-11-20.*
+*Updated 2026-11-19 for the lean self-custody direction. Adjustable strategy settings and "hold this mix" added 2026-11-20.*
 
 ## In one sentence
 
@@ -12,10 +12,10 @@ An iPhone and Android app where users **own their crypto wallet and our strategi
 
 1. **Sign up and get a wallet in under a minute:** email or Apple, Face ID, no seed phrase
 2. **Add cash** with Apple Pay, a debit card or a bank transfer; it shows as a dollar balance (USDC)
-3. **Buy, sell and hold crypto** by hand, or set up recurring buys ("$25 of BTC every Friday")
+3. **Buy, sell and hold crypto** by hand, set up recurring buys ("$25 of BTC every Friday"), or pick a mix of crypto and cash that the app keeps in place ("hold this mix", a self-directed tool; owner, 2026-11-20; its phase is proposed)
 4. **Pick a risk level and use our strategies:** choose Steady, Balanced or Bold, browse strategy cards that show the risks as well as the gains, then subscribe
 5. **Build their own rules** from templates like "buy $X when BTC drops Y%", with a required stop-loss
-6. **Let it run or stay in the loop:** each strategy or rule runs on **Auto-trade** (inside a limited permission) or **Approve each trade** (one tap and Face ID)
+6. **Let it run or stay in the loop:** each strategy and rule runs on **Auto-trade** (inside a limited permission) or **Approve each trade** (one tap and Face ID), and so would a held mix (proposed)
 7. **Stay in control** with their own limits, a loss limit that auto-pauses, and a Pause everything button that also revokes auto-trading
 8. **Understand every trade** through a one-line plain-English reason for why it happened
 9. **Practice risk-free** in demo mode with fake money
@@ -27,6 +27,7 @@ An iPhone and Android app where users **own their crypto wallet and our strategi
 |---|---|---|---|---|
 | Self-custody wallet | A wallet only they control; add cash and cash out through ramp partners | Customer | — (ramp partners charge their own fees) | Phase 1 |
 | Self-directed trading | Manual buy/sell, recurring buys | Customer | Possible small swap fee later | Phase 1 |
+| **"Hold this mix"** | A crypto and cash mix the customer picks, kept in place by the app; their own choice, not one of our strategies. See [Hold this mix](#hold-this-mix) | Customer, by picking the mix | Not set yet | Phase 1 (proposed) |
 | **Customer rules** | Rules that run automatically within their permission, or with approval | Customer, by setting the rule | Subscription | Phase 1 |
 | **Our strategies, Approve mode** | Our strategies suggest trades; customer approves or skips | Customer, by tapping approve | Subscription | Phase 1 |
 | **Our strategies, Auto-trade mode** | Our strategies trade inside their permission | Our strategy, within the customer's permission and limits | Subscription | Phase 1 (owner decision; see [Business: Accepted risks](business.md#accepted-risks)) |
@@ -50,24 +51,42 @@ Customers choose how much risk they want; each level has its own strategies, all
 - **Guardrails per level** (allowed coins, max per coin, cash floor) are enforced by the trade router, and the coin list is also locked into each auto-trading permission.
 - **Bitcoin is held as cbBTC** (backed 1:1 by bitcoin held by Coinbase), disclosed plainly.
 - **No level uses** leverage, short selling, market making or arbitrage.
+- **Steady's own tested strategy is still to be found.** The lab's first rebalancing study found no edge (NO EDGE; SCOUTING; see [What the first Steady study taught](#what-the-first-steady-study-taught)). Meanwhile, Steady customers can use ["hold this mix"](#hold-this-mix), a self-directed tool, not one of our strategies (owner, 2026-11-20).
+
+## Hold this mix
+
+*Added 2026-11-20. Owner decision (2026-11-20): offer "hold this mix" for Steady as a self-directed tool, like recurring buys, not as one of our strategies ("go with the simple tool"). The design below is the plan's sketch the owner answered, plus details that follow from rules elsewhere in these docs (Steady's coins and limits with the lab's 2-point margin, Pause everything, fees shown, no suggested or ranked mixes). Anything else beyond the sketch is marked proposed or open.*
+
+The customer picks a mix of crypto and cash, and the app keeps it there. Like a recurring buy, it is the customer's own choice. We make no claim it beats anything, and it is not put through the lab's checks. Its place on the Trade tab is proposed.
+
+- **The customer picks** the crypto share (the rest stays in cash, USDC) and how the crypto part is split between BTC and ETH. Coins are BTC (held as cbBTC), ETH and USDC only.
+- **The app keeps it there,** as the plan sketched it before the owner's answer: it trades back to the mix when a Steady limit is hit, and optionally on a long reset schedule (the study's comparison reset once a year). Between those trades the mix drifts. Far from the limits it can drift a long way: in the study, the comparison that traded only at a Steady limit (bought fresh each year; mixes of 34-55% crypto) hit a limit once in four years with each search, both times in 2021 (SCOUTING; RISK.md section 1). Close to a limit it trades often ([open questions](#open-questions-that-change-the-feature-set)). There is no reset-only option, because it would break the Steady limits between resets. *Proposed:* like a customer rule, it runs on Auto-trade or Approve each trade, as the customer chooses; whether the owner's acceptance of Auto-trade covers it is open. Pause everything stops it, as it stops all trading. Whether the customer's daily or weekly loss limit also pauses it is open ([open questions](#open-questions-that-change-the-feature-set)).
+- **Labeled as the customer's own.** The app says plainly that this is the customer's mix, not one of our strategies, with no claim it beats anything. It doesn't suggest a mix or rank mixes by past results. *Proposed, beyond the owner's words:* it shows no backtested return, only the worst fall.
+- **The worst fall is shown, next to the crypto share.** How far the chosen mix would have fallen at worst in a backtest on past prices, labeled hypothetical and naming the years it covers. In the study the crypto share moved the worst fall the most, and how often the mix was reset also mattered ([below](#what-the-first-steady-study-taught)), so the number sits right next to the crypto share. *Proposed:* the controls move in steps, so every mix and reset schedule the app offers has been backtested.
+- **Fees are shown.** Each trade back to the mix pays swap fees and price slippage, shown with the trade. Network fees are sponsored. The backtested worst fall includes all of these costs.
+- **Steady's limits hold.** The mix keeps at least 20% cash and at most 60% in any one coin, with the lab's 2-point margin, and the controls stop there. A limit hit is what triggers a trade back to the mix. The open Steady-limits questions below (tighten them? per coin or all coins together? does 60% apply to cash?) also set how much crypto the tool allows. Whether Steady's drawdown budget also caps it is open.
+- **No required stop-loss.** Like recurring buys, the tool needs no stop-loss. So "like a customer rule", here and in [Technical](technical.md#strategy-settings), is about how it runs (modes, per-customer checks, versioned record), not the rule checks (customer rules need a stop-loss). *Proposed; not in the owner's words.*
+- **Not a strategy setting.** It has no approved range, no model account and no live record of ours. A customer's results come from their own on-chain trades, as always. See [Technical: Strategy settings](technical.md#strategy-settings).
 
 ## Adjustable strategy settings
 
 *Added 2026-11-20. The owner, on the Steady settings: "All of this should be adjustable in the final application."*
 
-Customers can change the settings of our strategies. Every setting has a **default** and an **allowed range**.
+Customers can change the settings of our strategies. Every setting has a **default** and an **allowed range**. This section covers our strategies only. Self-directed tools, like recurring buys and ["hold this mix"](#hold-this-mix), are the customer's own choices and have no approved range.
 
-- **The range is tested by the lab and approved by the owner.** The owner approves the whole range a customer can pick, not one tuned number, and only after the [Strategy Lab](../../AGENTS.md#validation-gates)'s checks pass at every point of it (every combination of settings), not just the default. *(The lab-side change is proposed to the owner in [reports/director/2026-11-20-adjustable-settings.md](../../reports/director/2026-11-20-adjustable-settings.md). It is not in force: today AGENTS.md exports one pinned set of parameters.)*
+- **The range is tested by the lab and approved by the owner.** The owner approves the whole range a customer can pick, not one tuned number, and only after the [Strategy Lab](../../AGENTS.md#validation-gates)'s checks pass at every point of it (every combination of settings), not just the default. *(In AGENTS.md "Validation gates" and "Ready for production" since 2026-11-20, owner: "yes to 1"; see [reports/director/2026-11-20-adjustable-settings.md](../../reports/director/2026-11-20-adjustable-settings.md).)*
 - **Settings move in steps.** Every combination of settings a customer can pick was backtested, so the app never shows a number for settings nobody tested.
-- **Outside the range, it is no longer our strategy.** The controls stop at the edge of the approved range. A customer who wants to go further can copy the strategy into their own rule ([advanced rule builder](#strategies-and-rules), Phase 2; for Steady this needs a rebalancing building block, which the builder doesn't list yet). It is then labeled as their own rule, not tested by us, and any backtest of it is labeled hypothetical. It follows the same checks as every [customer rule](technical.md#customer-rules-and-advanced-mode), including the required stop-loss.
+- **Outside the range, it is no longer our strategy.** The controls stop at the edge of the approved range. *Proposed (director report decision 6, open):* a customer who wants to go further can copy the strategy into their own rule ([advanced rule builder](#strategies-and-rules), Phase 2; for Steady this needs a rebalancing building block, which the builder doesn't list yet). It is then labeled as their own rule, not tested by us, and any backtest of it is labeled hypothetical. It follows the same checks as every [customer rule](technical.md#customer-rules-and-advanced-mode), including the required stop-loss.
 - **The risk level caps the range.** No setting can take a strategy past its level's limits. Going past them means picking a higher level (with the usual warning and confirm) or building their own rule.
 - **A customer's own loss limit can only be tighter.** They can set it below the level's drawdown budget (the worst fall the level allows), never above it. A loss limit pauses the strategy. It does not sell what the wallet holds, so the app never presents it as a cap on losses: the first Steady study's rule, holding about 45% crypto, lost 15.4% in one day, 12 March 2020 (SCOUTING, [RISK.md](../../research/rebalance-steady/RISK.md)). A stop-loss that is part of a strategy, like Balanced's, is a setting with an approved range like any other.
 - **The app shows the worst fall for the chosen settings.** Next to the controls: how far that exact combination of settings fell at worst in the lab's backtest, and how far it fell in the worst 1 of 20 simulated histories. Both are labeled hypothetical, name the years the backtest covers, and are shown next to the level's budget. For the default settings the backtest is at least partly in-sample: the search that chose the default used some or all of the same years, so the number flatters it, and the app says so.
 - **No "best settings".** The app doesn't rank settings by backtested return or suggest settings for a specific person. Picking the setting with the best past result is the kind of luck the lab's checks exist to catch.
-- **The model account runs the defaults.** The strategy card's live record comes from the default settings. A customer's own results come from their own on-chain trades, as today.
+- **The live record runs the defaults.** The strategy card's live record comes from the model account on the default settings. Before production, AGENTS.md also requires at least 4 weeks on a second paper model account at the riskiest combination in the range (the owner can still drop it; director report decision 2). Whether that account keeps running after that, or shows on the card, is not decided. A customer's own results come from their own on-chain trades, as today.
 - **Until a range is approved, the default is the only setting.** A strategy can launch with fixed settings; the controls appear once the owner approves a range that passed the lab's checks.
 
 ### Steady settings
+
+These are the settings of a Steady rebalancing strategy of ours, once one passes the lab's checks. The first one did not ([below](#what-the-first-steady-study-taught)). ["Hold this mix"](#hold-this-mix) shares the first two controls (crypto share and BTC/ETH split), but it is the customer's own tool, with no approved range.
 
 | Setting | What it changes | Steady limit that caps it |
 |---|---|---|
@@ -97,9 +116,11 @@ Customers can change the settings of our strategies. Every setting has a **defau
   - the median Sharpe barely moved: 1.52 against 1.36;
   - even the search's 20% crypto, 80% cash mix fell −28.9%.
 
-**What this means for the app.** A simple "hold this mix" Steady option could be considered. The customer picks the crypto share and the BTC/ETH split. The app trades when a Steady limit is hit, and optionally on a long reset schedule (the study's comparison reset once a year). A reset-only option is not on the table: it would break the Steady limits between resets, because the yearly-reset comparison ignored them. Both of those comparisons were baselines, not tested strategies: the study gives no evidence that either would pass the lab's checks. The yearly-reset comparison still fell −46.4% at worst (seed A, SCOUTING). RISK.md section 2 says today's limits alone do not give the "smaller swings" [Product](product.md#strategies-by-risk-level) promises Steady customers, unless the owner tightens them (RISK.md section 3, point 3). The crypto share is the main risk control, so the worst-fall number belongs right next to it. Still pending:
-- Nautilus results with measured costs. These are scouting numbers.
-- How to offer it. It claims no edge, and the lab's checks test for one. The yearly-reset comparison was a baseline, not a tested strategy: it reused the search's yearly mixes, ignored the Steady limits and was never put through the checks. Its Sharpe was 0.948 with one search and 1.030 with the other, either side of the lab's 1.0 bar (SCOUTING). As one of our strategies, it must pass the same checks as any other. Otherwise it can be a self-directed tool like recurring buys, with its risk numbers shown and no performance claim. This is the owner's decision.
+**What this means for the app.** The rule found no edge, so Steady's own tested strategy is still to be found. "Hold this mix" is offered meanwhile as a self-directed tool, not as one of our strategies (owner, 2026-11-20; see [Hold this mix](#hold-this-mix)). It claims no edge, so it is not put through the lab's checks, and the checks are unchanged. The study still shapes how the tool is shown:
+- **The crypto share is the main risk control,** so the worst-fall number sits right next to it.
+- **A held mix can still fall far.** The study's comparisons that held a mix with little or no rebalancing were baselines, not tested strategies. The yearly-reset one, which ignored the Steady limits, fell −46.4% at worst with one search and −44.1% with the other. The one that traded back only when a Steady limit was hit fell −43.2% and −36.7%. It ran one year at a time, as the rule did: each year it was bought fresh at that year's mix (34-55% crypto) before the year began, at no cost in these numbers. So it is closest to the tool with a yearly reset. A fixed mix held four years with only the limits was not run. The same mixes held four years with no reset, also without the Steady limits, fell −71% to −75% (both searches). All SCOUTING.
+- **Today's limits alone don't give smaller swings.** RISK.md section 2 says they do not give the "smaller swings" [Product](product.md#strategies-by-risk-level) promises Steady customers, unless the owner tightens them (RISK.md section 3, point 3). The worst fall of a customer's mix depends mostly on its crypto share, and also on how often it is reset.
+- **These are scouting numbers.** The worst fall the app shows will come from Nautilus backtests with all costs included. Still pending: Nautilus results with measured costs.
 
 ## Feature catalog
 
@@ -133,6 +154,7 @@ Priority key: **Must** = must-have · **Standout** = what sets us apart · **Lat
 | Portfolio view | Coins, cash, profit/loss, every trade with a blockchain link | Home, Activity | 1 | Must #2 |
 | Manual buy/sell | Swap between cash and allowed coins | Trade | 1 | — |
 | Recurring buys (DCA) | "Buy $25 of BTC every Friday" | Trade | 1 | Must #4 |
+| Hold this mix | The customer picks the crypto share and the BTC/ETH split; the app trades back to the mix when a Steady limit is hit, and optionally on a long reset schedule, on Auto-trade or Approve (proposed). Labeled as the customer's own choice, not our strategy, with no claim it beats anything; the backtested worst fall for the mix (labeled hypothetical) and the fees are shown. See [Hold this mix](#hold-this-mix) | Trade (proposed) | 1 (proposed) | — |
 
 ### Strategies and rules
 
@@ -220,7 +242,7 @@ Priority key: **Must** = must-have · **Standout** = what sets us apart · **Lat
 |---|---|
 | **Home** | Total balance (coins and cash), today's change, active strategies with their mode, anything waiting for approval |
 | **Strategies** | Strategies grouped by risk level, honest strategy cards, subscribe with Auto-trade or Approve, strategy settings within the approved range, rule builder |
-| **Trade** | Buy/sell, recurring buys, Add cash, Cash out |
+| **Trade** | Buy/sell, recurring buys, hold this mix (proposed), Add cash, Cash out |
 | **Activity** | Every trade with its "why" reason and blockchain link, cash in and out |
 | **Account** | Wallet (address, receive, send, recovery), auto-trading permissions, limits, Pause everything, risk level, security, tax export, demo mode toggle |
 
@@ -246,7 +268,13 @@ Priority key: **Must** = must-have · **Standout** = what sets us apart · **Lat
 1. Strategies → the strategy → Settings
 2. Each control moves in the steps the lab tested and stops at the approved range; the backtested worst fall for the new settings updates next to the level's budget, labeled hypothetical
 3. Save; the change is a new version. If the new mix needs trades, they run in the strategy's mode (Auto-trade or Approve) like any other trade
-4. To go past the range: copy the strategy into your own rule (Phase 2)
+4. To go past the range: copy the strategy into your own rule (Phase 2; proposed, director report decision 6, open)
+
+**Hold a mix of your own** (proposed)
+1. Trade → Hold this mix
+2. Pick the crypto share and the BTC/ETH split, and optionally a long reset schedule. Each control moves in steps; the backtested worst fall for that mix updates next to the crypto share, labeled hypothetical
+3. The screen says plainly: this is your own mix, not one of our strategies, and we don't claim it beats anything. The fees a trade back to the mix pays are shown
+4. Choose Auto-trade or Approve each trade, and save. The trades that set up the mix, and every later trade back to it, run in that mode
 
 **Cash out**
 1. Trade → Cash out → choose amount
@@ -261,7 +289,7 @@ Priority key: **Must** = must-have · **Standout** = what sets us apart · **Lat
 - **Recommend a strategy for a specific person.** Customers choose their own risk level; we label.
 - **Run customer-written code.** Customer strategies are rules built from our building blocks and stored as data. A developer API for customers' own bots is possible much later as a separate product.
 - **Pass off backtests as real results.** Backtests are labeled hypothetical; the leaderboard is live-only.
-- **Run our strategies on untested settings.** A strategy's settings stay inside the approved range (tested by the lab, approved by the owner); going further makes it the customer's own rule.
+- **Run our strategies on untested settings.** A strategy's settings stay inside the approved range (tested by the lab, approved by the owner). Going further would make it the customer's own rule (proposed; director report decision 6, open).
 - **Show engine names.** Customers see strategies, not the software behind them.
 
 ## Behind the scenes
@@ -286,7 +314,15 @@ Every feature runs on the same backend pieces (details in [Technical](technical.
 - [ ] Is Steady's "at most 60%" per coin (the lab's reading) or for all coins together? Not yet confirmed by the owner
 - [ ] Does Steady's "at most 60%" also apply to cash (USDC)? The lab reads it as not (RISK.md reading 4). If it did, a Steady customer would need at least 40% crypto, and the mostly-cash mixes the first study reached (70-80% cash) would be ruled out
 - [ ] For customers off a strategy's defaults: decide their trade timing per customer, outside Nautilus, or keep Nautilus as the only decision-maker (fixed settings at launch, or one Nautilus node per approved combination)? See [Technical: Strategy settings](technical.md#strategy-settings)
-- [ ] "Hold this mix" for Steady: one of our strategies (it must pass the lab's checks) or a self-directed tool like recurring buys?
+- [x] "Hold this mix" for Steady: one of our strategies (it must pass the lab's checks) or a self-directed tool like recurring buys? **Owner (2026-11-20): a self-directed tool ("go with the simple tool").** The customer picks the mix and the app keeps it there. We make no claim it beats anything, and the app shows how far the mix would have fallen in the past, labeled hypothetical. It is not one of our strategies, so it is not put through the lab's checks, and the checks are unchanged. See [Hold this mix](#hold-this-mix)
+- [ ] "Hold this mix": the owner's words are "the app keeps it there", but with trades only at a Steady limit or a long reset, most mixes drift far between trades (above). Should the customer also pick a drift band (proposed)? If so, Steady's "a few trades a month" caps it (owner, 2026-11-20), and someone must set that cap, because the tool has no approved range. A band cap alone cannot keep a volatile market to a few trades a month: it also needs a check frequency or a minimum time between trades, as the rules service has
+- [ ] "Hold this mix": does Steady's "a few trades a month" also cap the tool's own trades (trades back to the mix after a limit hit, and resets), not only a drift band? With a coin's target 2 points under the 60% cap and the rest of the wallet flat, the tool sells each time that coin gains about 8.6% since the last trade (simple arithmetic, not a lab result)
+- [ ] "Hold this mix": does Steady's drawdown budget (not set yet) also cap the tool's crypto share? Or can a mix whose backtested worst fall is past the budget still be offered under the Steady label? The [hub](README.md#open-questions) says the budget helps set how much crypto a Steady customer can pick, and [Product](product.md#how-the-levels-work) gives each level a measured range for its worst drop
+- [ ] "Hold this mix": which years its worst-fall backtests cover. Covering 2023 onward would spend the lab's unseen validate and test data for any later Steady rebalancing strategy ([Technical: Strategy settings](technical.md#strategy-settings))
+- [ ] "Hold this mix": who can use it? It is described as a Steady option, but it sits on the Trade tab with recurring buys. Can a Balanced or Bold customer use it, and under which level's guardrails? Bold's coin list is still to be vetted and may not include BTC and ETH
+- [ ] "Hold this mix": does the customer's daily or weekly loss limit, which pauses the customer's strategies, also pause the tool? Pause everything already stops it
+- [ ] "Hold this mix" on Auto-trade: the owner's acceptance of the auto-trading risks (2026-11-19) names only our strategies and customer rules. Does it cover the tool? See [Business: Accepted risks](business.md#accepted-risks)
+- [ ] Steady at launch: if no Steady strategy of ours passes the lab's checks by launch, does Steady launch with "hold this mix" only? The strategy library plans one starter strategy per risk level
 - [x] Does Steady's guardrail "a few trades a month" ([Product](product.md#strategies-by-risk-level)) cap the drift band and check frequency? **Owner (2026-11-20): yes, unless rebalancing that often is shown to pay; if it is not profitable, cap it.** In the first study it did not pay: across the 400 trials of the two final searches (in-sample, 2017-2022, reference engine, placeholder costs; SCOUTING), the median Sharpe was 1.50 for settings that rebalanced less than once every 4 months (352 trials), 1.32 at 1-3 rebalances a month (6 trials), 1.24 at 3-6 a month (6) and 1.25 at 6 or more a month (3), counting rebalances after the first buy. The same held inside one mix: with 20-35% crypto, 1.51 against 1.25. Few trials sat at the busy end, because the search did not favour it, so this is a description, not a test. So the guardrail caps the drift band and check frequency, and `risk-officer` sets those ranges inside it. Still open: is it counted in trades (each coin's swap) or in rebalances? The lab's limits have no such cap: the first study searched check frequencies from daily and bands from 2% of the coin share, and the busiest in-sample trials, checking daily with a band of about 2% of the coin share, rebalanced on 697 and 757 of about 2,190 days, roughly 10 times a month; each rebalance can be up to two swaps (the two final searches, 2017-2022; SCOUTING)
 - [ ] Customer limits beyond the mix (for example a separate "keep at least 40% cash"): in Steady the limits also trigger trades, so such a limit is a strategy setting and needs its own approved range
 - [ ] Subscription price, given gas sponsorship and provider costs

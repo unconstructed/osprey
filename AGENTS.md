@@ -2,7 +2,7 @@
 
 Instructions for the coding agent team that builds and tests our trading strategies.
 
-This repo is where strategies are **built, simulated at scale, validated and approved**. It feeds the app described in the [app docs](docs/app/README.md): approved strategies are exported as pinned configs and run in production as NautilusTrader strategy nodes on paper "model accounts". User trades never happen here.
+This repo is where strategies are **built, simulated at scale, validated and approved**. It feeds the app described in the [app docs](docs/app/README.md): approved strategies are exported as pinned configs (each setting's default and approved range; see "Ready for production") and run in production as NautilusTrader strategy nodes on paper "model accounts". User trades never happen here.
 
 **Read first:** [research-methods.md](research-methods.md) explains *why* the pipeline below looks the way it does. [TESTING.md](TESTING.md) is the testing standard and the **first work order**: finish its open items before building anything new.
 
@@ -272,7 +272,7 @@ Full method in [research-methods.md](research-methods.md). Implementation rules:
 
 ## Validation gates
 
-A strategy is **ready for paper** (production model account) when `backtest-auditor` reports PASS on all of these. Thresholds are defaults the owner can change:
+A strategy is **ready for paper** (production model account) when `backtest-auditor` reports PASS on all of these, on the walk-forward result as today **and at the default and at every combination of the allowed values** of the settings a user can change in the app (see "Settings ranges" below). Thresholds are defaults the owner can change:
 
 | Gate | Default |
 |---|---|
@@ -286,7 +286,27 @@ A strategy is **ready for paper** (production model account) when `backtest-audi
 | Regimes | No single regime (bull, bear, sideways) produces most of the profit |
 | Final test window, run once | Sharpe within a reasonable distance of walk-forward; no new failure modes |
 
-**Ready for production (owner decision, not an agent's):** at least 4 weeks on a paper model account with results within tolerance of the backtest; the owner approves; `risk-officer` writes `exports/<name>/config.yaml` with pinned parameters, risk level, coin list and code commit.
+**Settings ranges.** Users can change a strategy's settings in the app, so approval covers every combination a user can pick, not one tuned point.
+- `risk-officer` sets each setting's allowed values inside the risk level's limits, in the study's pre-registration, before any result. The level's drawdown budget must be owner-approved before then. The pre-registration lists every earlier look at the same data that could inform the range (a study's prior looks, as in its plan). The app offers those values only.
+- The allowed range lies inside the search box. Where the box reaches further, the walk-forward choice and θ_final can use values a user cannot pick, and the default can sit some way from θ_final. The walk-forward choice still has to pass every gate, and the grid covers what users can pick.
+- A grid step is one full combination (one value for every setting a user can change). The grid is every combination of the per-setting values, and every gate below covers each combination (the table says how). Each setting's values include both ends of its range. The default takes, for each setting, the value nearest θ_final's (θ_final is the final search's stable-region pick, `lab/search/stability.py`). A setting users cannot change keeps θ_final's value.
+- The thresholds above are unchanged. Where each gate is measured:
+
+| Gate | Measured at |
+|---|---|
+| Walk-forward out-of-sample Sharpe, and the same with costs doubled | The walk-forward choice, as today, **and** every grid step held fixed over the same out-of-sample span |
+| Deflated Sharpe Ratio; Probability of Backtest Overfitting | As today. Every grid run is logged and added to the total trial count (AGENTS.md "Running many simulations", rule 4), as the plateau and doubled-cost runs are (rebalance-steady's strict count, RESULTS.md). The effective count for correlated trials (`backtest-auditor` item 8) still comes from the search studies' trials, and the grid runs do not enter it: they were fixed before any result, so nothing was selected from them. The trial-Sharpe variance and PBO also still come from the search's trials. So the total-count DSR can only fall, and the effective-count DSR is unchanged |
+| Parameter plateau | As today (each parameter ×0.8 and ×1.2 from the walk-forward choices, against the walk-forward Sharpe S), **and** each parameter ×0.8 and ×1.2 from the default, **and** every grid step. The default's steps and the grid steps are each held fixed over the walk-forward out-of-sample span, and each must keep ≥ 70% of S's Sharpe |
+| Monte Carlo 95th-percentile max drawdown | The walk-forward choice, as today, **and** every grid step: S's drawdown and the deepest grid-step drawdown are both within the risk level's budget |
+| Beats benchmarks; regimes | The walk-forward choice, as today, **and** the default and every grid step |
+| Final test window, run once | One run covering the default and every grid step together. The default is judged against the walk-forward Sharpe S, as today; every other grid step against its own fixed run over the walk-forward out-of-sample span. The window is then burned for the whole range |
+
+- A failing walk-forward result fails the strategy, as today. One failing grid step fails the range. After an audit, a range may be narrowed only to meet a risk limit (the drawdown budget or the level's limits), and only by dropping whole values from a setting's riskiest end, never to drop combinations whose Sharpe failed. A setting's riskiest end is the end whose grid steps include the deepest Monte Carlo 95th-percentile max drawdown, as measured. Each narrowing is logged with the new edge's margin to the budget, the dropped combinations stay in the trial count, and the range gates run again. The range is frozen before the test window opens.
+- The default is chosen by the search, so its fixed runs on the search's own data are in-sample. That includes its runs and its ±20% steps over the walk-forward out-of-sample span, when the final search used those years. Those runs add checks, not evidence. Its out-of-sample evidence stays the walk-forward choice, the validate look and the test window. The other grid steps were fixed before any result, so they were not selected.
+- The grid runner and the per-combination gate table ship with the tests [TESTING.md](TESTING.md) section 7 describes (hard rule 11), including a test that recomputes every reported number from its inputs.
+- Fixed settings (no setting a user can change) ship θ_final, like today's pinned config. They are gated as today on the walk-forward result, plus θ_final's own runs wherever the table names the default. A range is fixed in the pre-registration: one that fails cannot be cut down to fixed settings afterwards, because that would drop combinations whose Sharpe failed.
+
+**Ready for production (owner decision, not an agent's):** at least 4 weeks on paper model accounts, at the default and at the riskiest combination in the allowed range (the grid step with the deepest Monte Carlo 95th-percentile max drawdown), with results within tolerance of the backtest; the owner approves the default and the range; `risk-officer` writes `exports/<name>/config.yaml` with, for every setting a user can change, its default and its allowed values (a setting users can't change has one value), plus the risk level and its limits as read, the coin list, the backtested max drawdown and Monte Carlo 95th-percentile max drawdown for every combination, the code commit, the data snapshot ID and the model version (if any).
 
 ## Prediction models
 
@@ -319,10 +339,10 @@ Owned by `ml-researcher`. Full approach in [research-methods.md: Prediction mode
 | `quant-researcher` | Strategy hypotheses, `strategies/`, search spaces | Touch `config/`, open the test window, write audit reports |
 | `ml-researcher` | `lab/models/`, features, labels, model training and evaluation | Put a model in a strategy without an audit; use future data |
 | `backtest-auditor` | `lab/validation/`, audit reports, the one-time test-window run | Write or tune strategy logic |
-| `risk-officer` | `config/risk_levels.yaml`, drawdown budgets, exports | Loosen a limit without the owner's written approval |
+| `risk-officer` | `config/risk_levels.yaml`, drawdown budgets, each setting's allowed range (set before any result, inside the level's limits), exports | Loosen a limit or widen an approved range without the owner's written approval |
 | `director` | Reviewing how the desk works; researching better methods and tools; proposing improvements to agent files and docs on a branch for the owner | Change gates, `config/` or test tolerances to make things pass; approve strategies; merge its own changes |
 
-Handoff for any new strategy: `quant-researcher` (or `ml-researcher`) → `backtest-auditor` → `risk-officer` → paper model account → owner → export.
+Handoff for any new strategy: `quant-researcher` (or `ml-researcher`) and `risk-officer` pre-register the search box and the allowed ranges → `backtest-auditor` → `risk-officer` → paper model accounts → owner → export.
 
 The `director` reviews the desk after every milestone and after any failed audit, and proposes changes on a `director/<date>` branch. The owner merges what they agree with.
 

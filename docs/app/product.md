@@ -38,16 +38,16 @@ Technical detail: [Technical: Architecture](technical.md#architecture).
 
 ## Trading modes
 
-Every strategy subscription and every customer rule runs in one of two modes. The user chooses, and can switch anytime.
+Every strategy subscription and every customer rule runs in one of two modes, and so would "hold this mix" (proposed). The user chooses, and can switch anytime.
 
 | | Auto-trade | Approve each trade |
 |---|---|---|
 | How it works | Trades execute automatically inside the user's trading permission | Push notification; the user taps approve and confirms with Face ID |
-| Works for | Our strategies and customer rules | Our strategies and customer rules |
+| Works for | Our strategies, customer rules and "hold this mix" (proposed) | Our strategies, customer rules and "hold this mix" (proposed) |
 | Best for | Hands-off users; strategies where timing matters | Users who want a say on every trade |
 | Downside | The user isn't in the loop on each trade | Missed trades, notification fatigue |
 
-Auto-trade is **opt-in per strategy or rule**: turning it on shows the permission screen. Both modes are available at launch for our strategies and for customer rules, by owner decision. The risks are recorded in [Business: Accepted risks](business.md#accepted-risks).
+Auto-trade is **opt-in per strategy or rule**: turning it on shows the permission screen. Both modes are available at launch for our strategies and for customer rules, by owner decision. The risks are recorded in [Business: Accepted risks](business.md#accepted-risks). That decision does not name "hold this mix", so whether Auto-trade is accepted for it is still open.
 
 ### The auto-trading permission
 
@@ -76,6 +76,8 @@ Customers choose how much risk they want, and each risk level has its own strate
 | **Steady** | Wants smaller swings | **Rebalancing:** holds BTC, ETH and a slice of cash (USDC); trades only when the mix drifts | Trend following that moves to cash in downtrends | BTC and ETH only; always part cash; a few trades a month |
 | **Balanced** | Is OK with normal crypto swings | **Dip buying:** buys BTC or ETH after a set drop, with a cap on how much | A second dip strategy with different timing | BTC, ETH and a few vetted large tokens; stop-loss required |
 | **Bold** | Accepts big drops for bigger upside | **Momentum:** holds the strongest few from a vetted list of the most liquid tokens on Base; rotates weekly | Mean reversion, grid trading | Wider token list, more trades, biggest possible drops |
+
+**Steady, for now.** The lab's first rebalancing study found no edge (NO EDGE; SCOUTING, from the lab's simple in-house simulator, not NautilusTrader; see [Features: What the first Steady study taught](features.md#what-the-first-steady-study-taught)). So Steady's own tested strategy is still to be found; the plan above stands until the owner changes it. Meanwhile, Steady customers can use **"hold this mix"**, a self-directed tool like recurring buys, not one of our strategies (owner, 2026-11-20). The customer picks the crypto share and the BTC/ETH split, and the app keeps the mix there. The app makes no claim it beats anything and shows the mix's backtested worst fall, labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix).
 
 ### How the levels work
 
@@ -150,6 +152,7 @@ Full catalog by area, tab and phase: [Features](features.md).
 
 *Trading*
 - Manual buy/sell (swaps) and recurring buys
+- "Hold this mix" (proposed for Phase 1): the customer picks a crypto and cash mix and the app keeps it there; labeled as their own choice, with the backtested worst fall shown and labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix)
 
 *Strategies*
 - Risk levels: customer picks Steady, Balanced or Bold; strategies grouped and labeled by level; warning and confirm to go above it
@@ -211,7 +214,7 @@ Charts are the most performance-sensitive piece; use a native-backed charting li
 
 1. **Home:** total balance (coins and cash), today's change, active strategies with their mode (Auto or Approve), anything waiting for approval
 2. **Strategies:** strategies grouped by risk level, honest strategy cards, subscribe with Auto-trade or Approve, rule builder (simple and advanced mode)
-3. **Trade:** buy/sell, recurring buys, Add cash, Cash out
+3. **Trade:** buy/sell, recurring buys, hold this mix (proposed), Add cash, Cash out
 4. **Activity:** every trade with its "why did this happen" reason and blockchain link, cash in and out
 5. **Account:** wallet (address, receive, send, recovery), auto-trading permissions, limits, Pause everything, risk level, security, tax export, demo mode toggle
 

@@ -1,6 +1,50 @@
 # Director proposal: adjustable strategy settings (2026-11-20)
 
-**Status: PROPOSAL for the owner.** Nothing in it is in force. I edited no gate, threshold, `config/` file, test or
+**Status: core APPLIED on 2026-11-20 with the owner's approval ("yes to 1").**
+- **Owner's words (chat, 2026-11-20):** "yes to 1, go with the simple tool for 3". The numbers refer to the owner's chat
+  summary, not to section 9: summary 1 = decision 1 (4.1-4.4 and 4.6), summary 3 = decision 5 ("hold this mix").
+  Section 9's decision 3 (the Steady limits) is still open.
+- **Applied:** sections 4.1-4.4 to AGENTS.md, as written, and the 4.6 edits to `.claude/agents/risk-officer.md`,
+  `backtest-auditor.md`, `quant-researcher.md` and `research-methods.md`. 4.2 went in as written, so it includes the
+  second paper model account at the riskiest combination; decision 2 can still drop that clause.
+- **Small consistency edits made while applying** (not in the text below; none changes a threshold):
+  - AGENTS.md: the opening paragraph says the pinned export configs carry each setting's default and approved range.
+  - `risk-officer.md`: lists the ranges under "What you own" and in its description, which also says "paper model
+    accounts". The export step points to the rest of AGENTS.md "Ready for production" (the limits as read, and both
+    drawdowns for every combination). Step 1 adds AGENTS.md's conditions (the level's budget owner-approved first,
+    earlier looks listed) and the owner's Steady trade guardrail (decision 10). A new rule restates AGENTS.md's
+    narrowing rule: only to meet a risk limit, whole values from a setting's riskiest end, logged with the new edge's
+    margin, the dropped combinations kept in the trial count, never to drop failing Sharpes, never after the test
+    window opens. 4.6 had only the rule against widening, and the file's opening line lets the role tighten limits on
+    its own. "Setting drawdown budgets" points to AGENTS.md's budget-first rule and to decision 11 (no method
+    changed).
+  - `backtest-auditor.md`: item 6 compares every grid step and each ±20% step from the default with S's Sharpe, as
+    the 4.1 plateau row says, not with its own; fixed settings get θ_final's runs where the table names the default
+    (4.1's last bullet), so the paragraph is now "Settings ranges and fixed settings". Each grid step's fixed run must
+    pass the AGENTS.md walk-forward Sharpe gate, as its doubled-cost run must pass item 12 (4.1's first row; 4.6 named
+    only item 12). The trial-Sharpe variance (item 8) and PBO (item 9) still come from the search's trials only (4.1's
+    DSR and PBO row); item 9 said "across all trials", and grid runs are now logged trials, so it now says "all of the
+    search's trials". The final step freezes the range before the test window opens and judges the default against S,
+    every other grid step against its own fixed run (4.1's test-window row). The output adds the per-combination gate
+    table, which the risk-officer's export reads its drawdowns from.
+  - `quant-researcher.md` step 4: the allowed values are set before any search, pre-registered with the search box,
+    and the search ranges must contain every allowed value (4.1, second bullet). `ml-researcher.md` gets the matching
+    rule, because the 4.4 handoff line names both researchers.
+  - `research-methods.md`: stage 6 says "Paper model accounts", and the PBO row says "the search's trials". A note
+    under the funnel says stages 3 and 5 also cover every grid step. Live strategy-card figures come from the model
+    account "at the default settings" (decision 2 may add a second one). "Risk-level budgets" points to AGENTS.md's
+    budget-first rule and says the first budget is open (decision 11).
+- **Not applied, still proposals:** 4.5 (hard rule 12) and section 7 (the stale AGENTS.md places).
+- **Decided in section 9:** decision 1 (this approval), decision 5 ("hold this mix" is a self-directed tool, not one
+  of our strategies) and decision 10 (Steady's trade guardrail caps the drift band and check frequency). The others are
+  still open, including decision 11, added while applying.
+- **Open, for the owner and `risk-officer` (found while applying; no method changed):** AGENTS.md now says a level's
+  drawdown budget must be owner-approved before a range is pre-registered. But `risk-officer.md` ("Setting drawdown
+  budgets") and `research-methods.md` ("Risk-level budgets") still take the budget from the Monte Carlo drawdowns of
+  the level's audited strategies. A level's first study (Steady today) has none, so its budget has to come from
+  somewhere else first, such as RISK.md's reference mix (section 3; PLAN.md section 9). Now decision 11.
+
+When this proposal was written, nothing in it was in force. I edited no gate, threshold, `config/` file, test or
 test tolerance, and I did not touch AGENTS.md, TESTING.md, `lab/`, `tests/` or `research/`. Every AGENTS.md change below
 is quoted old text and new text for the owner to accept, change or reject.
 
@@ -13,9 +57,9 @@ costs (RESULTS.md, RISK.md, AUDIT.md).
 - **Already done, in the app plan (`docs/app/`):** the requirement is written into `features.md` (new section "Adjustable
   strategy settings") and `technical.md` (new section "Strategy settings"), with small reconciliations in `product.md`
   and `README.md`. Section 8 lists every change.
-- **No branch or PR yet.** This review ran inside a workflow that shares the working tree with another agent and forbids
-  commits and branch switches. The files are uncommitted on `claude/tender-brown-g86h44`. Suggested branch:
-  `director/2026-11-20`. I never merge my own changes.
+- **No director branch or PR.** This review ran inside a workflow that shares the working tree with another agent and
+  forbids branch switches. This file and the `docs/app/` edits were committed on `claude/tender-brown-g86h44`
+  (fea468e and a581f9c), not on a `director/<date>` branch. I never merge my own changes.
 
 **Terms used below.**
 - **Sharpe:** return per unit of ups and downs (annualised); higher is better.
@@ -165,7 +209,7 @@ the owner prefers one model account. The live record then covers the default onl
 4.1 already implies this. As a hard rule, it reaches `quant-researcher` and `ml-researcher` too, who read the hard
 rules but not the gate details.
 
-### 4.6 Matching edits outside AGENTS.md (same proposal; not made here)
+### 4.6 Matching edits outside AGENTS.md (same proposal; applied 2026-11-20, see the status)
 
 AGENTS.md alone would leave the role files contradicting it:
 - `.claude/agents/risk-officer.md`, step 5: "write `exports/<strategy>/config.yaml` with pinned parameters, ..." → "with
@@ -348,8 +392,11 @@ little power (3 rebalances), as RESULTS.md "Known weaknesses" does.
 
 ## 9. Decisions for the owner
 
-1. **Accept 4.1-4.4** (core) as written, edited, or not at all. 4.5 and 4.6 follow from them.
-2. **The second paper model account** at the riskiest combination (4.2, separable).
+1. **Accept 4.1-4.4** (core) as written, edited, or not at all. 4.5 and 4.6 follow from them. **Owner (2026-11-20):
+   "yes to 1". 4.1-4.4 applied as written; 4.6 applied with the small consistency edits listed in the status; 4.5 was
+   not part of the answer and stays a proposal.**
+2. **The second paper model account** at the riskiest combination (4.2, separable). In AGENTS.md since 2026-11-20 as
+   part of 4.2; still open: keep or drop.
 3. **The Steady limits.** Tighten them before the budget is computed (RISK.md section 3, point 3)? Under 4.1 this sets the
    top of the Steady crypto slider. Today's limits allow up to 80% crypto. In the two final searches (in-sample, over
    all of 2017-2022), the 3 trials with 70-77% crypto fell 66-72% at worst (RISK.md section 2: about two thirds), each
@@ -362,7 +409,10 @@ little power (3 rebalances), as RESULTS.md "Known weaknesses" does.
    like recurring buys, with its risk numbers shown and no performance claim. The yearly-reset comparison was a
    baseline, not a tested strategy: it reused the search's yearly mixes, ignored the Steady limits and was never put
    through the checks. Its Sharpe was 0.948 with one search and 1.030 with the other, either side of the lab's 1.0 bar
-   (SCOUTING). The gates must not be relaxed to fit it.
+   (SCOUTING). The gates must not be relaxed to fit it. **Owner (2026-11-20): a self-directed tool, not one of our
+   strategies ("go with the simple tool").** Like recurring buys: the user picks the mix and the app keeps it there. We
+   make no claim that it beats anything, and the app still shows how far it would have fallen in the past. It is not
+   put through the lab's gates.
 6. **Out-of-range settings.** Blocked for our strategy, with the customer-rule path as the only way further (my
    recommendation, written into `features.md`). The alternative is to allow them with an "untested" label, which I
    advise against: our strategy's name would sit on untested settings.
@@ -381,6 +431,12 @@ little power (3 rebalances), as RESULTS.md "Known weaknesses" does.
    ranges inside it at pre-registration (4.1), like the level's limits. **Owner (2026-11-20): it caps them unless
    rebalancing that often is shown to pay.** In the first study's final searches it did not (in-sample, SCOUTING; the
    numbers are in `features.md`), so it caps them. How it is counted (trades or rebalances) is still open.
+11. **A level's first drawdown budget.** AGENTS.md now says a level's budget must be owner-approved before any range
+   at that level is pre-registered. But `risk-officer.md` ("Setting drawdown budgets") and `research-methods.md`
+   ("Risk-level budgets") take the budget from the Monte Carlo drawdowns of the level's audited strategies, and a
+   level's first study (Steady today) has none. Where does the first budget come from: a reference mix measured before
+   the study, as RISK.md section 3 and PLAN.md section 9 propose, or something else? Found while applying decision 1;
+   both files now point here, and no method changed.
 
 ## 10. Risks of this proposal
 
@@ -424,12 +480,12 @@ Internal files only. No web research was needed for this proposal.
 
 ## Handoff
 
-- **Report:** `reports/director/2026-11-20-adjustable-settings.md`. **Branch:** none created (the workflow forbids
-  commits and branch switches in the shared tree); suggested `director/2026-11-20`. The `docs/app/` edits and this file
-  are uncommitted on `claude/tender-brown-g86h44`.
+- **Report:** `reports/director/2026-11-20-adjustable-settings.md`. **Branch:** no `director/` branch (the workflow
+  forbids branch switches in the shared tree). This file and the `docs/app/` edits were committed on
+  `claude/tender-brown-g86h44` (fea468e and a581f9c).
 - **Top improvement in one sentence:** approval should cover every combination of settings a user can pick, so the
   gates must hold on the walk-forward result as today and also at every combination in a range fixed before any
   result, with the unchanged thresholds, the riskiest combination judged against the level's drawdown budget, and
   nothing narrowed to drop failing Sharpes.
-- **Needs the owner:** decisions 1-10 in section 9. The most urgent is decision 3 (tighten the Steady limits or not),
+- **Needs the owner:** the open decisions in section 9 (2-4, 6-9 and 11; 1, 5 and 10 are decided). The most urgent is decision 3 (tighten the Steady limits or not),
   because it now sets what a Steady user can pick.

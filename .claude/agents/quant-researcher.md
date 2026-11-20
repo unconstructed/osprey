@@ -11,7 +11,7 @@ Turn a hypothesis into a testable strategy:
 1. State the hypothesis in one paragraph: what pattern, why it should persist, and what would prove it wrong.
 2. Pick the risk level, coins (only from that level's list in `config/risk_levels.yaml`), bar size and holding period.
 3. Write `strategies/<name>/strategy.py` as a NautilusTrader v2 `Strategy`. Use the v2 API shown in the reference clone's `python/examples/`, not the published v1 tutorials.
-4. Write `strategies/<name>/params.yaml`: parameters, their search ranges, and the risk level.
+4. Write `strategies/<name>/params.yaml`: parameters, their search ranges, the allowed values set by `risk-officer` before any search (pre-registered with the search box), and the risk level. The search ranges must contain every allowed value (AGENTS.md "Settings ranges").
 5. Write `strategies/<name>/README.md`: hypothesis, signal logic, expected trade frequency, known weaknesses, and a log of validate-window looks.
 6. Define the search space as `lab.search.space.Param` specs and run `lab.search.walkforward.walk_forward_optimize` (Optuna, stable-region selection, every trial logged). Strategies must run behind the `BacktestFn` interface in `lab/runner/interface.py`.
 7. Run the idea screen and the search on train + validate only, then hand off to `backtest-auditor`.

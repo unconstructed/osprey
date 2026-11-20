@@ -26,7 +26,9 @@ Everything below follows from that.
 | 3. Robustness battery | Parameter plateau, doubled costs, Monte Carlo, regime breakdown, benchmarks | Top 10–50 configurations | Train + validate |
 | 4. Overfitting statistics | Deflated Sharpe Ratio (counting every trial), Probability of Backtest Overfitting, combinatorial purged cross-validation | Top handful | Train + validate |
 | 5. Final holdout | Run **once** on the test window | 1–3 per idea | Test |
-| 6. Paper model account | Weeks of live prices, fake money, in production | Approved strategies | Live |
+| 6. Paper model accounts | Weeks of live prices, fake money, in production | Approved strategies | Live |
+
+With a settings range ([AGENTS.md: Validation gates](AGENTS.md#validation-gates), "Settings ranges"), stages 3 and 5 also cover every combination of settings a user can pick, on top of the counts above.
 
 ## Tools
 
@@ -52,8 +54,8 @@ Everything below follows from that.
 | **Walk-forward analysis** | Parameters that only worked in one period | Re-fit on a rolling window, score on the next unseen block, with a purge gap between them. This is the Optuna objective |
 | **Combinatorial purged cross-validation (CPCV)** | Luck from having only one historical path | Many train/test combinations with purging and embargo; gives a distribution of results instead of one number. Research comparing methods found CPCV better than walk-forward alone at preventing false discoveries |
 | **Deflated Sharpe Ratio (DSR)** | A high Sharpe that's just the best of many tries | Haircuts the Sharpe for the number of trials, return length, skew and fat tails. Bayesian search produces correlated trials, so use an effective trial count, not the raw count |
-| **Probability of Backtest Overfitting (PBO)** | Picking the in-sample winner that ranks poorly out of sample | Computed across all trials; complements DSR rather than replacing walk-forward |
-| **Parameter plateau** | A sharp peak that collapses if anything shifts | Every parameter ±20%; the result must stay mostly intact |
+| **Probability of Backtest Overfitting (PBO)** | Picking the in-sample winner that ranks poorly out of sample | Computed across all of the search's trials; complements DSR rather than replacing walk-forward |
+| **Parameter plateau** | A sharp peak that collapses if anything shifts | Every parameter ±20%, and every combination of settings a user can pick; the result must stay mostly intact |
 | **Cost stress** | Edges that only exist at unrealistically low costs | Re-run finalists with costs doubled |
 | **Monte Carlo** | Results that depend on the exact order of events | Shuffle trade order; resample blocks of regimes; randomly worsen fills. Use the 95th-percentile drawdown to set each risk level's budget |
 | **Regime breakdown** | One lucky stretch producing all the profit | Split results by bull, bear and sideways periods, including the 2018 and 2022 crashes |
@@ -96,8 +98,8 @@ Everything below follows from that.
 
 - **Costs match production:** swaps on Base through 0x. Pool fee + aggregator fee + size-dependent slippage + gas (sponsored by us). Measure slippage by sampling live 0x quotes at several trade sizes, and replace the placeholders in `config/costs.yaml`.
 - **Price proxy:** backtests use exchange candles; measure how far cbBTC/USDC on Base drifts from BTC/USD on Coinbase, and add that drift to the slippage assumption if it's material.
-- **Risk-level budgets:** each level's maximum drawdown budget comes from the Monte Carlo 95th-percentile drawdown of its strategies, rounded up.
-- **Strategy card numbers:** backtest figures (labeled hypothetical) come from the walk-forward results; live figures come only from the production model account.
+- **Risk-level budgets:** each level's maximum drawdown budget comes from the Monte Carlo 95th-percentile drawdown of its strategies, rounded up. The owner approves a level's budget before any settings range at that level is pre-registered ([AGENTS.md: Validation gates](AGENTS.md#validation-gates), "Settings ranges"). How a level's first budget is set, before any of its strategies has been audited, is still open with the owner.
+- **Strategy card numbers:** backtest figures (labeled hypothetical) come from the walk-forward results; live figures come only from the production model account at the default settings.
 - **Customer rule backtests (Phase 2):** the advanced rule builder's Backtest button runs the same cost model and the same Nautilus `RuleStrategy` used here.
 
 ## Sources
