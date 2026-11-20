@@ -107,10 +107,12 @@ The timing question also reaches customers on the defaults. A wallet that joined
 
 **"Hold this mix" is not a strategy setting.** It is a self-directed tool, not one of our strategies (owner, 2026-11-20; see [Features: Hold this mix](features.md#hold-this-mix)). The customer's mix has no approved range, no export, no Nautilus node and no model account. Like a customer rule:
 - it is checked per customer, against that customer's own on-chain holdings, so the per-customer timing question above, which is about our strategies, does not arise for it;
-- its trades go to the trade router with the same sizing and risk checks, in the customer's chosen mode;
-- its record (mix, reset schedule, mode) is versioned, and every trade records the version it used.
+- its trades go to the trade router with the same sizing and risk checks, in the customer's chosen mode (Auto-trade or Approve; owner, 2026-11-20);
+- its record (mix, drift band, reset schedule, mode) is versioned, and every trade records the version it used;
+- Steady's "a few trades a month" caps its drift band (owner, 2026-11-20). The customer sets the number, and the app recommends one based on the lab's data and simulations (owner, 2026-11-20; the lab's simulation for it is not run yet and waits for the owner's go). How the cap is enforced (a check frequency or a minimum time between trades, like the rules service's minimum time between checks for rules), and whether Steady keeps an upper limit above the customer's number, are open ([Features: open questions](features.md#open-questions-that-change-the-feature-set));
+- the customer's daily or weekly loss limit pauses it, as it pauses their strategies (owner, 2026-11-20), and Pause everything stops it. A pause stops its trades and sells nothing.
 
-Its worst fall is a Nautilus backtest on past prices with swap fees, slippage and gas included, labeled hypothetical, as rule backtests are. If the controls move in steps (proposed), every mix and reset schedule can be backtested ahead of time, not on demand. The lab doesn't test or approve any mix; the number describes the past only. *Open:* which years these backtests cover. The tool runs the same kind of rule as the lab's rebalance-steady study. The lab's validate data (2023-01-01 to 2024-06-30) are unlooked for that study, and its test data (from 2024-07-01) are opened once per strategy (AGENTS.md "Splits"; hard rule 5). Worst falls over those years, if the desk can see them, would spend those windows for any later Steady rebalancing strategy of ours. Agree the years with `backtest-auditor` before any of these backtests is run.
+Its worst fall is a Nautilus backtest on past prices with swap fees, slippage and gas included, labeled hypothetical, as rule backtests are. If the controls move in steps (proposed), every mix, drift band and reset schedule can be backtested ahead of time, not on demand. The lab doesn't test or approve any mix; the number describes the past only. *Open:* which years these backtests cover. The tool runs the same kind of rule as the lab's rebalance-steady study. The lab's validate data (2023-01-01 to 2024-06-30) are unlooked for that study, and its test data (from 2024-07-01) are opened once per strategy (AGENTS.md "Splits"; hard rule 5). Worst falls over those years, if the desk can see them, would spend those windows for any later Steady rebalancing strategy of ours. Agree the years with `backtest-auditor` before any of these backtests is run.
 
 These backtests need a Nautilus rebalancing backtest with the lab's cost model. Both wait on the lab's milestone 2 (the Nautilus runner and the fee and fill models), and the costs are placeholders until measured. Rule backtests on our servers only arrive in Phase 2, so for a Phase 1 launch the table is computed ahead of time; who computes it is not decided yet. As with rules, the live check and the backtests should use the same rebalancing logic, so a mix behaves the same in both.
 
@@ -239,7 +241,7 @@ Customers build their own strategies as **rules stored as data, never as code**.
 ## Auto-trading permission
 
 **How it works**
-1. The user turns on Auto-trade for a strategy or rule. The app shows the plain-English permission screen; the user confirms with Face ID.
+1. The user turns on Auto-trade for a strategy, a rule or "hold this mix". The app shows the plain-English permission screen; the user confirms with Face ID.
 2. The app adds our server's **authorization key** to the user's wallet as an additional signer, attached to a **policy**. The user stays the wallet's owner.
 3. The trade router can now sign swaps while the user is offline, but only what the policy allows. The policy is enforced inside Privy's secure enclave, so a bug or breach in our code still can't go beyond it.
 

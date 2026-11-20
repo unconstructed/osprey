@@ -38,16 +38,16 @@ Technical detail: [Technical: Architecture](technical.md#architecture).
 
 ## Trading modes
 
-Every strategy subscription and every customer rule runs in one of two modes, and so would "hold this mix" (proposed). The user chooses, and can switch anytime.
+Every strategy subscription and every customer rule runs in one of two modes, and so does "hold this mix" (owner, 2026-11-20). The user chooses, and can switch anytime.
 
 | | Auto-trade | Approve each trade |
 |---|---|---|
 | How it works | Trades execute automatically inside the user's trading permission | Push notification; the user taps approve and confirms with Face ID |
-| Works for | Our strategies, customer rules and "hold this mix" (proposed) | Our strategies, customer rules and "hold this mix" (proposed) |
+| Works for | Our strategies, customer rules and "hold this mix" | Our strategies, customer rules and "hold this mix" |
 | Best for | Hands-off users; strategies where timing matters | Users who want a say on every trade |
 | Downside | The user isn't in the loop on each trade | Missed trades, notification fatigue |
 
-Auto-trade is **opt-in per strategy or rule**: turning it on shows the permission screen. Both modes are available at launch for our strategies and for customer rules, by owner decision. The risks are recorded in [Business: Accepted risks](business.md#accepted-risks). That decision does not name "hold this mix", so whether Auto-trade is accepted for it is still open.
+Auto-trade is **opt-in per strategy, rule or held mix**: turning it on shows the permission screen. Both modes are available at launch for our strategies and for customer rules, by owner decision (2026-11-19). "Hold this mix" runs in either mode too (owner, 2026-11-20); its phase is still proposed. The risks are recorded in [Business: Accepted risks](business.md#accepted-risks).
 
 ### The auto-trading permission
 
@@ -77,7 +77,7 @@ Customers choose how much risk they want, and each risk level has its own strate
 | **Balanced** | Is OK with normal crypto swings | **Dip buying:** buys BTC or ETH after a set drop, with a cap on how much | A second dip strategy with different timing | BTC, ETH and a few vetted large tokens; stop-loss required |
 | **Bold** | Accepts big drops for bigger upside | **Momentum:** holds the strongest few from a vetted list of the most liquid tokens on Base; rotates weekly | Mean reversion, grid trading | Wider token list, more trades, biggest possible drops |
 
-**Steady, for now.** The lab's first rebalancing study found no edge (NO EDGE; SCOUTING, from the lab's simple in-house simulator, not NautilusTrader; see [Features: What the first Steady study taught](features.md#what-the-first-steady-study-taught)). So Steady's own tested strategy is still to be found; the plan above stands until the owner changes it. Meanwhile, Steady customers can use **"hold this mix"**, a self-directed tool like recurring buys, not one of our strategies (owner, 2026-11-20). The customer picks the crypto share and the BTC/ETH split, and the app keeps the mix there. The app makes no claim it beats anything and shows the mix's backtested worst fall, labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix).
+**Steady, for now.** The lab's first rebalancing study found no edge (NO EDGE; SCOUTING, from the lab's simple in-house simulator, not NautilusTrader; see [Features: What the first Steady study taught](features.md#what-the-first-steady-study-taught)). So Steady's own tested strategy is still to be found; the plan above stands until the owner changes it. Meanwhile, Steady customers can use **"hold this mix"**, a self-directed tool like recurring buys, not one of our strategies (owner, 2026-11-20). The customer picks the crypto share, the BTC/ETH split and a drift band, and the app keeps the mix within the band (owner, 2026-11-20). The app makes no claim it beats anything and shows the mix's backtested worst fall, labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix).
 
 ### How the levels work
 
@@ -152,7 +152,7 @@ Full catalog by area, tab and phase: [Features](features.md).
 
 *Trading*
 - Manual buy/sell (swaps) and recurring buys
-- "Hold this mix" (proposed for Phase 1): the customer picks a crypto and cash mix and the app keeps it there; labeled as their own choice, with the backtested worst fall shown and labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix)
+- "Hold this mix" (proposed for Phase 1): the customer picks a crypto and cash mix and a drift band, and the app keeps the mix within the band, on Auto-trade or Approve; labeled as their own choice, with the backtested worst fall shown and labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix)
 
 *Strategies*
 - Risk levels: customer picks Steady, Balanced or Bold; strategies grouped and labeled by level; warning and confirm to go above it
@@ -165,7 +165,7 @@ Full catalog by area, tab and phase: [Features](features.md).
 
 *Customer risk controls*
 - Max amount per trade and per day (also enforced inside the auto-trading permission)
-- Daily/weekly loss limit that auto-pauses the customer's strategies
+- Daily/weekly loss limit that auto-pauses the customer's strategies and "hold this mix"; a pause stops trading and doesn't sell
 - One big **Pause everything** button that also revokes auto-trading
 
 *Demo mode*

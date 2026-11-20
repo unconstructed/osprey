@@ -110,7 +110,7 @@ Plan pricing assuming in-app purchase fees; treat web checkout savings as upside
 
 **Owner decision (2026-11-19):** launch with auto-trading for both our strategies and customer rules, without a legal review.
 
-*Open:* "hold this mix" (a self-directed tool, owner 2026-11-20; see [Features: Hold this mix](features.md#hold-this-mix)) would also run on Auto-trade (proposed). The decision above names only our strategies and customer rules, so whether it covers the tool is the owner's call.
+**Owner decision (2026-11-20):** "hold this mix" (a self-directed tool; see [Features: Hold this mix](features.md#hold-this-mix)) also runs on Auto-trade or Approve, the customer's choice. So the acceptance above covers it too.
 
 | Risk | What could happen | How we reduce it |
 |---|---|---|
