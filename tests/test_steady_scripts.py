@@ -128,10 +128,13 @@ def set_look_due(out: Path, due: bool) -> None:
 
 def real_folders(monkeypatch, tmp_path: Path) -> tuple[Path, Path]:
     """Stand-ins for the pinned real-data folders (results/rebalance-steady, data/catalog) in ``tmp_path``, so a
-    real-data run can pass the path guard without touching the repo; the config folder stays config/."""
+    real-data run can pass the path guard without touching the repo; the config folder stays config/. The study
+    folder (``S.HERE``: the tracked RUNLOG.jsonl and committed copies) is a stand-in too, so a real run recorded in
+    the repo's RUNLOG never decides which guard these tests reach (#48)."""
     out, catalog_dir = tmp_path / "results" / "rebalance-steady", tmp_path / "data" / "catalog"
     monkeypatch.setattr(S, "DEFAULT_OUT", out)
     monkeypatch.setattr(S, "DEFAULT_CATALOG", catalog_dir)
+    monkeypatch.setattr(S, "HERE", tmp_path / "here")
     return out, catalog_dir
 
 
@@ -551,6 +554,15 @@ def test_real_runs_log_and_copy_into_the_study_folder_and_dry_runs_never_do(tmp_
         S.DEFAULT_OUT == S.REPO / "results" / "rebalance-steady"
         and S.DEFAULT_CATALOG == S.REPO / "data" / "catalog"
     )
+
+
+def test_real_folders_keep_real_runs_away_from_the_repo_s_runlog(tmp_path, monkeypatch):
+    """#48: every folder a real run reads or writes is a stand-in in ``tmp_path``, the RUNLOG and the committed
+    copies included, so the guard tests do not depend on the runs the repo has recorded (run 0 is in its RUNLOG)."""
+    out, catalog_dir = real_folders(monkeypatch, tmp_path)
+    for path in (out, catalog_dir, S.runlog_path(out, synthetic=False), S.tracked_dir(out, synthetic=False)):
+        assert tmp_path in Path(path).parents
+    assert S.runlog_entries(S.runlog_path(out, synthetic=False)) == []
 
 
 # ------------------------------------------------------------------------------- run_train start guards
@@ -1183,6 +1195,7 @@ def test_the_look_s_other_refusals(fresh, clean_git, capsys, monkeypatch):
     assert "no validate look" in capsys.readouterr().err
     monkeypatch.setattr(S, "DEFAULT_OUT", out)  # a real look in the pinned (here: stand-in) folders
     monkeypatch.setattr(S, "DEFAULT_CATALOG", out.parent / "no-catalog")
+    monkeypatch.setattr(S, "HERE", out.parent / "here")  # and a stand-in RUNLOG, not the repo's (#48)
     real = []
     assert RV.main(real) == 2  # FROZEN.json is synthetic
     assert "synthetic train run" in capsys.readouterr().err
