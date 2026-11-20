@@ -18,6 +18,10 @@ Sources (raw files land in ``<data>/raw/<source>/`` and each one is SHA-256 hash
   answer must carry the ETag seen at the start, so a part replaced mid-read is caught.
 - **binance**: monthly kline zips from data.binance.vision, each verified against its ``.CHECKSUM`` file
   (SHA-256) before it is written; at most ``BINANCE_WORKERS`` requests at a time.
+- **binance_futures**: USD-M futures positioning files from data.binance.vision (``data/futures/um/``):
+  monthly funding rates, daily metrics (open interest, long/short ratios) and monthly 5-minute klines (only
+  to check the metrics' timestamps), each verified against its ``.CHECKSUM``, never past a given last day
+  (the build passes the end of the validate window; see :func:`download_binance_futures`).
 - **coinbase**: public REST daily candles, 300 per request, at most ~3 requests per second; raw JSON pages
   are stored as received. Only complete candles are requested (the current day is never fetched).
 
@@ -535,18 +539,16 @@ def verify_checksum(data: bytes, checksum_text: str, filename: str) -> str:
     return digest
 
 
-def _binance_month(
-    client: httpx.Client | None, folder: Path, sym: str, iv: str, ym: tuple[int, int], retry: Retry | None
-) -> tuple[str, Path | None]:
-    """Make sure one monthly zip is on disk and verified. Returns (status, zip path or None if missing)."""
-    name = f"{sym}-{iv}-{ym[0]:04d}-{ym[1]:02d}.zip"
-    path, check = folder / name, folder / (name + ".CHECKSUM")
+def _binance_zip(client: httpx.Client | None, path: Path, url: str, retry: Retry | None) -> tuple[str, Path | None]:
+    """Make sure the data.binance.vision zip ``url`` is on disk at ``path`` and verified against its
+    ``.CHECKSUM`` (stored next to it). Returns (status, zip path or None if missing)."""
+    name = path.name
+    check = path.with_name(name + ".CHECKSUM")
     if path.is_file() and check.is_file():
         verify_checksum(path.read_bytes(), check.read_text(), name)
         return "verified on disk", path
     if client is None:
         return "missing", None
-    url = BINANCE_URL.format(sym=sym, iv=iv, name=name)
     try:
         check_text = fetch(client, url + ".CHECKSUM", max_bytes=4096, retry=retry).content
     except NotFoundError:
@@ -556,6 +558,14 @@ def _binance_month(
     write_atomic(check, check_text)
     write_atomic(path, data)
     return "downloaded and verified", path
+
+
+def _binance_month(
+    client: httpx.Client | None, folder: Path, sym: str, iv: str, ym: tuple[int, int], retry: Retry | None
+) -> tuple[str, Path | None]:
+    """Make sure one monthly spot kline zip is on disk and verified (:func:`_binance_zip`)."""
+    name = f"{sym}-{iv}-{ym[0]:04d}-{ym[1]:02d}.zip"
+    return _binance_zip(client, folder / name, BINANCE_URL.format(sym=sym, iv=iv, name=name), retry)
 
 
 def download_binance(
@@ -599,6 +609,139 @@ def download_binance(
         "zips": sum(len(v) for v in out.series.values()),
         "status": status_counts,
         "missing": missing,
+        "verified": "every zip's SHA-256 matched its published .CHECKSUM file",
+    }
+    return out
+
+
+# --------------------------------------------------------------------------- binance USD-M futures (positioning)
+
+
+FUTURES_BASE = "https://data.binance.vision/data/futures/um/"
+# kind -> (folder under FUTURES_BASE, file name); {p} is YYYY-MM for monthly files and YYYY-MM-DD for daily ones
+FUTURES_PATHS = {
+    "funding": ("monthly/fundingRate/{sym}/", "{sym}-fundingRate-{p}.zip"),
+    "metrics": ("daily/metrics/{sym}/", "{sym}-metrics-{p}.zip"),
+    "klines_5m": ("monthly/klines/{sym}/5m/", "{sym}-5m-{p}.zip"),
+}
+FUTURES_KINDS = tuple(FUTURES_PATHS)
+FUTURES_DAILY = frozenset({"metrics"})
+# First file published on data.binance.vision, found on 2026-11-20 by probing the .CHECKSUM files (the bucket
+# listing behind the site's index page is served from a host outside the allow-list). Funding rates are
+# published as monthly files only; the daily "metrics" files (open interest, long/short ratios) start years
+# after the spot klines. Online builds re-check that the period before each start is still not published.
+# The 5-minute futures klines are fetched for the metrics months only, to check the metrics' timestamps.
+FUTURES_FIRST = {
+    "funding": {"BTC": date(2020, 1, 1), "ETH": date(2020, 1, 1)},
+    "metrics": {"BTC": date(2020, 9, 1), "ETH": date(2021, 12, 1)},
+}
+
+
+def _month_ends_by(last_day: date) -> tuple[int, int]:
+    """The last month that has ended on or before ``last_day``."""
+    if (last_day + timedelta(days=1)).day == 1:
+        return last_day.year, last_day.month
+    return (last_day.year - 1, 12) if last_day.month == 1 else (last_day.year, last_day.month - 1)
+
+
+def futures_periods(kind: str, first: date, last_day: date) -> list[str]:
+    """Period labels of the ``kind`` files from ``first`` to ``last_day``: every day for daily kinds, every
+    month that has ended by ``last_day`` for monthly kinds (a month's file is complete only after it ends)."""
+    if kind in FUTURES_DAILY:
+        return [(first + timedelta(days=k)).isoformat() for k in range((last_day - first).days + 1)]
+    return [f"{y:04d}-{m:02d}" for y, m in month_range((first.year, first.month), _month_ends_by(last_day))]
+
+
+def _period_before(kind: str, first: date) -> str:
+    if kind in FUTURES_DAILY:
+        return (first - timedelta(days=1)).isoformat()
+    y, m = (first.year - 1, 12) if first.month == 1 else (first.year, first.month - 1)
+    return f"{y:04d}-{m:02d}"
+
+
+def futures_file(kind: str, coin: str, period: str) -> tuple[str, str]:
+    """(file name, URL) of one futures file, e.g. ``("BTCUSDT-metrics-2021-01-02.zip", "https://...")``."""
+    sym = BINANCE_SYMBOLS[coin]
+    folder, name = FUTURES_PATHS[kind]
+    name = name.format(sym=sym, p=period)
+    return name, FUTURES_BASE + folder.format(sym=sym) + name
+
+
+def _first_of(first: dict, kind: str, coin: str) -> date:
+    return first["metrics" if kind == "klines_5m" else kind][coin]
+
+
+def download_binance_futures(
+    client: httpx.Client | None,
+    raw_dir: Path,
+    coins: Sequence[str],
+    *,
+    last_day: date,
+    retry: Retry | None = None,
+    workers: int = BINANCE_WORKERS,
+    first: dict | None = None,
+) -> SourceFiles:
+    """USD-M futures funding rates, metrics and 5-minute klines for ``coins`` up to ``last_day``.
+
+    Every zip is checked against its ``.CHECKSUM`` (SHA-256) before it is written to
+    ``<raw_dir>/<SYMBOL>/<kind>/``. Nothing after ``last_day`` is requested: the build passes the last day of the
+    validate window, so no file of the test window is ever downloaded. Files are asked for from ``first``
+    (default :data:`FUTURES_FIRST`); online, the period before each start must answer 404, else the start is out
+    of date and :class:`DownloadError` is raised. A period that does not exist (404, or not on disk offline) is
+    listed in ``notes["missing"]``, never filled. ``series`` maps ``(coin, kind)`` to its zips in time order.
+    """
+    _check_selection(coins, INTERVALS[:1])
+    first = first or FUTURES_FIRST
+    jobs, periods = [], {}
+    for coin in coins:
+        for kind in FUTURES_KINDS:
+            labels = futures_periods(kind, _first_of(first, kind, coin), last_day)
+            periods[f"{BINANCE_SYMBOLS[coin]} {kind}"] = (
+                {"first": labels[0], "last": labels[-1], "asked": len(labels)} if labels else None
+            )
+            for label in labels:
+                name, url = futures_file(kind, coin, label)
+                jobs.append((coin, kind, raw_dir / BINANCE_SYMBOLS[coin] / kind / name, url))
+    starts: dict | str = "not checked (offline build)"
+    if client is not None:
+        starts = {}
+        for coin in coins:
+            for kind in ("funding", "metrics"):
+                start = first[kind][coin]
+                before = _period_before(kind, start)
+                url = futures_file(kind, coin, before)[1] + ".CHECKSUM"
+                try:
+                    fetch(client, url, max_bytes=4096, retry=retry)
+                except NotFoundError:
+                    starts[f"{BINANCE_SYMBOLS[coin]} {kind}"] = {"first": start.isoformat(), "before": before,
+                                                                "before_published": False}
+                else:
+                    raise DownloadError(f"{url} exists: {kind} for {coin} now starts before {start}; update "
+                                        "FUTURES_FIRST so the history is complete")
+
+    def run(job):
+        _, _, path, url = job
+        return _binance_zip(client, path, url, retry)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(run, jobs))
+    out = SourceFiles("binance_futures")
+    status_counts: dict[str, int] = {}
+    missing = []
+    for (coin, kind, path, _), (status, got) in zip(jobs, results, strict=True):
+        status_counts[status] = status_counts.get(status, 0) + 1
+        if got is None:
+            missing.append(path.name.removesuffix(".zip"))
+            continue
+        out.series.setdefault((coin, kind), []).append(got)
+        out.files += [RawFile.of(got), RawFile.of(got.with_name(got.name + ".CHECKSUM"))]
+    out.notes = {
+        "last_day": last_day.isoformat(),
+        "periods": periods,
+        "zips": sum(len(v) for v in out.series.values()),
+        "status": status_counts,
+        "missing": missing,
+        "starts": starts,
         "verified": "every zip's SHA-256 matched its published .CHECKSUM file",
     }
     return out

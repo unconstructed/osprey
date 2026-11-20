@@ -3,6 +3,7 @@
     uv run python -m lab.data.build --sources kraken,binance            # the AGENTS.md command
     uv run python -m lab.data.build                                     # kraken, binance and coinbase
     uv run python -m lab.data.build --offline                           # rebuild from data/raw, no network
+    uv run python -m lab.data.build --sources kraken,binance,coinbase,binance_futures   # plus positioning data
 
 Steps (AGENTS.md "Data" pipeline):
 
@@ -22,7 +23,16 @@ Steps (AGENTS.md "Data" pipeline):
    overwritten in place: a new ID moves the current catalog to ``<data>/snapshots/<old id>/`` first; the same
    ID with identical bars (``content_sha256``) keeps the existing catalog; the same ID with different bars
    (a code change) stops with an error.
-6. The data quality report ``<report-dir>/<YYYY-MM-DD>.md`` (:mod:`lab.data.report`).
+6. The data quality report ``<report-dir>/<YYYY-MM-DD>.md`` (:mod:`lab.data.report`; a report of another
+   snapshot with that name is never overwritten: the new one gets ``-<snapshot id>`` added).
+
+With ``binance_futures`` among the sources (opt-in; it needs at least one bar source) the same snapshot also
+holds Binance USD-M futures positioning data (:mod:`lab.data.futures`, :mod:`lab.data.external`): funding
+rates, open interest and long/short ratios for BTCUSDT and ETHUSDT, downloaded only up to the last day of the
+validate window, checked (including when each value became known, against 5-minute futures klines; the build
+stops if a metrics row's data reach further past its stamp than the ``known_at`` lag), stored under
+``<catalog>/ext/`` with ``known_at`` per row, read back and compared, and described in
+``<report-dir>/<YYYY-MM-DD>-positioning.md``.
 """
 
 from __future__ import annotations
@@ -34,7 +44,7 @@ import logging
 import shutil
 import subprocess
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from itertools import combinations
 from pathlib import Path
 
@@ -44,14 +54,18 @@ import pandas as pd
 
 from lab.config import REPO_ROOT, splits
 from lab.data import catalog as cat
+from lab.data import external as ext
+from lab.data import futures as fu
 from lab.data import quality
 from lab.data import sources as src
 from lab.data.loaders import load_binance_klines, load_coinbase_candles, load_kraken_ohlcvt
-from lab.data.report import write_report
+from lab.data.report import write_positioning_report, write_report
 
 log = logging.getLogger("lab.data.build")
 
-SOURCES = ("kraken", "binance", "coinbase")
+SOURCES = ("kraken", "binance", "coinbase")  # bar sources; the default
+EXT_SOURCES = ("binance_futures",)  # positioning data; opt-in
+ALL_SOURCES = SOURCES + EXT_SOURCES
 SCHEMA = "osprey.snapshot/1"
 ID_RULE = "first 16 hex of sha256 over the sorted raw-file sha256 hex digests joined by '\\n'"
 STAGING = "catalog.staging"
@@ -105,7 +119,7 @@ def _csv(text: str, allowed: tuple[str, ...], what: str) -> tuple[str, ...]:
 
 def parse_args(argv: list[str] | None = None) -> BuildConfig:
     p = argparse.ArgumentParser(prog="python -m lab.data.build", description=__doc__.split("\n\n")[0])
-    p.add_argument("--sources", default=",".join(SOURCES), type=lambda s: _csv(s, SOURCES, "--sources"))
+    p.add_argument("--sources", default=",".join(SOURCES), type=lambda s: _csv(s, ALL_SOURCES, "--sources"))
     p.add_argument("--coins", default=",".join(src.COINS), type=lambda s: _csv(s, src.COINS, "--coins"))
     p.add_argument(
         "--intervals", default=",".join(src.INTERVALS), type=lambda s: _csv(s, src.INTERVALS, "--intervals")
@@ -117,6 +131,8 @@ def parse_args(argv: list[str] | None = None) -> BuildConfig:
     a = p.parse_args(argv)
     if not a.tolerance > 0:
         p.error("--tolerance must be positive")
+    if not set(a.sources) & set(SOURCES):
+        p.error(f"--sources needs at least one bar source ({','.join(SOURCES)})")
     return BuildConfig(
         sources=a.sources,
         coins=a.coins,
@@ -141,9 +157,19 @@ def collect(cfg: BuildConfig, client: httpx.Client | None, now: datetime) -> dic
             out[name] = src.download_kraken(client, raw / "kraken", cfg.coins, cfg.intervals, now=now)
         elif name == "binance":
             out[name] = src.download_binance(client, raw / "binance", cfg.coins, cfg.intervals, now=now)
+        elif name == "binance_futures":
+            out[name] = src.download_binance_futures(
+                client, raw / "binance_futures", cfg.coins, last_day=ext_last_day(now)
+            )
         else:
             out[name] = src.download_coinbase(client, raw / "coinbase", cfg.coins, now=now)
     return out
+
+
+def ext_last_day(now: datetime) -> date:
+    """Last day of positioning files to download: the validate window's last day (config/splits.yaml), or the
+    day before ``now`` if that is earlier. Nothing of the test window is ever requested."""
+    return min(splits()["validate"][1].date(), (now.astimezone(UTC) - timedelta(days=1)).date())
 
 
 def compute_snapshot_id(hashes) -> str:
@@ -173,6 +199,8 @@ def normalise(files: dict[str, src.SourceFiles]) -> list[Series]:
     """Load every series with the source's loader, then drop zero-volume bars (listed, never filled)."""
     out = []
     for name, got in files.items():
+        if name in EXT_SOURCES:
+            continue  # normalise_external
         for (coin, interval), paths in sorted(got.series.items()):
             if name == "kraken":
                 bars = load_kraken_ohlcvt(paths[0])
@@ -188,6 +216,81 @@ def normalise(files: dict[str, src.SourceFiles]) -> list[Series]:
             bars.attrs = {}
             out.append(Series(name, coin, interval, bars, loading))
     return out
+
+
+@dataclass
+class External:
+    """One symbol's positioning tables as stored (``known_at`` added, cut at the holdout), what loading and
+    cleaning removed, and the timing check of its metrics."""
+
+    symbol: str
+    funding: pd.DataFrame
+    metrics: pd.DataFrame
+    loading: dict
+    timing: dict
+
+
+def _ext_paths(got: src.SourceFiles, coin: str, kind: str) -> list[Path]:
+    paths = got.series.get((coin, kind))
+    if not paths:
+        raise DataQualityError(f"{src.BINANCE_SYMBOLS[coin]}: no {kind} files; nothing to build positioning from")
+    return paths
+
+
+def normalise_external(got: src.SourceFiles, coins: tuple[str, ...], cut: pd.Timestamp) -> list[External]:
+    """Load, clean and time-stamp (``known_at``) each coin's futures files; keep what is known before ``cut``.
+
+    The timing check runs on the metrics as loaded (before the stale rule), against the 5-minute klines.
+    """
+    out = []
+    for coin in coins:
+        sym = src.BINANCE_SYMBOLS[coin]
+        funding = fu.load_funding(_ext_paths(got, coin, "funding"))
+        metrics = fu.load_metrics(_ext_paths(got, coin, "metrics"), sym)
+        timing = fu.metrics_timing(metrics, fu.load_klines_5m(_ext_paths(got, coin, "klines_5m")))
+        cleaned, stale = fu.mark_stale(metrics)
+        funding_k, f_after = fu.with_known_at(funding, fu.FUNDING_LAG, cut)
+        metrics_k, m_after = fu.with_known_at(cleaned, fu.METRICS_LAG, cut)
+        loading = {
+            "funding": {**funding.attrs, "dropped_known_at_or_after_cut": f_after},
+            "metrics": {**metrics.attrs, **stale, "dropped_known_at_or_after_cut": m_after},
+        }
+        out.append(External(sym, funding_k, metrics_k, loading, timing))
+    return out
+
+
+def check_external(exts: list[External]) -> dict:
+    """Quality of the stored positioning tables, the metrics timing summary (raises :class:`DataQualityError`
+    when a day's data reach further past the stamp than ``futures.METRICS_LAG``), and how much of the train and
+    validate windows' daily closes get a value from :func:`external.positioning_at`."""
+    lag = fu.METRICS_LAG / pd.Timedelta(minutes=1)
+    checks: dict = {"external": {}, "external_loading": {}, "metrics_timing": {}, "positioning_coverage": {}}
+    windows = splits()
+    for e in exts:
+        reach = e.timing["max_reach_minutes"]
+        if reach is not None and reach > lag:
+            raise DataQualityError(
+                f"{e.symbol}: on some days the metrics describe the market up to {reach} minutes after their "
+                f"create_time, more than the {lag:g}-minute lag used for known_at (look-ahead); runs: "
+                f"{e.timing['runs']}"
+            )
+        checks["metrics_timing"][e.symbol] = {k: v for k, v in e.timing.items() if k != "days"}
+        checks["external"][f"{e.symbol} funding"] = fu.check_funding(e.funding)
+        checks["external"][f"{e.symbol} metrics"] = fu.check_metrics(e.metrics)
+        checks["external_loading"][e.symbol] = e.loading
+        coverage = {}
+        for name in ("train", "validate"):
+            start, end = windows[name]
+            closes = pd.date_range(start + pd.Timedelta(days=1), end + pd.Timedelta(days=1), freq="1D")
+            rows = ext.positioning_at(e.funding, e.metrics, closes)
+            columns = {}
+            for col in ext.OUTPUT_COLUMNS:
+                have = rows[col] > 0 if col.startswith("funding_count") else rows[col].notna()
+                columns[col] = {"closes": int(have.sum()),
+                                "first": quality.iso(rows.index[have.to_numpy()][0]) if have.any() else None}
+            coverage[name] = {"closes": len(closes), "columns": columns}
+        checks["positioning_coverage"][e.symbol] = coverage
+    return checks
 
 
 # --------------------------------------------------------------------------- 3. checks
@@ -239,14 +342,24 @@ def git_state(repo: Path = REPO_ROOT) -> dict:
     return {"commit": head.stdout.strip(), "lab_dirty": bool(status.stdout.strip())}
 
 
-def content_hash(frames: dict[str, pd.DataFrame]) -> str:
-    """SHA-256 over every bar type (sorted) and its close-time ns and OHLCV float64 bytes as loaded back."""
+def content_hash(frames: dict[str, pd.DataFrame], tables: dict[str, pd.DataFrame] | None = None) -> str:
+    """SHA-256 over every bar type (sorted) and its close-time ns and OHLCV float64 bytes as loaded back, then
+    (when given) every stored positioning table (sorted by path): its times as ns and its values as float64.
+    Without ``tables`` the hash is the bars-only hash of earlier snapshots."""
     digest = hashlib.sha256()
     for bt in sorted(frames):
         f = frames[bt]
         digest.update(bt.encode())
         digest.update(np.asarray(f.index.as_unit("ns").asi8, dtype="<i8").tobytes())
         digest.update(np.ascontiguousarray(f.loc[:, list(cat.BAR_COLUMNS)].to_numpy(dtype="<f8")).tobytes())
+    for path in sorted(tables or {}):
+        digest.update(path.encode())
+        for col, values in tables[path].items():
+            digest.update(col.encode())
+            if col in ("ts", "known_at"):
+                digest.update(np.asarray(pd.DatetimeIndex(values).as_unit("ns").asi8, dtype="<i8").tobytes())
+            else:
+                digest.update(np.ascontiguousarray(values.to_numpy(dtype="<f8")).tobytes())
     return digest.hexdigest()
 
 
@@ -254,12 +367,13 @@ def _ulps(got: np.ndarray, source: np.ndarray) -> float:
     return float(np.max(np.abs(got - source) / np.spacing(np.abs(source)))) if len(source) else 0.0
 
 
-def write_staging(staging: Path, series: list[Series], snapshot: dict) -> dict:
-    """Write instruments, bars and SNAPSHOT.json into ``staging``; read every series back with ``load_bars``.
+def write_staging(staging: Path, series: list[Series], snapshot: dict, exts: list[External] = ()) -> dict:
+    """Write instruments, bars, the positioning tables of ``exts`` and SNAPSHOT.json into ``staging``; read
+    every series back with ``load_bars`` and every table with ``external.read_table``.
 
-    Returns ``{bar_type: round-trip result}`` and fills ``snapshot["series"]`` and ``content_sha256``. The
-    round trip must be exact against :func:`catalog.stored_values`; the distance from the source floats is
-    recorded (prices: ulps, volumes: absolute rounding at 1e-8).
+    Returns the snapshot with ``series``, ``content_sha256`` and (with ``exts``) ``external`` filled in. The
+    bar round trip must be exact against :func:`catalog.stored_values`; the distance from the source floats is
+    recorded (prices: ulps, volumes: absolute rounding at 1e-8). Tables must come back equal.
     """
     if staging.exists():
         shutil.rmtree(staging)  # left over from an interrupted build; it was never published
@@ -289,7 +403,17 @@ def write_staging(staging: Path, series: list[Series], snapshot: dict) -> dict:
             "max_volume_rounding": float(np.max(np.abs(got["volume"].to_numpy() - s.bars["volume"].to_numpy()))),
         }
         loaded[s.bar_type] = got
-    snapshot["content_sha256"] = content_hash(loaded)
+    tables = {}
+    for e in exts:
+        for name, frame in (("funding", e.funding), ("metrics", e.metrics)):
+            entry = ext.write_table(staging, e.symbol, name, frame)
+            back = ext.read_table(staging, e.symbol, name, sha256=entry["sha256"])
+            if not back.equals(frame):
+                raise RuntimeError(f"{entry['path']}: round trip differs from what was written")
+            snapshot.setdefault("external", []).append(entry)
+            tables[entry["path"]] = back
+    snapshot["content_sha256"] = content_hash(loaded, tables)
+    snapshot["bars_content_sha256"] = content_hash(loaded)  # equal across snapshots whose bars are equal
     snapshot["series"] = [
         {
             "instrument": s.instrument,
@@ -347,6 +471,10 @@ SOURCE_NOTES = {
     "published .CHECKSUM (SHA-256).",
     "coinbase": "Coinbase Exchange public REST daily candles (USD), raw JSON pages; for the cross-check only. "
     "No published checksums.",
+    "binance_futures": "data.binance.vision USD-M futures (data/futures/um/): monthly funding rates, daily metrics "
+    "(open interest, long/short ratios) and monthly 5-minute klines (only to check when metrics become known); "
+    "every zip verified against its published .CHECKSUM (SHA-256). Nothing after the last day of the validate "
+    "window is requested.",
 }
 
 
@@ -364,6 +492,11 @@ def build(cfg: BuildConfig, client: httpx.Client | None = None, now: datetime | 
             own.close()
     series = normalise(files)
     checks = run_checks(series, cfg.tolerance)
+    exts: list[External] = []
+    if "binance_futures" in files:
+        cut = ext.holdout_cut()
+        exts = normalise_external(files["binance_futures"], cfg.coins, cut)
+        checks.update(check_external(exts))
     hashes = [f.sha256 for got in files.values() for f in got.files]
     snapshot = {
         "schema": SCHEMA,
@@ -392,13 +525,23 @@ def build(cfg: BuildConfig, client: httpx.Client | None = None, now: datetime | 
         "series": [],
         "checks": checks,
     }
+    if exts:
+        snapshot["positioning"] = {
+            "cut": cut.isoformat(),
+            "cut_rule": "only values known strictly before the close of the last validate bar (config/splits.yaml)",
+            "rules": ext.RULES,
+            "stale_after": fu.describe(fu.STALE_AFTER),
+            "metrics_lag": fu.describe(fu.METRICS_LAG),
+        }
     staging = cfg.data_dir / STAGING
-    write_staging(staging, series, snapshot)
+    write_staging(staging, series, snapshot, exts)
     published, what = publish(staging, cfg.data_dir / "catalog", cfg.data_dir / "snapshots")
     log.info("snapshot %s: %s", published["snapshot_id"], what)
     result = {**published, "publish": what}
     if cfg.report_dir is not None:
         result["report"] = str(write_report(published, cfg.report_dir))
+        if "external" in published:
+            result["positioning_report"] = str(write_positioning_report(published, cfg.report_dir, result["report"]))
     return result
 
 
@@ -409,8 +552,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"snapshot {result['snapshot_id']} ({result['publish']}), created {result['created']}")
     for s in result["series"]:
         print(f"  {s['bar_type']:40s} {s['rows']:>7d} bars  {s['start']} .. {s['end']}  gaps {s['gaps']}")
-    if "report" in result:
-        print(f"report: {result['report']}")
+    for e in result.get("external", []):
+        name = f"{e['symbol']} {e['table']}"
+        print(f"  {name:40s} {e['rows']:>7d} rows  {e['first_ts']} .. {e['last_ts']}")
+    for key in ("report", "positioning_report"):
+        if key in result:
+            print(f"{key.replace('_', ' ')}: {result[key]}")
     return 0
 
 

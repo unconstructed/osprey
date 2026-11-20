@@ -87,6 +87,9 @@ results dashboard, not `lab/`, and runs on its own. Tests per file in brackets.
 | `test_loaders.py` (78) | Kraken and Binance loaders: seconds, ms and µs (also mixed in one file), headers, duplicates keep the last row, bad rows dropped and counted, short and over-wide lines, bar close-time index, real Binance rows (2017 in ms and 2025 in µs, as CSV and .zip); resampling keeps complete buckets only |
 | `test_synthetic.py` (20) | Generator: valid bars for any length, seed and number of assets; determinism; volatility clustering; realistic volatility and BTC/ETH correlation; the shuffled luck control keeps bar shapes and destroys clustering |
 | `test_config.py` (6) | `splits()` reads the fixed windows as UTC with `latest` open-ended; daily and hourly close-time bars fall in the right window, with no gap or overlap (#19) |
+| `test_futures.py` (18) | Binance futures files (positioning data): funding, metrics and 5-minute kline zips parsed by hand-built examples (headers, quotes, `""` and `0E-8`, short lines, other symbols, rows outside the file's period, exact vs conflicting duplicates); the frozen-feed rule marks a value only from the moment it has been unchanged for an hour, never earlier (causal: tampering later rows never changes earlier cleaned rows); funding and metrics checks by hand; the timing check finds each day's timestamp convention, flags data that reach past the 5-minute lag, and calls a day inconclusive without a clear winner |
+| `test_external.py` (23) | **Point in time for positioning:** a value known at or after a bar's close never appears in its row (hypothesis tamper-the-future: rewrite, drop and add every later value, incl. one known exactly at the close); the newest value known before the close does (touch the present); funding last/1-day/7-day means and metrics last values by hand, with the exact `known_at < close` boundary and the age limits to the microsecond; the store round trip, a store file changed after the build is refused, a store with test-window values is refused, and `load_positioning` refuses any `end` after the last validate close |
+| `test_positioning_build.py` (18) | Download (fake data.binance.vision): every zip checked against its `.CHECKSUM`, nothing after the last validate day requested (the July 2024 files exist on the fake server and are never asked for), a missing day listed and never filled, the start check stops when history begins earlier than recorded; the build stores the tables with `known_at`, drops the row known only at the cut, records the timing runs and per-window coverage, keeps the bars-only content hash, stops on missing files, on look-ahead in the metrics timing and on a table round-trip mismatch; reports, and a second snapshot the same day never overwrites the first one's report (#33) |
 
 ---
 
@@ -128,6 +131,7 @@ Bugs the tests found, all fixed in the code you have:
 | 30 | `data/sources.MultiPartHTTPReader` (milestone 1) | A range answer without an ETag was accepted even when the HEAD had one, so a Kraken part replaced mid-read could pass | Missing or different ETag raises `DownloadError`; members re-extracted under the strict check are byte-identical |
 | 31 | `data/quality.cross_check` (milestone 1) | `pd.concat` on DatetimeIndex without `sort=True` warned that a future pandas would stop sorting the joined index | `sort=True` |
 | 32 | `data/report.render_report` (milestone 1) | The report's `Command:` line left out `--tolerance`, so a build at another tolerance printed a command that rebuilds at 1% | Always prints `--tolerance` with the exact float; test parses the printed command and checks it reproduces the build options |
+| 33 | `data/report.write_report` (positioning data) | Reports were named by date only, so a second snapshot built the same day (here: adding positioning data to `b08377c310126e3f`) would have overwritten the committed report of the first | `report_path`: a file whose first line names another snapshot is kept, and the new report gets `-<snapshot id>`; `test_a_second_snapshot_on_the_same_day_keeps_the_first_report` |
 
 Findings that are not bugs (keep them in mind):
 
@@ -145,6 +149,13 @@ Findings that are not bugs (keep them in mind):
   moving it by 4e-11). Z-scoring log volume, as the starter did, only slows the saturation. Kept as
   is and pinned by `test_volume_z_is_bounded_by_its_window`; excluding the present bar from the
   window's mean and spread would remove the bound. Decision for `ml-researcher`.
+- **Binance futures metrics changed their timestamp convention on 2024-04-26** (data, not a code bug).
+  Until 2024-04-25 a row's `create_time` T is the END of its 5-minute period (its taker ratio equals the
+  kline period [T-5, T), its open-interest value / open interest equals the price at T); from 2024-04-26 it
+  is the START (period [T, T+5), price at T+5), for BTCUSDT and ETHUSDT alike. Reading `create_time` as
+  "known at" would leak 5 minutes in the newer files. `known_at = create_time + 5 min` covers both, and the
+  build re-checks every day against 5-minute futures klines and stops if any day's data reach further.
+  Do not shorten `futures.METRICS_LAG` without rerunning that check.
 
 **Consequence of fixes 4–6:** every number from the old demo is stale. Rerun it (5.5). The merge changes
 them again: fills at the next open, the `config/costs.yaml` cost model and osprey's generator (#12–#14, #22).

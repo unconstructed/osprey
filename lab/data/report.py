@@ -1,7 +1,8 @@
-"""The data quality report (``reports/data/<YYYY-MM-DD>.md``), rendered from a snapshot dict alone.
+"""The data quality reports, rendered from a snapshot dict alone: ``reports/data/<YYYY-MM-DD>.md`` (bars) and,
+for a snapshot with positioning data, ``reports/data/<YYYY-MM-DD>-positioning.md``.
 
-Everything in the report comes from ``SNAPSHOT.json``, so the report can be regenerated from it and no
-number is typed by hand.
+Everything in the reports comes from ``SNAPSHOT.json``, so they can be regenerated from it and no number is
+typed by hand. A report file of another snapshot is never overwritten (:func:`report_path`).
 """
 
 from __future__ import annotations
@@ -94,6 +95,15 @@ def _sources(snap: dict) -> list[str]:
                 f"- Months {details['months']}: {details['zips']} zips; status {details['status']}",
                 f"- {details['verified']}",
                 f"- Missing months: {_list(details['missing'])}",
+                "",
+            ]
+        elif name == "binance_futures":
+            out += [
+                f"- Up to {details['last_day']} (the validate window's last day): {details['zips']} zips; status "
+                f"{details['status']}",
+                f"- {details['verified']}",
+                f"- Missing files: {_list(details['missing'])}",
+                "- Positioning series, checks and point-in-time rules: the positioning report of this snapshot",
                 "",
             ]
         else:
@@ -252,6 +262,13 @@ def _round_trip(snap: dict) -> list[str]:
     return out + [""]
 
 
+def _content_line(snap: dict) -> str:
+    bars = snap.get("bars_content_sha256", snap["content_sha256"])
+    if bars == snap["content_sha256"]:
+        return f"- Bars content SHA-256: `{bars}`"
+    return f"- Content SHA-256 (bars and positioning tables): `{snap['content_sha256']}`; bars only: `{bars}`"
+
+
 def render_report(snap: dict) -> str:
     build = snap["build"]
     code = build["code"]
@@ -265,7 +282,7 @@ def render_report(snap: dict) -> str:
         f"- Code: commit `{code['commit']}`, lab/ with uncommitted changes: {_fmt(code['lab_dirty'])}",
         f"- Snapshot ID rule: {snap['id_rule']}; raw files: "
         f"{sum(len(s['files']) for s in snap['sources'].values())}",
-        f"- Bars content SHA-256: `{snap['content_sha256']}`",
+        _content_line(snap),
         "",
     ]
     lines += _sources(snap) + _coverage(snap) + _bad_ticks(snap) + _intervals(snap) + _cross(snap) + _alignment(snap)
@@ -274,9 +291,220 @@ def render_report(snap: dict) -> str:
     return "\n".join(lines)
 
 
+def report_path(report_dir: str | Path, snap: dict, suffix: str = "") -> Path:
+    """``<report_dir>/<created date><suffix>.md``, unless that file is the report of ANOTHER snapshot (its first
+    line doesn't name this snapshot's ID): then ``<created date><suffix>-<snapshot id>.md``, so a second
+    snapshot built the same day never overwrites the first one's report."""
+    path = Path(report_dir) / f"{snap['created'][:10]}{suffix}.md"
+    if path.is_file():
+        first = path.read_text().partition("\n")[0]
+        if f"`{snap['snapshot_id']}`" not in first:
+            path = path.with_name(f"{path.stem}-{snap['snapshot_id']}.md")
+    return path
+
+
 def write_report(snap: dict, report_dir: str | Path) -> Path:
-    """Write ``<report_dir>/<snapshot created date>.md`` and return its path."""
-    path = Path(report_dir) / f"{snap['created'][:10]}.md"
+    """Write the bars report to :func:`report_path` and return its path."""
+    path = report_path(report_dir, snap)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_report(snap))
+    return path
+
+
+# --------------------------------------------------------------------------- positioning report
+
+TAKER_MEANING = {-5: "period ending at T", 0: "period starting at T"}
+
+
+def _offset(k, meaning: dict | None = None) -> str:
+    if k is None:
+        return "inconclusive"
+    if meaning is not None:
+        return meaning.get(k, f"period starting at T{k:+d} min")
+    return "price at T" if k == 0 else f"price at T{k:+d} min"
+
+
+def _pos_files(snap: dict) -> list[str]:
+    d = snap["sources"]["binance_futures"]["details"]
+    out = ["## 1. Files and what was verified", "",
+           f"Every zip's SHA-256 matched its published `.CHECKSUM`; files were requested up to {d['last_day']} "
+           f"(the validate window's last day) and no later. Status: {d['status']}. Missing: {_list(d['missing'])}.",
+           ""]
+    starts = d["starts"]
+    rows = []
+    for name, p in d["periods"].items():
+        start = starts.get(name) if isinstance(starts, dict) else None
+        before = "n/a" if start is None else f"{start['before']}: {'published' if start['before_published'] else 'not published (404)'}"
+        rows.append([name] + ([p["first"], p["last"], p["asked"]] if p else ["none", "none", 0]) + [before])
+    out += _table(["Series", "First file", "Last file", "Files asked for", "Period before the first (online check)"],
+                  rows)
+    if not isinstance(starts, dict):
+        out += [f"Start check: {starts}.", ""]
+    return out
+
+
+def _pos_coverage(snap: dict) -> list[str]:
+    q = snap["checks"]["external"]
+    out = ["## 2. Stored series", "",
+           "`ts` is the source's timestamp, `known_at` when the value became public (section 3). Missing = funding "
+           "events or 5-minute rows absent between the first and the last (never filled).", ""]
+    rows = []
+    for e in snap["external"]:
+        c = q[f"{e['symbol']} {e['table']}"]
+        rows.append([f"{e['symbol']} {e['table']}", e["rows"], e["first_ts"], e["last_ts"], e["last_known_at"],
+                     c["gaps"], c["missing"], e["path"]])
+    out += _table(["Series", "Rows", "First ts", "Last ts", "Last known_at", "Gaps", "Missing", "File"], rows)
+    out += ["Daily bar closes of each split window that get a value from `external.positioning_at` (first such "
+            "close in brackets). The test window is not stored.", ""]
+    cols = ["funding_last", "funding_mean_7d", "oi_last", "oi_change_7d", "ls_account_last", "ls_top_position_last"]
+    rows = []
+    for sym, windows in snap["checks"]["positioning_coverage"].items():
+        for name, w in windows.items():
+            cells = []
+            for col in cols:
+                c = w["columns"][col]
+                cells.append(f"{c['closes']} ({c['first'][:10]})" if c["first"] else "0")
+            rows.append([sym, name, w["closes"]] + cells)
+    out += _table(["Symbol", "Window", "Daily closes"] + cols, rows)
+    return out
+
+
+def _pos_timing(snap: dict) -> list[str]:
+    pos = snap["positioning"]
+    out = ["## 3. When a value is known (point in time)", "",
+           f"Only values known strictly before a bar's close are used for that bar; stored values are all known "
+           f"before {pos['cut']} ({pos['cut_rule']}).", ""]
+    out += [f"- `{k}`: {v}" for k, v in pos["rules"].items()] + [""]
+    out += ["Timestamp check of the metrics against 5-minute futures klines, per UTC day: which kline period the "
+            "row's taker buy/sell ratio equals, and which moment's price its open-interest value / open interest "
+            f"equals. Data reach = how far past T a day's data go; the known_at lag is {pos['metrics_lag']}, and "
+            "the build stops if any day reaches further.", ""]
+    rows = []
+    for sym, t in snap["checks"]["metrics_timing"].items():
+        for r in t["runs"]:
+            reach = [k + 5 for k in [r["taker_offset"]] if k is not None]
+            reach += [k for k in [r["price_offset"]] if k is not None]
+            rows.append([sym, r["from"], r["to"], r["days"], _offset(r["taker_offset"], TAKER_MEANING),
+                         _offset(r["price_offset"]), f"T{max(reach):+d} min" if reach else "n/a"])
+    out += _table(["Symbol", "From", "To", "Days", "Taker ratio matches", "OI value / OI matches", "Data reach"],
+                  rows)
+    out += ["Days with no conclusive check: " + ", ".join(
+        f"{sym} {t['inconclusive_days']}" for sym, t in snap["checks"]["metrics_timing"].items()) + "; furthest "
+        "reach: " + ", ".join(f"{sym} {_fmt(t['max_reach_minutes'])} min" for sym, t in
+                             snap["checks"]["metrics_timing"].items()) + ".", ""]
+    return out
+
+
+def _pos_cleaning(snap: dict) -> list[str]:
+    out = ["## 4. Loading and cleaning", "",
+           "Bad rows dropped; duplicates keep the last row; values that are empty or not positive (e.g. `0E-8`) "
+           f"become NaN; a value unchanged for {snap['positioning']['stale_after']} or more becomes NaN from that "
+           "moment on (frozen feed; the run's earlier rows are kept, as they could not be known to be frozen at "
+           "their time). Nothing is filled.", ""]
+    rows = []
+    for sym, loading in snap["checks"]["external_loading"].items():
+        for table in ("funding", "metrics"):
+            ld = loading[table]
+            rows.append([f"{sym} {table}", ld["files"], ld["rows_read"], ld["dropped_bad"], ld["exact_duplicates"],
+                         ld["conflicting_duplicates"], ld["files_out_of_order"], ld["rows_outside_file_period"],
+                         ld["dropped_known_at_or_after_cut"]])
+    out += _table(["Series", "Files", "Rows read", "Bad dropped", "Exact duplicates", "Conflicting duplicates",
+                   "Files out of time order", "Rows outside the file's period", "Known at/after the cut"], rows)
+    rows = []
+    for sym, loading in snap["checks"]["external_loading"].items():
+        ld, fields = loading["metrics"], snap["checks"]["external"][f"{sym} metrics"]["fields"]
+        for name, f in fields.items():
+            absent = f["longest_absence"]
+            rows.append([sym, name, f["rows"], ld[f"missing_{name}"], ld[f"invalid_{name}"], ld["stale_rows"][name],
+                         "none" if absent is None else f"{absent['from']} -> {absent['to']} ({absent['rows']} rows)"])
+    out += _table(["Symbol", "Field", "Rows with a value", "Empty", "Not positive", "Stale (frozen)",
+                   "Longest stretch without a value"], rows)
+    for sym, loading in snap["checks"]["external_loading"].items():
+        runs = sorted(loading["metrics"]["stale_runs"], key=lambda r: (-r["rows"], r["from"]))
+        out.append(f"- {sym}: {len(runs)} stale runs; longest: " + _list(
+            [f"{r['field']} {r['from']} -> {r['to']} ({r['rows']} rows)" for r in runs], 8)
+            + f"; open-interest value without open interest: {loading['metrics']['value_without_open_interest']}")
+    return out + [""]
+
+
+def _pos_values(snap: dict) -> list[str]:
+    out = ["## 5. Gaps and values", ""]
+    for name, c in snap["checks"]["external"].items():
+        gaps = _list([f"{g['after']} -> {g['before']} ({g['missing']})" for g in c["longest_gaps"]], 10)
+        if "rate" in c:
+            r = c["rate"]
+            out.append(f"- `{name}`: {c['gaps']} gaps ({c['missing']} events missing): {gaps}. Intervals (hours: "
+                       f"events) {c['interval_hours']}; instants {c['grid_offset_ms']['min']}..{c['grid_offset_ms']['max']} "
+                       f"ms from the interval grid ({c['off_grid_over_1min']} over 1 min). Rate min {r['min']:.6g}, "
+                       f"p1 {r['p01']:.6g}, median {r['median']:.6g}, p99 {r['p99']:.6g}, max {r['max']:.6g}; largest: "
+                       + _list([f"{x['ts']} {x['rate']:+.6g}" for x in c["largest_abs"]], 5))
+        else:
+            moves = _list([f"{m['ts']} ({m['abs_log_change']})" for m in c["open_interest_largest_moves"]], 5)
+            st = c["open_interest_longest_unchanged"]
+            out.append(f"- `{name}`: {c['rows']} of {c['expected_rows']} 5-minute rows, {c['off_grid']} off the grid; "
+                       f"{c['gaps']} gaps ({c['missing']} rows missing), {c['days_short']} of {c['days']} days short "
+                       f"of 288 rows ({c['days_empty']} empty; the last day also lacks any row known only at or after "
+                       f"the cut). Longest gaps: {gaps}. Largest 5-minute open-interest "
+                       f"moves |log change| (kept: no causal rule tells a recovering feed from a real move): {moves}. "
+                       "Longest unchanged open interest left after the stale rule: "
+                       + ("none" if st is None else f"{st['rows']} rows, {st['from']} -> {st['to']}"))
+    return out + [""]
+
+
+def _pos_open(snap: dict) -> list[str]:
+    starts = {e["symbol"]: {} for e in snap["external"]}
+    for e in snap["external"]:
+        starts[e["symbol"]][e["table"]] = e["first_ts"][:10]
+    cov = snap["checks"]["positioning_coverage"]
+    items = [
+        "**Coverage is far shorter than the price history.** " + "; ".join(
+            f"{sym}: funding from {s['funding']}, open interest and long/short ratios from {s['metrics']}; daily "
+            f"closes of the train window with an open-interest value: {cov[sym]['train']['columns']['oi_last']['closes']} "
+            f"of {cov[sym]['train']['closes']}" for sym, s in starts.items())
+        + ". data.binance.vision publishes nothing earlier ("
+        + ("checked in this build: the period before each first file answered 404"
+           if isinstance(snap["sources"]["binance_futures"]["details"]["starts"], dict)
+           else "not re-checked in this offline build; an online build checks that the period before each first "
+           "file answers 404")
+        + "). A model or rule using these series can only be trained and validated on that part of the history.",
+        "**Publication delay of the live API not measured.** `known_at` adds no delay to funding (the rate is "
+        f"fixed at the funding instant) and {snap['positioning']['metrics_lag']} to metrics (one 5-minute period; "
+        "section 3). The futures API that would show the live delay (fapi.binance.com) is not on the network "
+        "allow-list. For bar closes on the 5-minute grid the newest metrics row used was stamped at least 10 "
+        "minutes before the close.",
+        "**The test window was not downloaded.** Extending positioning data past "
+        f"{snap['positioning']['cut'][:10]} is a separate, deliberate step for the backtest-auditor's one-time "
+        "test run and for production; `load_positioning` refuses a later `end`.",
+        "**USDT-margined perpetuals.** Funding rates are per 8-hour interval (a fraction, not annualised); open "
+        "interest is in contracts (1 contract = 1 BTC or 1 ETH) and in USDT.",
+    ]
+    return ["## 6. Open items", ""] + [f"- {x}" for x in items] + [""]
+
+
+def render_positioning_report(snap: dict, main_report: str | None = None) -> str:
+    build, code = snap["build"], snap["build"]["code"]
+    lines = [
+        f"# Positioning data report, snapshot `{snap['snapshot_id']}`",
+        "",
+        f"- Created: {snap['created']} (UTC), {'offline rebuild from data/raw' if build['offline'] else 'online build'}",
+        f"- Command: `uv run python -m lab.data.build --sources {','.join(build['sources'])} --coins "
+        f"{','.join(build['coins'])} --intervals {','.join(build['intervals'])} "
+        f"--tolerance {float(build['tolerance'])!r}{' --offline' if build['offline'] else ''}`",
+        f"- Code: commit `{code['commit']}`, lab/ with uncommitted changes: {_fmt(code['lab_dirty'])}",
+        f"- Bars of this snapshot and their checks: {main_report or 'the data quality report of this snapshot'}",
+        "- Load with `lab.data.external.load_positioning(symbol, freq, start, end)`: one row per bar close, only "
+        "values known before it, never past the validate window.",
+        "",
+    ]
+    lines += _pos_files(snap) + _pos_coverage(snap) + _pos_timing(snap) + _pos_cleaning(snap) + _pos_values(snap)
+    lines += _pos_open(snap)
+    return "\n".join(lines)
+
+
+def write_positioning_report(snap: dict, report_dir: str | Path, main_report: str | None = None) -> Path:
+    """Write the positioning report to :func:`report_path` (suffix ``-positioning``) and return its path."""
+    path = report_path(report_dir, snap, "-positioning")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    name = None if main_report is None else f"`{Path(main_report).name}`"
+    path.write_text(render_positioning_report(snap, name))
     return path
