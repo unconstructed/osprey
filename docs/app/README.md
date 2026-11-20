@@ -14,6 +14,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | [Business](business.md) | Partners and call questions, revenue, app store rules, regulation, accepted risks, compliance checklist, later brokerage track |
 | [Database](database.md) | One Postgres database in 12 schemas: what each holds, built-in safety rules, how a trade moves through the tables, build steps and required tests ([schema.sql](schema.sql)) |
 | [Phase 1 setup](phase-1-setup.md) | Step-by-step hosting setup: the slow paperwork to start now, your accounts and approvals, the agents' build order for dev, then staging and production before beta |
+| [AWS setup](aws-setup.md) | The full AWS build behind Phase 1: decisions with defaults, the seven-account map, guardrails, logins, security alarms, network, domain and email, front door, apps, data, backups, monitoring, deploy pipeline, limits and costs |
 | [Strategy Lab](../../AGENTS.md) | Guide for the coding agents (repo root): NautilusTrader setup, data, mass simulation, validation gates, prediction models ([research methods](../../research-methods.md)) |
 
 ## Decisions
@@ -36,7 +37,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | Backend language | Python (FastAPI), matching NautilusTrader | [Technical](technical.md#architecture) |
 | Database | One PostgreSQL database in 12 schemas with per-user Row-Level Security and an append-only ledger mirroring the chain; Redis for live data | [Database](database.md) |
 | Live charts | One market data service pulls exchange prices once for every coin; Redis holds live prices, Postgres holds chart history; a WebSocket gateway streams prices to the app | [Technical](technical.md#live-prices-and-charts) |
-| Hosting | AWS, phased: lean launch on ECS Fargate, RDS Multi-AZ, SQS, KMS; upgrades only when load calls for it; infrastructure as code | [Technical](technical.md#hosting) |
+| Hosting | AWS in three phases (owner's plan): lean launch on ECS Fargate, RDS Multi-AZ, SQS, KMS; growth upgrades (Aurora, bigger caches, own RPC node) only when load calls for it; in-house key signing and nodes only if volume or licensing requires it; seven AWS accounts with organization guardrails; Terraform | [Technical](technical.md#hosting), [AWS setup](aws-setup.md) |
 | Legal review | Skipped before launch by owner decision; risks and mitigations recorded | [Business](business.md#accepted-risks) |
 | Later track | Brokerage version through a CaaS partner (Alpaca first) for bank-deposit users and stocks | [Business](business.md#later-brokerage-track) |
 | Build team | AI agent team builds and maintains; owner personally reviews risk, trade router and permission code | [Technical](technical.md#agent-team-rules) |
@@ -48,7 +49,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | 1 | Strategy Lab: NautilusTrader set up, historical data in the catalog, the three launch strategies built, mass simulation and validation | [Strategy Lab](../../AGENTS.md) |
 | 2 | Approved strategies run on paper model accounts; optionally small amounts of own money | [Product](product.md#strategies-by-risk-level) |
 | 3 | Privy set up: login, embedded and smart wallets, gas sponsorship, signers and policies, on Base Sepolia testnet | [Technical](technical.md#wallets-and-login) |
-| 4 | Backend foundations (Phase 1 hosting): AWS accounts, RDS Postgres, Redis, SQS, KMS, S3 Object Lock, infrastructure as code | [Phase 1 setup](phase-1-setup.md) |
+| 4 | Backend foundations (Phase 1 hosting): AWS accounts and guardrails, RDS Postgres, Valkey (Redis), SQS, KMS, S3 Object Lock, Terraform | [Phase 1 setup](phase-1-setup.md), [AWS setup](aws-setup.md) |
 | 5 | Trade router, 0x swap builder, risk engine, auto-trading permission, chain watcher; testnet first | [Technical](technical.md#architecture) |
 | 6 | Ramp integrations in sandbox: Coinbase Onramp/Offramp and MoonPay | [Business](business.md#ramp-partners) |
 | 7 | Mobile app MVP (React Native + Expo) against testnet | [Product](product.md#mobile-app) |

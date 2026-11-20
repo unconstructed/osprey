@@ -327,7 +327,7 @@ Add an `org_id` tenant layer only if we later white-label the platform for other
 
 Start lean and upgrade only when real load calls for it. Anything that protects money or records (Multi-AZ database, queues, tamper-proof logs, key protection) is in from day one.
 
-**Step by step:** [Phase 1 setup](phase-1-setup.md) lists what the owner does (accounts, billing, approvals), what the agents build, and in what order.
+**Step by step:** [Phase 1 setup](phase-1-setup.md) lists what the owner does (accounts, billing, approvals), what the agents build, and in what order. **[AWS setup](aws-setup.md)** is the full build: the account map, guardrails, logins, security alarms, network, domain and email, front door, apps, data, backups, monitoring, deploy pipeline, limits and costs.
 
 ### Phase 1: Launch
 
@@ -340,7 +340,7 @@ Start lean and upgrade only when real load calls for it. Anything that protects 
 | Login and wallets | **Privy** (external) | Login, passkeys, embedded and smart wallets, signers and policies, gas sponsorship |
 | Edge | Load balancer + AWS WAF | Blocks abusive traffic and rate-limits the API |
 | Postgres | RDS for PostgreSQL, **Multi-AZ** | Keep a standby in a second availability zone; point-in-time backups |
-| Redis | ElastiCache | Required by Nautilus for crash recovery |
+| Redis | ElastiCache, Valkey engine (Redis-compatible, about 20% cheaper; Redis engine if Nautilus has trouble with it) | Required by Nautilus for crash recovery |
 | Trade queues | SQS, with dead-letter queues | Absorbs signal fan-out and market spikes; pay per use |
 | Secrets and keys | Secrets Manager + **KMS** | Privy app secret and the auto-trading authorization key; API keys for 0x, RPC and ramps |
 | Blockchain access | Managed RPC provider | Reads balances and submits transactions on Base |
@@ -365,12 +365,43 @@ Upgrade each piece when it becomes the bottleneck, not on a schedule.
 | **Second chain** (for example Solana) | Users want tokens Base doesn't have |
 | **Our own RPC node** | RPC rate limits or costs become a problem |
 
+### Phase 3: Full control at scale
+
+Bring cryptographic signing and blockchain nodes in-house only when volume or licensing requires full control.
+
+| Upgrade | Do it when |
+|---|---|
+| **Hardware-backed key signing:** AWS KMS with `secp256k1` keys, plus Nitro Enclaves or CloudHSM for isolated signing | Only if we ever hold or co-sign keys ourselves, for example our own custodial or brokerage product. Today Privy signs inside its secure enclaves, and our one key (the auto-trading authorization key) is already in KMS from Phase 1 |
+| **Dedicated blockchain nodes** on EC2 for direct RPC with no rate limits | Volume makes the managed RPC provider too limiting or too expensive |
+| **Audit and compliance:** S3 Object Lock and CloudTrail for tamper-proof logs | Already done: moved into Phase 1, because money records must be tamper-proof from day one |
+
+### How this follows the original three-phase plan
+
+The owner's plan (2026-11-19) was: launch lean on AWS, offload heavy crypto infrastructure to third-party APIs, and scale up as the app grows. Every item is kept; a few moved because of later decisions.
+
+| Original plan | Original phase | Where it is now | Why |
+|---|---|---|---|
+| ECS Fargate for the API | 1 | Phase 1 | Unchanged |
+| RDS PostgreSQL for accounts and the transaction ledger | 1 | Phase 1, Multi-AZ | Unchanged; the standby protects money records ([Database](database.md)) |
+| Third-party wallet and key provider (Circle, Privy or Turnkey) | 1 | Phase 1: **Privy** (Turnkey as backup) | Users own their wallets; we never hold keys |
+| Secrets Manager for API keys | 1 | Phase 1, plus KMS | KMS also guards the auto-trading authorization key |
+| Cognito for login and MFA | 1 | **Replaced by Privy** | Privy already does login and the Face ID passkey, so one provider handles both |
+| Aurora PostgreSQL | 2 | Phase 2 | Unchanged: upgrade when the database becomes the bottleneck |
+| SQS to absorb order bursts | 2 | **Moved to Phase 1** | One signal fans out to every subscriber's trade from the first day |
+| MSK (Kafka) | 2 | Not planned | SQS covers our volume |
+| ElastiCache for fast lookups | 2 | **Moved to Phase 1** | NautilusTrader needs Redis, and live prices and charts run on it |
+| DynamoDB for sessions and idempotency | 2 | Not planned | A unique key in Postgres already blocks double trades |
+| KMS `secp256k1` with Nitro Enclaves or CloudHSM | 3 | Phase 3, only if we ever hold keys | Privy signs today |
+| Our own EC2 blockchain nodes | 3 | Phase 3 (or earlier if RPC limits bite) | Managed RPC first |
+| S3 Object Lock and CloudTrail | 3 | **Moved to Phase 1** | Tamper-proof money records from day one |
+
+**One gap to decide:** the original plan called for a **double-entry** ledger. Ours is append-only and records every swap as two linked entries (coins out, coins in), with the blockchain as the record of truth. That's enough while users hold their own money. Formal double-entry bookkeeping (every movement balanced against a counter-account) would be needed for the brokerage track, or earlier if an accountant asks for it.
+
 ### Not on our roadmap
 
 | Item | Why not |
 |---|---|
 | Holding customer funds in wallets we control | That's custody, and custody means licenses. Users own their wallets; our permission can only swap inside them |
-| Our own key signing (KMS `secp256k1`, Nitro Enclaves, CloudHSM) | The wallet provider does signing in its secure enclaves |
 | Kafka (MSK) | SQS is enough at our scale |
 | DynamoDB for idempotency | The unique trade key in Postgres already prevents double trades |
 | Customer-written code (Python strategies) | Running strangers' code on servers that can trade user funds is a security risk, needs an isolated container per strategy, and turns one engine per strategy into one per customer. Customers build rules from our building blocks instead |
@@ -383,16 +414,21 @@ Separate AWS accounts and Privy apps for:
 - **Staging:** testnet, mirrors production, used for TestFlight / Play internal testing
 - **Production:** Base mainnet, real money, locked down
 
+Plus four shared accounts that run no app code: management (billing and logins), security (alarms), log archive (locked audit logs) and backup (locked backup copies). See [AWS setup: The account map](aws-setup.md#the-account-map).
+
 ### Infrastructure as code
 
-Everything defined in Terraform or AWS CDK, so the agent team changes infrastructure through reviewed code, never by clicking in the console.
+Everything defined in **Terraform** (AWS CDK is the alternative), so the agent team changes infrastructure through reviewed code, never by clicking in the console. The agents have no AWS access themselves: GitHub Actions deploys, production waits for the owner's approval, and a nightly check flags anything changed outside the code.
 
 ### Security baseline
 
 - Encryption in transit and at rest
 - Databases in private subnets, no public access
-- Least-privilege IAM roles per service; only the trade router can use the authorization key
-- MFA on every AWS, Privy, ramp and admin account
+- Least-privilege IAM roles per service; only the trade router can use the authorization key, and any other caller sets off an alarm
+- Organization guardrails nobody can override: no IAM users or access keys, no root logins in member accounts, only our regions, nothing shared outside the organization, production data and keys can't be deleted
+- GuardDuty, Security Hub, Config and Access Analyzer on in every account
+- Outbound traffic only to an allowlist of providers; providers lock our API keys to our outbound addresses where they can
+- MFA on every AWS, Privy, ramp and admin account; hardware keys on the AWS root login
 - Audit logging (CloudTrail) on; archives under S3 Object Lock
 - Backups tested by actually restoring them
 - Independent security review of the trade router and auto-trading permission before public launch
@@ -400,7 +436,9 @@ Everything defined in Terraform or AWS CDK, so the agent team changes infrastruc
 
 ### Rough cost
 
-Phase 1: a few hundred dollars a month for AWS across staging and production, plus Privy's fees, gas sponsorship (a small amount per trade on Base) and the RPC provider. Ramp fees are paid by users at purchase and cash-out. *Estimate only; verify with each provider's pricing and the AWS pricing calculator.*
+The original plan targeted about $100–300 a month for a lean launch. That holds until the beta, while only dev runs: about $220–280 a month for AWS. From the closed beta, with staging part-time and production's standby database and two copies of every service, expect about $900–1,000 a month; production alone is about $550–700. Turning dev off overnight, running staging only for test weeks, one-year commitments once usage is steady, and startup credits all bring it down. Breakdown: [AWS setup: What it costs](aws-setup.md#what-it-costs).
+
+On top of AWS: Privy's fees, gas sponsorship (a small amount per trade on Base), the RPC provider and Expo. Ramp fees are paid by users at purchase and cash-out. *Estimates only; verify with each provider's pricing and the AWS Pricing Calculator.*
 
 ## Agent team rules
 
