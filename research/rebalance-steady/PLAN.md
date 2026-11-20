@@ -666,6 +666,12 @@ at the hashes in A3 (section 16, row A-1):
    re-scores this study.
 6. The headroom h = 0.02 (A2) is the risk-officer's proposal. Default: keep it.
 
+**Owner answers (2026-11-20, in chat, before any real-data run).** Q1: a drifted breach at any close forces a full
+rebalance (the default). Q3: the coin share is searched over the box of section 5 (the default). Q4: G8 is read
+literally (the default; no gate change). Q5: the drawdown budget stays TBD, so G6 is MISSING = FAIL and this study
+cannot reach CANDIDATE FOR AUDIT (the default). Q2 and Q6 were not asked; their defaults hold (`max_coin_pct` per
+coin and not applied to USDC; h = 0.02). No section of this plan changes.
+
 **Known weaknesses.**
 - Scouting on the reference engine, not Nautilus. Exchange candles are a proxy for Base prices. Kraken is quoted in
   USD and Binance in USDT, while Base trades against USDC.
