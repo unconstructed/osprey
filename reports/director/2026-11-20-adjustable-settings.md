@@ -378,7 +378,9 @@ little power (3 rebalances), as RESULTS.md "Known weaknesses" does.
    that differs from the backtest of its own book.
 10. **Steady's "a few trades a month".** Does this `product.md` guardrail cap the drift band and the check frequency
    a user can pick, and is it counted in trades or in rebalances? If it caps them, `risk-officer` sets those two
-   ranges inside it at pre-registration (4.1), like the level's limits. `features.md` lists it as an open question.
+   ranges inside it at pre-registration (4.1), like the level's limits. **Owner (2026-11-20): it caps them unless
+   rebalancing that often is shown to pay.** In the first study's final searches it did not (in-sample, SCOUTING; the
+   numbers are in `features.md`), so it caps them. How it is counted (trades or rebalances) is still open.
 
 ## 10. Risks of this proposal
 
