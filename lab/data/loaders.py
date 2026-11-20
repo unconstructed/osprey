@@ -1,4 +1,5 @@
-"""CSV loaders for the free bar sources, normalised to the lab's bar conventions.
+"""Loaders for the free bar sources (Kraken and Binance CSV, Coinbase JSON candle pages), normalised to the
+lab's bar conventions.
 
 Output of every loader: a DataFrame indexed by bar CLOSE time (tz-aware UTC ``DatetimeIndex`` named
 ``ts``, microsecond resolution like every bar index in the lab, strictly increasing) with float64
@@ -26,7 +27,9 @@ lines included), ``dropped_bad`` and ``dropped_duplicates`` for the data quality
 from __future__ import annotations
 
 import csv
+import json
 import re
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -205,7 +208,7 @@ def load_kraken_ohlcvt(path: str | Path, interval: pd.Timedelta | str | int | No
 _SECOND_NS = 1_000_000_000
 
 
-def load_binance_klines(path: str | Path) -> pd.DataFrame:
+def load_binance_klines(path: str | Path, interval: pd.Timedelta | str | None = None) -> pd.DataFrame:
     """Load a data.binance.vision kline CSV (columns in ``BINANCE_COLUMNS`` order, header optional).
 
     ``close_time`` is the last moment of the bar, ``open_time + interval - 1 unit`` (1 ms, or 1 us in
@@ -213,6 +216,15 @@ def load_binance_klines(path: str | Path) -> pd.DataFrame:
     ``close_time + 1 unit - open_time``, rounded to the nearest second (so a file whose ``close_time``
     is the exact bar end in ms or us also loads correctly), and the index is ``open_time + length``.
     A row whose length rounds to zero or less is bad. ``trades`` is Binance's ``count``.
+
+    With ``interval`` (e.g. ``"1h"``) the bars are put on that grid instead, for the catalog. Real files
+    have rows that are not whole grid bars: bars cut short by exchange maintenance (open on the grid,
+    early ``close_time``) and, in February 2018, a run of hourly bars shifted off the grid by 28m14.789s.
+    Grid mode labels a bar ``open_time + interval`` when its open lies on the grid and its length is in
+    ``(0, interval + 1 s]`` (a short bar holds every trade of its interval: the exchange was halted for the
+    rest); a bar longer than that is bad; a bar whose open is off the grid is dropped and counted. ``attrs``
+    then also has ``dropped_off_grid`` (count), ``off_grid_opens`` and ``short_bars`` (``[open ISO, seconds]``
+    of the bars kept although shorter than ``interval - 1 s``).
     """
     path = Path(path)
     raw, source, over_wide = _read_fields(path, 7, len(BINANCE_COLUMNS))
@@ -223,9 +235,74 @@ def load_binance_klines(path: str | Path) -> pd.DataFrame:
     # integer round-half-up to whole seconds
     length = (close_ns + close_unit - open_ns + _SECOND_NS // 2) // _SECOND_NS * _SECOND_NS
     ts_ok = (length > 0).fillna(False).to_numpy(dtype=bool)
+    if interval is None:
+        good = _good_rows(bars, ts_ok)
+        _require_rows(good, source)
+        return _finish(bars, open_ns + length, good, source, over_wide)
+    step = pd.Timedelta(interval).value
+    if step <= 0:
+        raise ValueError(f"{source}: bar interval must be positive, got {interval}")
+    ts_ok &= (length <= step + _SECOND_NS).fillna(False).to_numpy(dtype=bool)
     good = _good_rows(bars, ts_ok)
+    on_grid = (open_ns % step == 0).fillna(False).to_numpy(dtype=bool)
+    keep = good & on_grid
+    _require_rows(keep, source)
+    out = _finish(bars, open_ns + step, keep, source, over_wide)
+    off = good & ~on_grid
+    short = keep & (length < step - _SECOND_NS).fillna(False).to_numpy(dtype=bool)
+
+    def iso(ns: pd.Series) -> list[str]:
+        return [t.isoformat() for t in pd.to_datetime(ns.to_numpy(dtype="int64"), unit="ns", utc=True)]
+
+    out.attrs["dropped_bad"] -= int(off.sum())
+    out.attrs["dropped_off_grid"] = int(off.sum())
+    out.attrs["off_grid_opens"] = iso(open_ns[off])
+    out.attrs["short_bars"] = [
+        [t, int(n) // _SECOND_NS] for t, n in zip(iso(open_ns[short]), length[short], strict=True)
+    ]
+    return out
+
+
+COINBASE_FIELDS = ("time", "low", "high", "open", "close", "volume")
+
+
+def _coinbase_row(row) -> list:
+    """One candle as [time, low, high, open, close, volume]; a malformed row becomes all None (bad)."""
+    numeric = isinstance(row, list) and len(row) == len(COINBASE_FIELDS)
+    numeric = numeric and all(isinstance(x, int | float) and not isinstance(x, bool) for x in row)
+    if not numeric or not isinstance(row[0], int):
+        return [None] * len(COINBASE_FIELDS)
+    return row
+
+
+def load_coinbase_candles(paths: Sequence[str | Path], granularity: int = 86_400) -> pd.DataFrame:
+    """Load Coinbase Exchange REST candle pages (``GET /products/{id}/candles`` answers saved as JSON).
+
+    Each page is a JSON list of ``[time, low, high, open, close, volume]`` rows (NOTE the order), newest
+    first, with ``time`` the bar OPEN in unix seconds; the index is ``time + granularity``. Pages are read
+    in the order given; rows go through the same cleaning as the CSV loaders (a row that is not six numbers
+    with an integer time is bad; duplicates keep the last row in page order). ``trades`` is NaN (the API
+    has no trade count). A page that is not a JSON list raises ``ValueError``.
+    """
+    paths = [Path(p) for p in paths]
+    if not paths:
+        raise ValueError("no Coinbase pages given")
+    rows = []
+    for path in paths:
+        page = json.loads(path.read_text())
+        if not isinstance(page, list):
+            raise ValueError(f"{path.name}: a candles page must be a JSON list")
+        rows += [_coinbase_row(row) for row in page]
+    source = f"{paths[0].parent.name} ({len(paths)} pages)"
+    if not rows:
+        raise ValueError(f"{source}: no valid rows")
+    table = pd.DataFrame(rows, columns=list(COINBASE_FIELDS))
+    bars = table.loc[:, list(BAR_COLUMNS)].astype(float)
+    bars["trades"] = np.nan
+    open_ns = epoch_to_ns(table["time"].astype("Int64").astype(str))
+    good = _good_rows(bars, open_ns.notna().to_numpy(dtype=bool))
     _require_rows(good, source)
-    return _finish(bars, open_ns + length, good, source, over_wide)
+    return _finish(bars, open_ns + granularity * _SECOND_NS, good, source, 0)
 
 
 def resample(bars: pd.DataFrame, rule: str) -> pd.DataFrame:
