@@ -10,6 +10,7 @@ import io
 import json
 import re
 import runpy
+import shlex
 import threading
 import time
 import warnings
@@ -1054,3 +1055,23 @@ def test_report_renders_optional_details(built):
             "unchanged, 2015-08-11T09:00:00+00:00 -> 2015-08-11T14:00:00+00:00") in text
     assert ("- `BTC/USD.KRAKEN-1-HOUR-LAST-EXTERNAL`: 3 bars in 1 gaps: 2017-08-21T20:00:00+00:00 -> "
             "2017-08-22T00:00:00+00:00 (3)") in text
+
+
+@pytest.mark.parametrize(
+    "options",
+    [{}, {"offline": True, "tolerance": 0.0123456789, "sources": ["binance"], "coins": ["ETH"], "intervals": ["1h"]}],
+)
+def test_report_command_reproduces_the_build_options(built, options):
+    """Regression: the report's Command line left out --tolerance, so a build with another tolerance (other
+    cross-check outliers) printed a command that would not reproduce it. Parsed back by the CLI, the printed
+    command must give the snapshot's build options."""
+    root, _, _ = built
+    snap = json.loads((root / "data" / "catalog" / cat.SNAPSHOT_FILE).read_text())
+    snap["build"].update(options)
+    line = next(x for x in rep.render_report(snap).splitlines() if x.startswith("- Command: `"))
+    words = shlex.split(line.removeprefix("- Command: `").removesuffix("`"))
+    assert words[:5] == ["uv", "run", "python", "-m", "lab.data.build"]
+    cfg = b.parse_args(words[5:])
+    got = {"sources": list(cfg.sources), "coins": list(cfg.coins), "intervals": list(cfg.intervals),
+           "offline": cfg.offline, "tolerance": cfg.tolerance}
+    assert got == {k: snap["build"][k] for k in got}

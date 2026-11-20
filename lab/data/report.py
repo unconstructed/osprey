@@ -260,8 +260,8 @@ def render_report(snap: dict) -> str:
         "",
         f"- Created: {snap['created']} (UTC), {'offline rebuild from data/raw' if build['offline'] else 'online build'}",
         f"- Command: `uv run python -m lab.data.build --sources {','.join(build['sources'])} --coins "
-        f"{','.join(build['coins'])} --intervals {','.join(build['intervals'])}"
-        f"{' --offline' if build['offline'] else ''}`",
+        f"{','.join(build['coins'])} --intervals {','.join(build['intervals'])} "
+        f"--tolerance {float(build['tolerance'])!r}{' --offline' if build['offline'] else ''}`",
         f"- Code: commit `{code['commit']}`, lab/ with uncommitted changes: {_fmt(code['lab_dirty'])}",
         f"- Snapshot ID rule: {snap['id_rule']}; raw files: "
         f"{sum(len(s['files']) for s in snap['sources'].values())}",

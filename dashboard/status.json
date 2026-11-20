@@ -1,13 +1,31 @@
 {
-  "updated": "2026-11-19",
-  "note": "Milestone, open-work and paper status below is edited by hand. No results have been recorded yet: no test run, audit or data snapshot.",
+  "updated": "2026-11-20",
+  "note": "Milestone, open-work and paper status below is edited by hand. Real BTC/ETH data is in the catalog (milestone 1); no strategy has been built or audited yet.",
   "milestones": {
-    "0": {"status": "not_started", "note": "Starter code not yet copied into this repo"},
-    "1": {"status": "not_started", "note": ""},
-    "2": {"status": "not_started", "note": ""},
-    "3": {"status": "not_started", "note": ""},
-    "4": {"status": "not_started", "note": ""},
-    "5": {"status": "not_started", "note": ""}
+    "0": {
+      "status": "in_progress",
+      "note": "Starter code merged (TESTING.md 4a); 1003+ tests, 100% branch coverage; demo rerun. Open: mutation testing for runner, search, models, data (5.4)."
+    },
+    "1": {
+      "status": "done",
+      "note": "Kraken, Binance and Coinbase BTC/ETH daily+hourly in data/catalog; snapshot b08377c310126e3f; report reports/data/2026-11-20.md."
+    },
+    "2": {
+      "status": "not_started",
+      "note": ""
+    },
+    "3": {
+      "status": "not_started",
+      "note": ""
+    },
+    "4": {
+      "status": "not_started",
+      "note": ""
+    },
+    "5": {
+      "status": "not_started",
+      "note": ""
+    }
   },
   "open_work": {
     "5.1": "not_started",
@@ -19,8 +37,26 @@
     "5.7": "not_started"
   },
   "strategies": {
-    "rebalance-steady": {"paper": {"status": "not_started", "started": null, "note": ""}},
-    "dip-buy-balanced": {"paper": {"status": "not_started", "started": null, "note": ""}},
-    "momentum-bold": {"paper": {"status": "not_started", "started": null, "note": ""}}
+    "rebalance-steady": {
+      "paper": {
+        "status": "not_started",
+        "started": null,
+        "note": ""
+      }
+    },
+    "dip-buy-balanced": {
+      "paper": {
+        "status": "not_started",
+        "started": null,
+        "note": ""
+      }
+    },
+    "momentum-bold": {
+      "paper": {
+        "status": "not_started",
+        "started": null,
+        "note": ""
+      }
+    }
   }
 }
