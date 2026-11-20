@@ -13,6 +13,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | [Technical](technical.md) | Architecture, trade router, auto-trading permission, launch chain, wallets, rule engine, Nautilus engine, database, phased AWS hosting, agent team rules |
 | [Business](business.md) | Partners and call questions, revenue, app store rules, regulation, accepted risks, compliance checklist, later brokerage track |
 | [Database](database.md) | One Postgres database in 12 schemas: what each holds, built-in safety rules, how a trade moves through the tables, build steps and required tests ([schema.sql](schema.sql)) |
+| [Phase 1 setup](phase-1-setup.md) | Step-by-step hosting setup: the slow paperwork to start now, your accounts and approvals, the agents' build order for dev, then staging and production before beta |
 | [Strategy Lab](../../AGENTS.md) | Guide for the coding agents (repo root): NautilusTrader setup, data, mass simulation, validation gates, prediction models ([research methods](../../research-methods.md)) |
 
 ## Decisions
@@ -47,7 +48,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
 | 1 | Strategy Lab: NautilusTrader set up, historical data in the catalog, the three launch strategies built, mass simulation and validation | [Strategy Lab](../../AGENTS.md) |
 | 2 | Approved strategies run on paper model accounts; optionally small amounts of own money | [Product](product.md#strategies-by-risk-level) |
 | 3 | Privy set up: login, embedded and smart wallets, gas sponsorship, signers and policies, on Base Sepolia testnet | [Technical](technical.md#wallets-and-login) |
-| 4 | Backend foundations (Phase 1 hosting): AWS accounts, RDS Postgres, Redis, SQS, KMS, S3 Object Lock, infrastructure as code | [Technical](technical.md#phase-1-launch) |
+| 4 | Backend foundations (Phase 1 hosting): AWS accounts, RDS Postgres, Redis, SQS, KMS, S3 Object Lock, infrastructure as code | [Phase 1 setup](phase-1-setup.md) |
 | 5 | Trade router, 0x swap builder, risk engine, auto-trading permission, chain watcher; testnet first | [Technical](technical.md#architecture) |
 | 6 | Ramp integrations in sandbox: Coinbase Onramp/Offramp and MoonPay | [Business](business.md#ramp-partners) |
 | 7 | Mobile app MVP (React Native + Expo) against testnet | [Product](product.md#mobile-app) |

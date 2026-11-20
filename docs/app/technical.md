@@ -327,6 +327,8 @@ Add an `org_id` tenant layer only if we later white-label the platform for other
 
 Start lean and upgrade only when real load calls for it. Anything that protects money or records (Multi-AZ database, queues, tamper-proof logs, key protection) is in from day one.
 
+**Step by step:** [Phase 1 setup](phase-1-setup.md) lists what the owner does (accounts, billing, approvals), what the agents build, and in what order.
+
 ### Phase 1: Launch
 
 | Piece | Service | Note |
