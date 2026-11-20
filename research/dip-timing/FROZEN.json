@@ -1,0 +1,32 @@
+{
+ "best": "V06",
+ "code_hashes": {
+  "config/costs.yaml": "0eeadeac8cc92f4e52a155dbe93c2a38ec3b60c685237d1bc162ece7ab10588d",
+  "config/splits.yaml": "a31ccc1477dc8292b38d67e9d6874f0c049dea98d53b24cfceee749c9a454f4c",
+  "lab/models/dips.py": "dd5bece4bc0853162af28a3c2b1cad1500aaf947cbd00c8f5f34b9e400712bae",
+  "lab/models/train.py": "40259a3cea472bdf1e4d6e85ccbfdf90fa865e500dd16f601ebea3131f8fd61f",
+  "lab/runner/reference.py": "c5387cc22820573641f3df4dea7c0bc0b2be475733614544b1356d324e5745ee",
+  "lab/validation/splits.py": "d1eff9d4caa9fe35c2f918dadbeea33fa8743a63f5751210989acee773864856",
+  "lab/validation/stats.py": "725602bd575fec438d58967d1b024dcbb1f321e659ac92936a214398610b0ab9",
+  "research/dip-timing/PLAN.md": "933dbe88dc56a3411d61c5258fa1b2cc930e0bb798d64449e601bf47866b9144",
+  "research/dip-timing/freeze.py": "fd32fe5fae2da74b4dabbb7c371794a6f5dee30b74c1e25706e3320e361cff8e",
+  "research/dip-timing/run_train.py": "40f7280e82e80773442d90a12bd9c1120bdf2ae00a881539a04078616861181c",
+  "research/dip-timing/run_validate.py": "a8b16546149f6e6aaccfa3d9b878c403dc83574b936f69ef204957f573720f1f",
+  "research/dip-timing/study.py": "a3877087918761c336649d96aed2c0f4efe1efa7f83f8927dc95e187a5846efc"
+ },
+ "config_hash": "0cda419180466c5b2f677bca923c6877c7ac4bedcb20dcdc88e8020c1e904c3a",
+ "config_hash_at_train_run": "0cda419180466c5b2f677bca923c6877c7ac4bedcb20dcdc88e8020c1e904c3a",
+ "frozen_utc": "2026-11-20T03:28:28.130145+00:00",
+ "git": {
+  "commit": "62b2f11",
+  "dirty": true
+ },
+ "snapshot": "1746a21b75683e76",
+ "train_outputs_sha256": {
+  "events_d0.parquet": "39b2e1e21dbe648bc9714eb70b433c12fd00e3aff46030945975ac61d32d08a0",
+  "series.parquet": "40b58e711df7551c50b9b66a58182aec2877944cbc52224fcc154ddcfa1f58cb",
+  "summary.json": "29bb930e3df234f7eb6594d016bda603b8d5cf4793376f264503bf7b783e5267",
+  "trials.jsonl": "8ee9990072f09af2de41338020e8abc6fc43d87e6daf861d58a3e78baf31a339",
+  "trials.parquet": "e1caa35d670533c3c1607f1203b8d637082975b84f460358d62b93f5125907fb"
+ }
+}

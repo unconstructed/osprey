@@ -67,6 +67,7 @@ __all__ = [
     "dip_buy",
     "random_entry",
     "realised_vol",
+    "scheduled",
 ]
 
 PERIODS_PER_YEAR = 365  # daily crypto bars: annualised volatility = per-bar volatility * sqrt(365)
@@ -530,3 +531,39 @@ def random_entry(params: Mapping, bars: pd.DataFrame, costs: Costs | None = None
     entries = (1 + slots + np.arange(n_trips) * hold).tolist()
     decisions = {e - 1: weight for e in entries} | {e + hold - 1: 0.0 for e in entries}
     return _simulate(bars, costs, lambda t, s: decisions.get(t))
+
+
+def scheduled(params: Mapping, bars: pd.DataFrame, costs: Costs | None = None) -> pd.DataFrame:
+    """Hold the target weight a schedule column names, decided at each close and filled at the next open.
+
+    params: ``col`` (required): the name of a column of ``bars`` that holds, at the close of bar t, the target
+    weight in [0, 1] to hold from the open of bar t+1. The column must be known at that close (computed point in
+    time from bars up to t, e.g. by :func:`lab.models.dips.schedule_column`); this rule only executes it.
+
+    An order is sent at close t only when the column's value differs from the last target ordered (0 before the
+    first order: the book starts flat). Holding a weight therefore holds coin units: the weight drifts with the
+    price and is never rebalanced for free (TESTING.md bug #4). A ladder of rising targets (1/3, 2/3, 1) adds to
+    one round trip; a return to 0 closes it. A change at the last close is never filled. A column value that is
+    not a finite number in [0, 1] raises ``ValueError``.
+    """
+    p = _check_params("scheduled", params, frozenset({"col"}))
+    col = _get(p, "col", _REQUIRED)
+    if not isinstance(col, str) or col not in bars.columns or col in ("open", "high", "low", "close", "volume"):
+        raise ValueError(f"col must name a schedule column of bars (not a price or volume), got {col!r}")
+    costs = _prepare(bars, costs)
+    try:
+        target = bars[col].to_numpy(dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"schedule column {col!r} must hold numbers") from exc
+    if not (np.isfinite(target).all() and (target >= 0.0).all() and (target <= 1.0).all()):
+        raise ValueError(f"schedule column {col!r} must hold finite target weights in [0, 1]")
+    targets = target.tolist()
+    last = [0.0]  # the last target ordered
+
+    def decide(t: int, s: _State) -> float | None:
+        if targets[t] == last[0]:
+            return None
+        last[0] = targets[t]
+        return targets[t]
+
+    return _simulate(bars, costs, decide)

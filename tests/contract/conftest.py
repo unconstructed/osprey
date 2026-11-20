@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -32,6 +33,21 @@ def dip_buy_with_forecast(params: dict, bars: pd.DataFrame, costs: Costs | None 
     validate_bars(bars)
     forecast = 1.2 * reference.realised_vol(bars["close"].to_numpy(dtype=float), 5)
     return reference.dip_buy({**params, "vol_col": "pred_vol"}, bars.assign(pred_vol=forecast), costs)
+
+
+def scheduled_ladder(params: dict, bars: pd.DataFrame, costs: Costs | None = None) -> pd.DataFrame:
+    """``scheduled`` on a point-in-time ladder column ``target``: at close t, the share of the last 3 bars that
+    closed down (0, 1/3, 2/3 or 1; 0 before 3 returns exist). Partial steps up and down exercise drifted weights
+    inside one round trip. The column at t reads closes t-3..t only, so tampering bars from ``cut`` on can't move
+    it before ``cut``. ``params`` pass through unchanged (``{"col": "target"}``)."""
+    validate_bars(bars)
+    close = bars["close"].to_numpy(dtype=float)
+    down = np.zeros(len(close))
+    down[1:] = close[1:] < close[:-1]
+    ladder = np.zeros(len(close))
+    for t in range(3, len(close)):
+        ladder[t] = down[t - 2 : t + 1].sum() / 3.0
+    return reference.scheduled(params, bars.assign(target=ladder), costs)
 
 
 @dataclass(frozen=True)
@@ -110,6 +126,12 @@ RUNNERS: tuple[Runner, ...] = (
         reference.constant_mix,
         {"weight": 0.6, "every": 3, "band": 0.01},
         bad_params=({"band": 1.0}, {"every": 2.5}),
+    ),
+    Runner(
+        "ref_scheduled_ladder",
+        scheduled_ladder,
+        {"col": "target"},
+        bad_params=({}, {"col": "nope"}, {"col": "close"}, {"col": "volume"}, {"col": "target", "hold": 3}),
     ),
     Runner(
         "ref_random_entry",

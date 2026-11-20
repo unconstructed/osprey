@@ -20,7 +20,15 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from lab.runner.interface import validate_result
-from lab.runner.reference import Costs, buy_and_hold, constant_mix, dip_buy, random_entry, realised_vol
+from lab.runner.reference import (
+    Costs,
+    buy_and_hold,
+    constant_mix,
+    dip_buy,
+    random_entry,
+    realised_vol,
+    scheduled,
+)
 
 ZERO = Costs.zero()
 
@@ -497,6 +505,91 @@ def test_trade_log_matches_the_portfolio_with_costs_on(btc, start, length, costs
         assert np.prod(1.0 + result.attrs["trade_returns"]) == pytest.approx(total, rel=1e-10)
 
 
+# ---------------------------------------------------------------------------------------------- scheduled
+
+
+def with_target(bars: pd.DataFrame, target) -> pd.DataFrame:
+    return bars.assign(target=np.asarray(target, dtype=float))
+
+
+def test_scheduled_fills_each_change_at_the_next_open(make_bars):
+    bars = make_bars([100.0, 100.0, 110.0, 121.0, 110.0, 99.0, 99.0])
+    result = scheduled({"col": "target"}, with_target(bars, [0, 1, 1, 1, 0, 0, 0]), ZERO)
+    validate_result(result, bars)
+    assert fill_bars(result) == [2, 5]  # decided at closes 1 and 4
+    assert sides(result) == ["buy", "sell"]
+    assert result.attrs["trades"]["price"].tolist() == [100.0, 110.0]  # the opens of bars 2 and 5
+    assert result["position"].tolist() == [0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0]
+    assert result.attrs["trade_returns"] == pytest.approx([110.0 / 100.0 - 1.0], rel=1e-12)
+
+
+def test_scheduled_holds_coin_units_between_changes(make_bars):
+    """A held target of 0.5 is bought once; afterwards the weight drifts with the price (no free rebalance)."""
+    bars = make_bars([100.0, 100.0, 200.0, 50.0, 50.0])
+    result = scheduled({"col": "target"}, with_target(bars, [0.5] * 5), ZERO)
+    assert fill_bars(result) == [1]
+    pos = result["position"].tolist()
+    assert pos[1] == pytest.approx(0.5) and pos[2] == pytest.approx(2 / 3) and pos[3] == pytest.approx(1 / 3)
+
+
+def test_scheduled_ladder_is_one_round_trip(make_bars):
+    """1/3 -> 2/3 -> 1 -> 0 adds to one round trip; each step trades from the drifted weight to its target."""
+    closes = [100.0, 100.0, 90.0, 80.0, 70.0, 77.0, 84.0]
+    bars = make_bars(closes)
+    third = 1.0 / 3.0
+    target = [third, third, 2 * third, 1.0, 1.0, 0.0, 0.0]
+    result = scheduled({"col": "target"}, with_target(bars, target), ZERO)
+    assert fill_bars(result) == [1, 3, 4, 6]
+    assert sides(result) == ["buy", "buy", "buy", "sell"]
+    assert len(result.attrs["trade_returns"]) == 1
+    # bar 3 opens at 90 (close of bar 2): the 1/3 bought at 100 has drifted to 30 / (30 + 66.67) of the book
+    drifted = third * 0.9 / (third * 0.9 + 2 * third)
+    assert result["turnover"].iloc[3] == pytest.approx(2 * third - drifted, rel=1e-12)
+    total = np.prod(1.0 + result["ret"].to_numpy())
+    assert 1.0 + result.attrs["trade_returns"][0] == pytest.approx(total, rel=1e-12)
+
+
+def test_scheduled_change_at_the_last_close_is_never_filled(make_bars):
+    bars = make_bars([100.0, 101.0, 102.0])
+    result = scheduled({"col": "target"}, with_target(bars, [0, 0, 1]), ZERO)
+    assert result.attrs["n_trades"] == 0 and (result["position"] == 0.0).all()
+
+
+def test_scheduled_equals_dip_buy_on_the_same_decisions(btc):
+    """Feed ``scheduled`` the decisions ``dip_buy`` took: the two results are identical, bar for bar."""
+    bars = btc.iloc[100:700]
+    params = {"drop": 0.05, "lookback": 5, "hold": 6}
+    ref = dip_buy(params, bars, Costs())
+    trades = ref.attrs["trades"]
+    target = np.zeros(len(bars))
+    at = {ts: i for i, ts in enumerate(bars.index)}
+    entries = [at[ts] for ts in trades.loc[trades["side"] == "buy", "ts"]]
+    exits = [at[ts] for ts in trades.loc[trades["side"] == "sell", "ts"]]
+    assert len(entries) >= 5
+    for e, x in zip(entries, exits + [len(bars)], strict=False):
+        target[e - 1 : x - 1] = 1.0
+    out = scheduled({"col": "target"}, with_target(bars, target), Costs())
+    pd.testing.assert_frame_equal(out, ref.loc[:, list(out.columns)], check_exact=True)
+    np.testing.assert_array_equal(out.attrs["trade_returns"], ref.attrs["trade_returns"])
+    assert out.attrs["n_trades"] == ref.attrs["n_trades"]
+
+
+@pytest.mark.parametrize(
+    ("column", "match"),
+    [
+        ([0.0, math.nan, 0.0, 0.0], "finite target weights"),
+        ([0.0, math.inf, 0.0, 0.0], "finite target weights"),
+        ([0.0, -0.1, 0.0, 0.0], "finite target weights"),
+        ([0.0, 1.1, 0.0, 0.0], "finite target weights"),
+        (["a", "b", "c", "d"], "must hold numbers"),
+    ],
+)
+def test_scheduled_rejects_bad_columns(make_bars, column, match):
+    bars = make_bars([100.0, 101.0, 102.0, 103.0]).assign(target=column)
+    with pytest.raises(ValueError, match=match):
+        scheduled({"col": "target"}, bars, ZERO)
+
+
 # ------------------------------------------------------------------------------------------------- errors
 
 
@@ -545,6 +638,11 @@ BAD_PARAMS = [
     (random_entry, {"n_trades": 1, "hold": 3, "seed": -1}, "seed must be >= 0"),
     (random_entry, {"n_trades": 1, "hold": 3, "weight": 0.0}, r"weight must be in \(0.0, 1.0\]"),
     (random_entry, {"n_trades": 1, "hold": 3, "trades": 2}, r"random_entry: unknown params \['trades'\]"),
+    (scheduled, {}, "missing required param 'col'"),
+    (scheduled, {"col": "target"}, "must name a schedule column"),
+    (scheduled, {"col": "close"}, "must name a schedule column"),
+    (scheduled, {"col": 3}, "must name a schedule column"),
+    (scheduled, {"col": "x", "hold": 2}, r"scheduled: unknown params \['hold'\]"),
 ]
 
 
