@@ -1,0 +1,2 @@
+{"commit": "afb73189cc196dbbce88fe3318950265f368756f", "config_hash": "a227c1677b62e796940e6117557572dd279b6ea8b74dbe0b22002c95dbf2680f", "data": "real", "dirty": false, "out_dir": "/home/user/osprey/results/hold-mix-cap", "run": 0, "script": "run.py", "snapshot_id": "1746a21b75683e76", "utc": "2026-11-21T19:32:12.128652+00:00"}
+{"data": "real", "event": "complete", "run": 0, "script": "run.py", "utc": "2026-11-21T20:31:18.149312+00:00"}
