@@ -165,7 +165,7 @@ Full catalog by area, tab and phase: [Features](features.md).
 
 *Customer risk controls*
 - Max amount per trade and per day (also enforced inside the auto-trading permission)
-- Daily/weekly loss limit that auto-pauses the customer's strategies and "hold this mix"; a pause stops trading and doesn't sell
+- Daily/weekly loss limit that auto-pauses the customer's strategies, their own rules and "hold this mix"; a pause stops trading and doesn't sell
 - One big **Pause everything** button that also revokes auto-trading
 
 *Demo mode*
