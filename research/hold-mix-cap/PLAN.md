@@ -6,7 +6,9 @@ snapshot `1746a21b75683e76` (bars content hash `08f5ca2c…`), as recorded in re
 RESULTS.md. The catalog was not opened for this plan, and no price was read.
 
 Revised the same day after a review, **still before any result** and before any code: amendments A1-A4 (section 13).
-The main change (A1): the first buy does not start the wait; the wait runs only between rebalances.
+The main change (A1): the first buy does not start the wait; the wait runs only between rebalances. After the build's
+code review, still before any run on real data: A5 (the owner's boom-year check, as an addendum) and A6 (logging and
+smaller fixes).
 
 > **SCOUTING ONLY.** Every number this study produces comes from the lab's reference portfolio engine
 > (`lab/runner/portfolio.py`, driven by the new `lab/runner/holdmix.py`), not from NautilusTrader (AGENTS.md hard
@@ -593,6 +595,9 @@ every customer, whatever band they pick, and each band the app offers counts onc
   change to the limits would still need its own run.
 - **Few independent years:** rule B's median and 90th percentile of extra_out by window start year (2017 .. 2021) and
   on the five non-overlapping Kraken windows k = 0, 12, 24, 36, 48.
+- **Without the boom years (A5; an addendum):** rules A-D recomputed with each train year left out in turn, and
+  without the best one and two years for BTC, reporting whether each headline value holds. The removals and the
+  rules are pinned in amendment A5.
 
 ## 10. What is reported (RESULTS.md, written by the lead after the run)
 
@@ -618,6 +623,9 @@ Every table is labelled SCOUTING with placeholder costs.
 - **Full runs:** every configuration over 2017-2022 (Kraken) and 2017-08-18 to 2022 (Binance), with and without the
   yearly reset: how often the reset fired, what it cost, and how it changed D_out and d̄.
 - **Descriptions** of section 9 (the other limit readings; years; the first-buy reading).
+- **Boom-year addendum** (A5), next to the headline and never in its place: for each removal (each train year, the
+  best year, the best two years), the kept windows and whether N\*_rob(b), b\*_rob per wallet size, the app default,
+  N_up,rob, the value test and CONFLICT equal the headline's (`decision.json`, `boom_check`).
 - **Fees caveat.** Every fee number, and rule A's fee condition, uses placeholder costs. It must be rechecked with
   measured Base costs before the app shows a recommended number.
 - **Falls** (amendment A3), in `falls.csv` and RESULTS.md, **by crypto share first**, then by mix:
@@ -696,7 +704,8 @@ start="2017-01-02"), snapshot_id="synthetic")` and its first 365 rows, with the 
   settings as read, the grid, the window bounds from the calendar, the thresholds, the A0 re-timing, and the snapshot
   id and bars hash from `SNAPSHOT.json`. Then one line is appended to the tracked
   `research/hold-mix-cap/RUNLOG.jsonl` (UTC time, script, run number, commit, dirty flag, config hash, snapshot id,
-  "real"). Right after the panels load, before any backtest, `start.json` gets their row counts and panel hashes.
+  "real"). Right after the panels load, before any backtest, `start.json` gets their row counts and panel hashes,
+  and then each source's BTC calendar-year returns (A5's ranking).
 - **Git-ignored results**, in `results/hold-mix-cap/run<k>/`:
   - `runs.parquet`: one row per run (916,596): run id, source, scope (rolling or full), window, first and last
     close, rows, comparator (grid or limit-only), first-buy reading (`lab` or `other`), s, f, w_btc, w_eth, b, N, W,
@@ -705,7 +714,12 @@ start="2017-01-02"), snapshot_id="synthetic")` and its first 365 rows, with the 
   - `limit_only_bands.parquet`: limit-only's band-dependent metrics, 6 rows per limit-only run (section 7);
   - `parity.parquet`: the parity checks and their outcome;
   - `failures.parquet`: the failed runs with their tracebacks;
-  - `summary.json`: the consistency checks, timings, counts, stop rules and the decision tables;
+  - `blocks/`: each (source, scope, window) block's four tables (`<block>.runs.parquet`, `.lob`, `.parity`,
+    `.failures`), written as soon as the block returns, so a stop, a crash or a killed process keeps every block
+    computed so far (stop rule 6; A6). The four tables above are written as soon as the grid ends, before any count,
+    check or decision, and `runs.parquet` again with the comparison columns;
+  - `summary.json`: the consistency checks, timings, counts, the blocks and runs logged so far, the stop rules, and a
+    pointer to `decision.json`, which holds the decision tables (A6);
   - `decision.json`: a byte-identical copy of the tracked one.
 - **Tracked** (the lead commits them after the run), in `research/hold-mix-cap/`:
   - `RUNLOG.jsonl`;
@@ -722,8 +736,8 @@ start="2017-01-02"), snapshot_id="synthetic")` and its first 365 rows, with the 
   - `falls.csv`: the falls tables of section 10, falls as positive sizes, with the same label column and the label of
     section 10 in a `note` column;
   - `decision.json`: the mechanical output of section 9 (every rule's table, the descriptions, the thresholds, the
-    counts and the dropped pairs), with a `label` field (as above) and a `status` field: "SCOUTING evidence for the
-    owner; sets no limit";
+    counts and the dropped pairs) and the boom-year addendum (`boom_check`, A5), with a `label` field (as above) and
+    a `status` field: "SCOUTING evidence for the owner; sets no limit";
   - `RESULTS.md`, written by the lead, not by `run.py`.
 - **Config hash:** SHA-256 over a JSON blob of the per-file SHA-256s (sorted by path) and the pinned values (the
   grid, the windows, the thresholds, h, the first-buy reading of the grid and of the description). The files:
@@ -831,6 +845,58 @@ start="2017-01-02"), snapshot_id="synthetic")` and its first 365 rows, with the 
   customer wording; the resume-after-pause pin and the production controls (section 15); labels inside the tracked
   files; `snapshot_id` and `commit` columns; per-configuration returns kept out of the tracked files; section 16's
   preface and its points on limits and budgets. Run count 916,596 and about 83 CPU-minutes (section 11).
+- **A5, the boom-year addendum (2026-11-21, before any result).** The owner decided on 2026-11-21
+  (`reports/director/2026-11-21-boom-check.md`, commit `652eefc`, after this plan's `1ff5ac2`) that every study is
+  also checked "with and without" the boom years. Here the check is an **addendum**: it is reported next to the
+  pre-registered result and never replaces it, and the rules of section 9 are unchanged. Found by the build's code
+  review: the note left the windowed study's choices open, and settling them after run 0 would be a forking path.
+  Pinned now, before run 0:
+  1. **The removals:** each calendar year 2017, 2018, 2019, 2020, 2021 and 2022 in turn, then the best year, then the
+     best two years. Years are bar days (close minus 1 day), as in section 6. The years are ranked by BTC's
+     close-to-close return over each calendar year, R(Y) = C_end(Y) / C_start(Y) − 1, where C_end(Y) is BTC's close
+     on Y's last bar and C_start(Y) the close on the last bar of Y − 1, or on Y's first bar when the panel has no bar
+     of Y − 1. The ranking uses **Kraken's** BTC closes for both sources (Kraken holds every train year whole; Binance's
+     2017 starts on 18 August, so its R(2017) covers 4.5 months). Largest first; a tie goes to the earlier year. Both
+     sources' R(Y) are written into `start.json` right after the panels load, before any backtest (Binance's 2017
+     from its first close, 2017-08-18). The yearly returns are public knowledge (BTC's largest yearly rises were in
+     2017 and 2020); every year is removed in turn, so no year is picked with hindsight.
+  2. **Which windows go:** window k overlaps year Y when one of its months M_k .. M_(k+11) is in Y, i.e. 12 (Y − 2017)
+     − 11 ≤ k ≤ 12 (Y − 2017) + 11, and every window that overlaps a removed year is dropped. Without 2017, Kraken and
+     Binance keep k = 12 .. 59 (48 windows each); without 2018, 37 and 36; without 2019, 2020 or 2021, 37 and 29
+     (without 2020: k ≤ 24 and k ≥ 48); without 2022, k ≤ 48 (49 and 41). Without 2017 and 2020 both keep 25. The full
+     runs are not split.
+  3. **What is recomputed** on the kept windows: rules B, A and C per source and rule D, exactly as in section 9 (the
+     same pools, settings and thresholds; `run.py`'s `decide_sources(runs, lob, windows=...)` and `holdmix.robust`).
+     Nothing is rerun or refitted: the kept windows' logged runs are reused. For each removal, `decision.json`'s
+     `boom_check` block holds rule D's output and whether N\*_rob(b) for each band, b\*_rob for each wallet size, the
+     app default, N_up,rob (the outcome in words), the value test and the CONFLICT flag equal the headline's: True,
+     False, or MISSING when either side is MISSING, and `all`. The descriptions, the per-share table and the falls are
+     not recomputed. With failed runs, rule E's block carries the same check on its kept pairs (the windows each pool
+     still holds).
+  4. **Too few windows:** a removal that leaves either source fewer than **12** windows (one year of window starts) is
+     MISSING, with no value computed. With this calendar no single year can do that (the fewest kept is Binance's 29);
+     two years can (2019 and 2021 would leave Binance 6).
+
+  Every block is labelled "ADDENDUM (owner decision 2026-11-21, PLAN.md A5) ... never in place of it" plus the
+  SCOUTING label. The owner's strategy reading ("beats its comparators only with the boom years in") does not apply
+  as such: this study recommends settings and claims no edge, so the addendum reports whether the recommendation
+  holds. Changed here: sections 9, 10 and 12. It changes the config hash (`run.py`, `holdmix.py`, this file and the
+  pinned values), before any run. Code: `holdmix.year_returns`, `best_years`, `overlaps`, `windows_without`,
+  `boom_removals`, `boom_plan` and `boom_compare`, and `run.py`'s `boom_check`. Tests: TESTING.md bug-log row #53.
+- **A6, logging and smaller fixes from the build's code review (2026-11-21, before any run on real data).** (1) **Every
+  run logged on a stop or crash** (stop rule 6 and section 12, which the first build did not meet): it kept every row
+  in memory and wrote the tables only at the end, so a stop from a block, the counts or `runs.csv`, or a crash in the
+  decisions after the hour-long grid, left only `start.json` and `summary.json`. Now each block's tables go to
+  `run<k>/blocks/` as the block returns (with 2 workers, blocks already running when another stops finish and are
+  written too; the stopping block itself is not, its stop names the run), `summary.json` counts the blocks and runs
+  logged, and the four tables are written before any count, check or decision. (2) **Rule D's label** also compares
+  the CONFLICT flag and the default under the limit between the primary and the robust values (both are headline
+  values, section 10): before, a default under the limit that moved left the label ROBUST. (3) A parity check compares
+  the engine's own outcome, so a metric that fails after the engine ran is a failed run (stop rule 4), never a failed
+  parity check (stop rule 8). (4) The stop rule 3 guard reads a loader's tz-naive index as UTC. (5) `start.json`
+  records the platform (the workers are forked, which is safe on Linux, where the real run is made); `summary.json`
+  points to `decision.json` for the decision tables. No change to the grid, the counts, the thresholds or any rule's
+  number. Tests: TESTING.md bug-log row #53.
 
 **Deviations.** Every departure from this plan, however small, goes in a Deviations table in RESULTS.md. Each row
 says what changed, why, and when relative to which result, with its effect on any number.
