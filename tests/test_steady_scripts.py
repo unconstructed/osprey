@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from test_portfolio import edit_steady_entry, set_steady_budget
 
 from lab.config import CONFIG_DIR
 from lab.data import catalog
@@ -74,11 +75,9 @@ def copy_config(dst: Path, src: Path = CONFIG_DIR) -> Path:
 
 
 def edit_risk(cfg: Path, old: str, new: str) -> None:
-    """Replace the first occurrence (the steady block) in ``cfg/risk_levels.yaml``."""
-    path = cfg / "risk_levels.yaml"
-    text = path.read_text()
-    assert old in text
-    path.write_text(text.replace(old, new, 1))
+    """Replace ``old`` (exactly once there) in the steady entry of ``cfg/risk_levels.yaml``, by key: never the
+    first occurrence in the file, which is balanced's once Steady's budget is set (#55)."""
+    edit_steady_entry(cfg, old, new)
 
 
 def train_args(out: Path, cfg: Path, *extra: str) -> list[str]:
@@ -148,9 +147,13 @@ def write_start(out: Path, k: int, data: str, fast: bool, status: str = "started
 
 @pytest.fixture(scope="module")
 def train0(tmp_path_factory):
-    """One ``run_train.py`` run 0 dry run (synthetic seed 7, fast settings, a copy of config/), clean git."""
+    """One ``run_train.py`` run 0 dry run (synthetic seed 7, fast settings, a copy of config/), clean git. Steady's
+    budget is written as TBD in the copy, as rebalance-steady's real run 0 read it: the tests on this run and on
+    its copies (``fresh``, ``frozen``) are about a run whose G6 is MISSING and the budget-only change after it, so
+    they set that state up instead of reading the real file's budget (#55)."""
     root = tmp_path_factory.mktemp("rs_scripts")
     cfg = copy_config(root / "config")
+    set_steady_budget(cfg, "TBD")
     out = root / "out"
     before = here_hashes()
     with pytest.MonkeyPatch.context() as mp:
@@ -166,7 +169,7 @@ def train0_budget(tmp_path_factory):
     MISSING) and its wiring can be checked."""
     root = tmp_path_factory.mktemp("rs_budget")
     cfg = copy_config(root / "config")
-    edit_risk(cfg, "max_drawdown_budget_pct: TBD", "max_drawdown_budget_pct: 100")
+    set_steady_budget(cfg, "100")  # by key, whatever the real file holds (#55)
     out = root / "out"
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(S, "git_state", lambda repo=S.REPO: dict(CLEAN))
@@ -409,7 +412,15 @@ def test_the_config_hash_covers_the_plan_s_files(tmp_path, monkeypatch):
 
 
 def test_compare_hashes_and_the_risk_levels_exception(tmp_path, monkeypatch):
-    cfg = copy_config(tmp_path / "config")
+    """The recorded run read Steady's budget as TBD (as rebalance-steady's run 0 did), written into every copy
+    here, so each case differs from the record in the one change it names (#55)."""
+
+    def config(name: str) -> Path:
+        cfg = copy_config(tmp_path / name)
+        set_steady_budget(cfg, "TBD")
+        return cfg
+
+    cfg = config("config")
     rec = S.file_hashes(cfg)
     rec_hash = S.config_hash(rec)
     limits = sd.steady_limits(cfg)
@@ -436,14 +447,14 @@ def test_compare_hashes_and_the_risk_levels_exception(tmp_path, monkeypatch):
             ("coins: [BTC, ETH, USDC]", "coins: [BTC, USDC]", "no longer reads"),
         )
     ):
-        cfg2 = copy_config(tmp_path / f"case{i}")
+        cfg2 = config(f"case{i}")
         edit_risk(cfg2, old, new)
         got = S.compare_hashes(rec, rec_hash, S.file_hashes(cfg2), limits, cfg2)
         assert not got["ok"] and got["differs"] == [S.RISK_FILE] and why in got["reason"]
     monkeypatch.setitem(S.PINNED, "warmup", 121)
     got = S.compare_hashes(rec, rec_hash, rec, limits, cfg)
     assert not got["ok"] and got["differs"] == ["<pinned values>"]
-    cfg3 = copy_config(tmp_path / "c3")
+    cfg3 = config("c3")
     edit_risk(cfg3, "max_drawdown_budget_pct: TBD", "max_drawdown_budget_pct: 30")
     got = S.compare_hashes(rec, rec_hash, S.file_hashes(cfg3), limits, cfg3)
     assert not got["ok"]  # risk_levels alone differs, but the pinned values changed too
@@ -655,6 +666,7 @@ def test_the_box_must_keep_the_headroom_from_the_limits_as_read(tmp_path, clean_
 
 def test_the_start_record_and_the_runlog_come_before_any_bar(tmp_path, clean_git, monkeypatch):
     cfg = copy_config(tmp_path / "config")
+    set_steady_budget(cfg, "TBD")  # the start record of a TBD budget (G6 MISSING), set up here (#55)
     out = tmp_path / "out"
     seen = {}
 

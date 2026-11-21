@@ -17,6 +17,7 @@ import hashlib
 import math
 import pickle
 import re
+import shutil
 from dataclasses import replace
 
 import numpy as np
@@ -629,6 +630,80 @@ def write_levels(path, steady: str) -> None:
 
 
 STEADY = "  coins: [BTC, ETH, USDC]\n  min_cash_pct: 20\n  max_coin_pct: 60\n  max_drawdown_budget_pct: TBD\n"
+
+
+def steady_lines(lines: list[str]) -> range:
+    """The line numbers of the ``steady:`` entry of a risk_levels.yaml split into lines: its key line up to the
+    next line that starts in the first column (the next level, or a comment there), or the end of the file."""
+    start = next(i for i, x in enumerate(lines) if x.startswith("steady:"))
+    end = next((i for i in range(start + 1, len(lines)) if lines[i][:1].strip()), len(lines))
+    return range(start, end)
+
+
+def edit_steady_entry(cfg, old: str, new: str) -> None:
+    """Replace ``old`` with ``new`` in the ``steady:`` entry of ``cfg/risk_levels.yaml`` only, where ``old`` must
+    occur exactly once. Never the first occurrence in the file: balanced and bold hold the same keys, so a copy of
+    the real file with Steady's budget set would have had balanced's ``TBD`` edited instead (#55)."""
+    path = cfg / "risk_levels.yaml"
+    lines = path.read_text().splitlines(keepends=True)
+    span = steady_lines(lines)
+    block = "".join(lines[span.start : span.stop])
+    assert block.count(old) == 1, f"{old!r} is not exactly once in the steady entry of {path}"
+    path.write_text("".join(lines[: span.start]) + block.replace(old, new) + "".join(lines[span.stop :]))
+
+
+def set_steady_budget(cfg, value: str) -> None:
+    """Write ``max_drawdown_budget_pct: <value>`` (a YAML scalar: ``TBD``, ``30``) into the ``steady:`` entry of
+    ``cfg/risk_levels.yaml``, whatever the copied file held there, so a test sets up the budget state it is about
+    instead of depending on the real file's (#55). The line's comment is dropped; nothing else changes."""
+    path = cfg / "risk_levels.yaml"
+    lines = path.read_text().splitlines(keepends=True)
+    hits = [i for i in steady_lines(lines) if lines[i].lstrip().startswith("max_drawdown_budget_pct:")]
+    assert len(hits) == 1, f"the steady entry of {path} must hold max_drawdown_budget_pct exactly once"
+    line = lines[hits[0]]
+    lines[hits[0]] = f"{line[: len(line) - len(line.lstrip())]}max_drawdown_budget_pct: {value}\n"
+    path.write_text("".join(lines))
+
+
+def test_the_real_file_sets_steady_s_budget_at_35_and_leaves_balanced_and_bold_missing():
+    """``config/risk_levels.yaml`` as committed: Steady's Monte Carlo 95th-percentile max drawdown budget is 35%
+    (owner-approved 2026-11-21, ``reports/director/2026-11-21-owner-answers-trend-steady.md`` item 1), read as the
+    fraction 0.35; balanced and bold are still TBD, so a gate that needs their budget is MISSING (None). The hash
+    is of the file's bytes."""
+    data = (CONFIG_DIR / "risk_levels.yaml").read_bytes()
+    steady = pf.risk_limits("steady")
+    assert steady["max_drawdown_budget"] == 0.35 and steady["max_drawdown_budget_pct"] == 35
+    assert steady["sha256"] == hashlib.sha256(data).hexdigest()
+    balanced = pf.risk_limits("balanced")
+    assert balanced["max_drawdown_budget"] is None and balanced["max_drawdown_budget_pct"] == "TBD"
+    assert balanced["sha256"] == steady["sha256"]
+    raw = load_yaml("risk_levels")
+    assert sorted(raw) == ["balanced", "bold", "steady"]
+    # bold's coin list is still empty, which risk_limits refuses (this runner holds BTC and ETH only), so its
+    # budget is read with risk_limits' own rule
+    assert raw["bold"]["max_drawdown_budget_pct"] == "TBD"
+    assert pf._budget(raw["bold"]["max_drawdown_budget_pct"]) is None
+
+
+def test_the_steady_entry_helpers_edit_the_steady_entry_only(tmp_path):
+    """The test helpers that edit a copied risk_levels.yaml touch the steady entry and nothing else (#55)."""
+    shutil.copy(CONFIG_DIR / "risk_levels.yaml", tmp_path / "risk_levels.yaml")
+    real = load_yaml("risk_levels", tmp_path)
+    set_steady_budget(tmp_path, "TBD")
+    got = load_yaml("risk_levels", tmp_path)
+    assert got["steady"] == {**real["steady"], "max_drawdown_budget_pct": "TBD"}
+    assert {k: v for k, v in got.items() if k != "steady"} == {k: v for k, v in real.items() if k != "steady"}
+    edit_steady_entry(tmp_path, "max_drawdown_budget_pct: TBD", "max_drawdown_budget_pct: 30")
+    assert pf.risk_limits(config_dir=tmp_path)["max_drawdown_budget"] == 0.3
+    assert load_yaml("risk_levels", tmp_path)["balanced"] == real["balanced"]
+    # the only TBD left is balanced's
+    with pytest.raises(AssertionError, match="is not exactly once in the steady entry"):
+        edit_steady_entry(tmp_path, "max_drawdown_budget_pct: TBD", "max_drawdown_budget_pct: 25")
+    assert load_yaml("risk_levels", tmp_path)["balanced"] == real["balanced"]
+    write_levels(tmp_path, STEADY)  # steady is not the last entry: the span stops at the next level
+    set_steady_budget(tmp_path, "40")
+    want = f"steady:\n{STEADY.replace('TBD', '40')}balanced:\n  coins: [BTC]\n"
+    assert (tmp_path / "risk_levels.yaml").read_text() == want
 
 
 def test_risk_limits_are_the_config_file_s_numbers_as_fractions():

@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from test_portfolio import edit_steady_entry, set_steady_budget
 
 from lab.config import CONFIG_DIR
 from lab.data import catalog
@@ -146,10 +147,9 @@ def copy_config(dst: Path) -> Path:
 
 
 def edit_steady(cfg: Path, old: str, new: str) -> None:
-    path = cfg / "risk_levels.yaml"
-    text = path.read_text()
-    assert old in text
-    path.write_text(text.replace(old, new, 1))
+    """Replace ``old`` (exactly once there) in the steady entry of ``cfg/risk_levels.yaml``, by key: never the
+    first occurrence in the file, which is balanced's once Steady's budget is set (#55)."""
+    edit_steady_entry(cfg, old, new)
 
 
 def read_json(path: Path) -> dict:
@@ -243,9 +243,12 @@ def test_the_hashed_files_are_section_12_s_and_the_config_hash_moves_with_them(t
     assert R.config_hash(moved) != base
     cfg = copy_config(tmp_path / "cfg")
     assert R.file_hashes(cfg) == hashes
+    set_steady_budget(cfg, "TBD")  # a budget-only change from TBD to 30, set up whatever the real file holds (#55)
+    tbd = R.file_hashes(cfg)
     edit_steady(cfg, "max_drawdown_budget_pct: TBD", "max_drawdown_budget_pct: 30")
     other = R.file_hashes(cfg)
-    assert [k for k in hashes if hashes[k] != other[k]] == ["config/risk_levels.yaml"]
+    assert [k for k in tbd if tbd[k] != other[k]] == ["config/risk_levels.yaml"]
+    assert [k for k in hashes if hashes[k] != tbd[k]] in ([], ["config/risk_levels.yaml"])
     pinned = R.pinned_values()
     assert pinned["thresholds"] == {
         "EXTRA_OUT_MEDIAN": 7.0,

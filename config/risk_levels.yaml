@@ -1,9 +1,9 @@
-# config/risk_levels.yaml — owned by risk-officer. Budgets are TBD from the first backtests.
+# config/risk_levels.yaml — owned by risk-officer. Steady's budget is set (owner-approved); the others are TBD.
 steady:
   coins: [BTC, ETH, USDC]
   min_cash_pct: 20
   max_coin_pct: 60
-  max_drawdown_budget_pct: TBD   # set from Monte Carlo 95th-percentile drawdown
+  max_drawdown_budget_pct: 35   # owner-approved 2026-11-21: Monte Carlo 95th-percentile max drawdown budget
 balanced:
   coins: [BTC, ETH, USDC]        # plus vetted large tokens on Base, once listed
   stop_loss_required: true
