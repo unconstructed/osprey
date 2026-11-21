@@ -1169,10 +1169,53 @@ def test_fees_per_year_use_the_calendar_span_across_a_missing_close():
     assert m["gas_usd_per_year"] == pytest.approx(year * gas * len(later), rel=1e-12)
 
 
+# TESTING.md #54: a subnormal BTC target with band 0 and W = 1 trades BTC legs of 4.9e-320 USD on bars 7, 8, 10, 13 and
+# 15 (each weight change is one or two subnormal steps), below the smallest normal double: money_metrics refuses
+SUBNORMAL = (
+    random_panel(20, 0, (0.01, 0.0), (0.0, 0.0)),
+    {
+        "w_btc": 2.6e-322,
+        "w_eth": 1.6201141011962973e-161,
+        "band": 0.0,
+        "wait_days": 1,
+        "reset_days": None,
+        "first_buy_waits": False,
+        "min_cash": None,
+        "max_coin": None,
+        "headroom": 0.0,
+    },
+    COSTS,
+)
+
+
 @given(panel=gappy_panels(), p=hold_params(), costs=st.sampled_from((*COST_MODELS[:2], Costs.zero())))
+@example(panel=SUBNORMAL[0], p=SUBNORMAL[1], costs=SUBNORMAL[2])
+# the same with BTC at 1e-307: every rebalance leg is a normal double (4.1e-307 to 2.3e-305 USD), and no refusal
+@example(panel=SUBNORMAL[0], p={**SUBNORMAL[1], "w_btc": 1e-307}, costs=SUBNORMAL[2])
 def test_money_metrics_by_brute_force(panel, p, costs):
+    """Fees, gas and falls against loop computations. V_open = usd / |weight change| (PLAN.md section 8) equals the
+    independent book's V_open (``test_portfolio.unit_book``) to 1e-12 on every rebalance leg worth at least the
+    smallest normal double, 2.2e-308 USD. Below it a leg's USD size has fewer significant bits than the 1e-12 fee
+    check needs, and money_metrics may refuse the run (#54): then the refusal must be the fee check's, a rebalance leg
+    must be that small, and the book's V_open must give fees + gas equal to the cost column (the engine paid right;
+    only the recovery fails). A refused run returns no metrics, so the rest is checked on every other draw."""
     result = hm.hold_mix(p, panel, costs)
-    m = hm.money_metrics(result, costs)
+    legs = result.attrs["fills"]
+    later = legs[legs["bar"] >= 2]
+    _, _, v_open, _, _ = unit_book(panel, target_of(p), result, costs)
+    by_bar = dict(zip(fill_bars_of(result).tolist(), v_open, strict=True))
+    book = np.array([by_bar[b] for b in later["bar"].tolist()], dtype=float)
+    recovered = (later["usd"] / (later["weight_after"] - later["weight_before"]).abs()).to_numpy()
+    normal = later["usd"].to_numpy() >= np.finfo(float).tiny
+    np.testing.assert_allclose(recovered[normal], book[normal], rtol=1e-12)
+    try:
+        m = hm.money_metrics(result, costs)
+    except hm.ConsistencyError as exc:
+        assert "customer fees + gas" in str(exc) and "differ from the cost column" in str(exc)
+        assert not normal.all()
+        paid = math.fsum(result["cost"].to_numpy()[2:].tolist())
+        assert math.fsum((later["cost"].to_numpy() / book).tolist()) == pytest.approx(paid, rel=1e-12)
+        return
     r = result["ret"].to_numpy()[1:]
     e = np.cumprod(np.concatenate(([1.0], 1.0 + r)))
     index = result.index
