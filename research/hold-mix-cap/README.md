@@ -1,0 +1,6 @@
+# hold-mix-cap (SCOUTING)
+
+A scouting study for the app's "hold this mix" tool, run on the lab's reference engine (not NautilusTrader) with placeholder costs and exchange prices. It recommends a cap on rebalances a month and a default drift band, and gives the owner evidence on whether Steady should keep a hard upper limit on rebalances a month. It claims no edge, approves nothing, and sets no limit or drawdown budget.
+It reads the train years 2017-2022 only (closes up to 2023-01-01 00:00 UTC); validate and test stay unread. Validate-window looks: 0.
+The pre-registration, written before any result, is [PLAN.md](PLAN.md). It was revised after a review on 2026-11-21, still before any result (amendments A1-A4 in its section 13). The main decision, made by the lab because the owner said "you decide": the cap is kept as a wait of at least 30/N days (rounded up) between rebalances, and the first buy is not a rebalance, so it does not start the wait.
+Every real run will be logged in `RUNLOG.jsonl`, and the results will go in `RESULTS.md`.
