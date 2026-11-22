@@ -105,6 +105,7 @@ Plan pricing assuming in-app purchase fees; treat web checkout savings as upside
 - Customers pick their own risk level (Steady, Balanced, Bold); we label strategies by level. See [Product: Strategies by risk level](product.md#strategies-by-risk-level).
 - The app doesn't recommend a level or a strategy for a specific person.
 - Risk labels are backed by measured results (worst expected drop per level), with backtests labeled hypothetical, so the labels themselves aren't misleading marketing.
+- A customer's own "hold this mix" mix is also labeled by risk. Any mix is allowed (the lab reads this as any mix the Steady limits allow), but a mix that fell more than Steady's 35% drawdown budget in the past is shown as Balanced or Bold, not Steady (owner, 2026-11-22; [Features: The risk label of a mix](features.md#the-risk-label-of-a-mix)). Unlike a strategy's label, which comes from audited Nautilus results, the number that decides a mix's label is still open, and so is the line between Balanced and Bold.
 
 ## Accepted risks
 

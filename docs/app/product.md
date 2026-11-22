@@ -77,7 +77,12 @@ Customers choose how much risk they want, and each risk level has its own strate
 | **Balanced** | Is OK with normal crypto swings | **Dip buying:** buys BTC or ETH after a set drop, with a cap on how much | A second dip strategy with different timing | BTC, ETH and a few vetted large tokens; stop-loss required |
 | **Bold** | Accepts big drops for bigger upside | **Momentum:** holds the strongest few from a vetted list of the most liquid tokens on Base; rotates weekly | Mean reversion, grid trading | Wider token list, more trades, biggest possible drops |
 
-**Steady, for now.** The lab's first rebalancing study found no edge (NO EDGE; SCOUTING, from the lab's simple in-house simulator, not NautilusTrader; see [Features: What the first Steady study taught](features.md#what-the-first-steady-study-taught)). So Steady's own tested strategy is still to be found; the plan above stands until the owner changes it. Meanwhile, Steady customers can use **"hold this mix"**, a self-directed tool like recurring buys, not one of our strategies (owner, 2026-11-20). The customer picks the crypto share, the BTC/ETH split and a drift band, and the app keeps the mix within the band (owner, 2026-11-20). The app makes no claim it beats anything and shows the mix's backtested worst fall, labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix).
+**Steady, for now.** The lab's first rebalancing study found no edge (NO EDGE; SCOUTING, from the lab's simple in-house simulator, not NautilusTrader; see [Features: What the first Steady study taught](features.md#what-the-first-steady-study-taught)). So Steady's own tested strategy is still to be found; the plan above stands until the owner changes it. Meanwhile, Steady customers can use **"hold this mix"**, a self-directed tool like recurring buys, not one of our strategies (owner, 2026-11-20). The customer picks the crypto share, the BTC/ETH split and a drift band, and the app keeps the mix within the band (owner, 2026-11-20). The app makes no claim it beats anything and shows the mix's backtested worst fall, labeled hypothetical. The owner decided three more points on 2026-11-22 ([record](../../reports/director/2026-11-22-owner-answers-hold-mix.md)):
+- **One default for every customer:** a 50% drift band with at most 1 rebalance a month. The owner is asked to confirm it, because the question's premise was not what the study found (the record's item (h)).
+- **A hard Steady limit of at most 2 rebalances in any 30 days,** for this tool only, not our Steady strategies. It never holds back a trade that fixes a Steady limit (a pause still does).
+- **A mix that fell more than 35% in the past** (Steady's drawdown budget) is shown as Balanced or Bold, not Steady.
+
+The numbers behind them are SCOUTING and are rechecked with measured Base costs before customers see them. See [Features: Hold this mix](features.md#hold-this-mix).
 
 ### How the levels work
 
@@ -152,7 +157,7 @@ Full catalog by area, tab and phase: [Features](features.md).
 
 *Trading*
 - Manual buy/sell (swaps) and recurring buys
-- "Hold this mix" (proposed for Phase 1): the customer picks a crypto and cash mix and a drift band, and the app keeps the mix within the band, on Auto-trade or Approve; labeled as their own choice, with the backtested worst fall shown and labeled hypothetical. See [Features: Hold this mix](features.md#hold-this-mix)
+- "Hold this mix" (proposed for Phase 1): the customer picks a crypto and cash mix and a drift band (no tighter than 30%, owner; 30% or 50%, the lab's reading; 50% with at most 1 rebalance a month by default, and at most 2 in any 30 days), and the app keeps the mix within the band, on Auto-trade or Approve; labeled as their own choice, with the backtested worst fall shown and labeled hypothetical; a mix that fell more than 35% in the past is shown as Balanced or Bold, not Steady (owner, 2026-11-22). See [Features: Hold this mix](features.md#hold-this-mix)
 
 *Strategies*
 - Risk levels: customer picks Steady, Balanced or Bold; strategies grouped and labeled by level; warning and confirm to go above it

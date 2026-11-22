@@ -28,8 +28,8 @@ from hypothesis import strategies as st
 
 from lab.config import CONFIG_DIR, load_yaml
 from lab.data.synthetic import synthetic_market
+from lab.runner import holdmix, reference
 from lab.runner import portfolio as pf
-from lab.runner import reference
 from lab.runner.interface import BAR_COLUMNS, RESULT_COLUMNS, WEIGHT_TOL, validate_bars, validate_result
 from lab.runner.reference import Costs
 from lab.search.objective import evaluate_params
@@ -683,6 +683,65 @@ def test_the_real_file_sets_steady_s_budget_at_35_and_leaves_balanced_and_bold_m
     # budget is read with risk_limits' own rule
     assert raw["bold"]["max_drawdown_budget_pct"] == "TBD"
     assert pf._budget(raw["bold"]["max_drawdown_budget_pct"]) is None
+
+
+HOLD_MIX_CAP_KEY = "hold_mix_max_rebalances_per_30d"
+
+
+def test_the_real_file_caps_the_hold_this_mix_tool_at_2_rebalances_in_30_days_in_steady_only():
+    """``config/risk_levels.yaml`` as committed: Steady's hard limit for the self-directed hold-this-mix tool, at
+    most 2 rebalances in any 30 days (owner-approved 2026-11-22). The app's rule engine reads it; no ``lab/`` code
+    does, and it is not a cap on our own strategies. The key is in the steady entry only, written once, and its
+    value is the integer 2 (not a bool, a float or a string)."""
+    raw = load_yaml("risk_levels")
+    assert sorted(raw) == ["balanced", "bold", "steady"]
+    value = raw["steady"][HOLD_MIX_CAP_KEY]
+    assert type(value) is int and value == 2
+    assert HOLD_MIX_CAP_KEY not in raw["balanced"] and HOLD_MIX_CAP_KEY not in raw["bold"]
+    # written once, as a key of the steady entry (a duplicate key would load as its last value without a word)
+    lines = (CONFIG_DIR / "risk_levels.yaml").read_text().splitlines()
+    hits = [i for i, x in enumerate(lines) if HOLD_MIX_CAP_KEY in x]
+    assert len(hits) == 1 and hits[0] in steady_lines(lines)
+    assert lines[hits[0]].strip() == f"{HOLD_MIX_CAP_KEY}: 2"
+
+
+def test_the_hold_this_mix_cap_is_a_15_day_wait_in_the_engine():
+    """The cap of 2 a month is enforced as at least 15 days between trades back to the mix: ``holdmix.wait_days``
+    gives 15 for the file's value, and ``check_path``'s count, ceil(30 / W), allows 2 such trades in any
+    30-day stretch [ts, ts + 30 days). Limit fixes are outside that count (the wait never holds them back), but
+    they restart the wait, as in the engine."""
+    value = load_yaml("risk_levels")["steady"][HOLD_MIX_CAP_KEY]
+    assert holdmix.wait_days(2) == 15
+    assert holdmix.wait_days(value) == 15
+    assert holdmix.MONTH_DAYS == 30 and math.ceil(holdmix.MONTH_DAYS / holdmix.wait_days(value)) == 2
+
+
+def test_the_hold_this_mix_cap_leaves_steady_s_risk_limits_unchanged(tmp_path):
+    """``risk_limits("steady")`` returns what it returned before the key was added: the same keys (no key for the
+    cap) and the file's own values. Only ``sha256`` moves: the file without the key's line gives the same dict but
+    for its hash and path. The values are read from the file, not typed here, so an owner-approved change to
+    Steady's other limits does not fail this test (#55); the real file's budget is pinned by
+    ``test_the_real_file_sets_steady_s_budget_at_35_and_leaves_balanced_and_bold_missing``."""
+    raw = load_yaml("risk_levels")["steady"]
+    lim = pf.risk_limits("steady")
+    assert lim == {
+        "level": "steady",
+        "path": str(CONFIG_DIR / "risk_levels.yaml"),
+        "sha256": hashlib.sha256((CONFIG_DIR / "risk_levels.yaml").read_bytes()).hexdigest(),
+        "coins": tuple(raw["coins"]),
+        "min_cash": raw["min_cash_pct"] / 100.0,
+        "max_coin": raw["max_coin_pct"] / 100.0,
+        "max_drawdown_budget": pf._budget(raw["max_drawdown_budget_pct"]),
+        "max_drawdown_budget_pct": raw["max_drawdown_budget_pct"],
+    }
+    shutil.copy(CONFIG_DIR / "risk_levels.yaml", tmp_path / "risk_levels.yaml")
+    edit_steady_entry(tmp_path, f"  {HOLD_MIX_CAP_KEY}: {raw[HOLD_MIX_CAP_KEY]}\n", "")
+    without = pf.risk_limits("steady", tmp_path)
+    assert HOLD_MIX_CAP_KEY not in load_yaml("risk_levels", tmp_path)["steady"]
+    assert without["sha256"] != lim["sha256"]
+    for key in ("sha256", "path"):
+        del without[key], lim[key]
+    assert without == lim
 
 
 def test_the_steady_entry_helpers_edit_the_steady_entry_only(tmp_path):
