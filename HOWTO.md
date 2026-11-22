@@ -413,7 +413,7 @@ A strategy is ready for paper when `backtest-auditor` reports PASS on all of the
 | Regimes | No single regime (bull, bear, sideways) produces most of the profit | `regime_max_profit_share` |
 | Final test window, run once | Sharpe within a reasonable distance of walk-forward; no new failure modes | `final_test` |
 
-The drawdown budgets in `config/risk_levels.yaml` are still TBD. `risk-officer` sets them from the Monte Carlo 95th-percentile drawdown, after asking the owner (hard rule 10).
+Steady's drawdown budget in `config/risk_levels.yaml` is 35% (owner-approved 2026-11-21); Balanced's and Bold's are still TBD. The budget is a limit on the Monte Carlo 95th-percentile max drawdown, and `risk-officer` writes a budget only after the owner approves it (hard rule 10).
 
 ### Steps
 
