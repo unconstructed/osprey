@@ -1,9 +1,13 @@
-# Owner answers on "hold this mix": one default, Steady's trade limit, risk labels (2026-11-22, in chat)
+# Owner answers on "hold this mix": a default by wallet size, Steady's trade limit, risk labels (2026-11-22, in chat)
 
 Asked with AskUserQuestion on 2026-11-22, after hold-mix-cap run 0, its audit and its risk review
 (`research/hold-mix-cap/`: RESULTS.md, AUDIT.md, RISK.md and `decision.json`). Questions 1 to 3 are RISK.md section 7's
 owner decisions (1) and (2) and RESULTS.md's open questions 1 to 3 for the owner. Question 4 asks whether the new limit
 also applies to our own Steady strategies. Recorded by `director`.
+
+Later the same day the owner was asked Q1 again, in chat, because this record's review found that the first question's
+premise was wrong (item (h)). That second answer, "Tighter for small wallets" (item 5 below), supersedes the first,
+"Same for everyone". Both are kept exactly as given.
 
 Every hold-mix-cap number here is **SCOUTING**: it comes from the lab's reference engine, not NautilusTrader, with
 placeholder costs and exchange prices standing in for Base prices. It is in-sample, from the 2017-2022 train years
@@ -23,8 +27,8 @@ only. Every fall is hypothetical (a simulation on past prices). The study approv
    cap 4 for 500 and 5,000 USD wallets held at both cost levels and on both sources, and in 8 and 7 of the 8 boom-year
    checks (RESULTS.md, headline and boom-year addendum, the b\*(500) and b\*(5000) columns). Under Q2's limit the real
    alternative would have been 0.30 with cap 2 for wallets up to 5,000 USD, which was not asked. The answer is
-   recorded as given; the owner is asked to confirm it or answer again (item (h) below). The owner may well keep one
-   default for simplicity.
+   recorded as given. *Superseded:* the owner was asked again the same day, with that alternative, and answered
+   "Tighter for small wallets" (item 5 below; item (h)).
 2. **Q2:** "Should Steady have a hard limit of at most 2 trades back to the mix in any 30 days? Customers can still
    choose fewer. Trades that fix a Steady limit breach (for example, too much in one coin) always go through. This
    means Steady can't offer settings tighter than 30% off target."
@@ -44,16 +48,48 @@ only. Every fall is hypothetical (a simulation on past prices). The study approv
    **Answer:** "Only the hold-this-mix tool (Recommended)" (option text: "Our strategies have to pass the lab's checks
    with costs on, so too much trading already shows up as a failure. The trend test still reports how often it
    trades.")
+5. **Q1, asked again** (2026-11-22, in chat, after the first answer to Q1, the answers to Q2-Q4 and this record's
+   review, item (h)): "Correction: I described the hold-this-mix default question wrongly. The single default (trade
+   back when a coin is 50% off target, max 1 trade a month) is the one that depends on the made-up fees. It's set by
+   big $50,000 wallets. For wallets up to $5,000 the tests pointed to a tighter setting, and that result held up
+   well. With your 2-trades-a-month limit, the tighter option for small wallets is 30% off target, max 2 a month.
+   Which do you want? Either one gets rechecked with real fees before customers see it."
+   Options: "Keep one default for all (Recommended)" (option text: "50% off target, max 1 a month for everyone.
+   Simplest to explain. Customers can still pick 30% / 2 a month themselves.") and "Tighter for small wallets"
+   (option text: "Up to $5,000: 30% off target, max 2 a month. Above that: 50%, max 1. The app picks the default by
+   wallet size.").
+   **Answer:** "Tighter for small wallets". It supersedes the first answer to Q1.
+   *Note (the lab's; not the owner's words):* "that result held up well" describes 0.20 with cap 4, the study's
+   per-size default for 500 and 5,000 USD wallets without a limit (it held at both cost levels, on both sources and in
+   8 and 7 of the 8 boom-year checks; the note under Q1). Q2's limit rules that band out. 0.30 with cap 2 is the
+   study's "default under the limit" on its primary values (Kraken, 1x: "0.30 with cap 2, at every wallet size";
+   RESULTS.md, headline; `decision.json`, `robust.primary_check.under_limit`), not its headline. For 500 and 5,000 USD
+   wallets RESULTS.md reads it as "acceptable at both sizes on both sources and both cost levels (read from the rule
+   A table below; not a pre-registered output)". The study simulated wallets of 500, 5,000 and 50,000 USD only, so
+   the 5,000 USD line is the owner's choice, and sizes between 5,000 and 50,000 USD were not simulated. The
+   recommended option was "Keep one default for all"; the owner chose the other one.
 
 ## What the answers mean, as the lab reads them
 
 These are the lab's readings of the answers, not the owner's words.
 
-1. **One default for every customer** (Q1): drift band 0.50 (trade back when BTC or ETH is more than 50% off its
-   target) with a cap of 1 rebalance a month, that is at least 30 days between trades back to the mix. A Steady limit
-   hit can add trades. There is no default per wallet size. The default is labelled NOT ROBUST: it depends on the
-   placeholder fees of 50,000 USD wallets and on which boom years are in. So it must be rechecked with measured Base
-   costs before customers see a number.
+1. **A default by wallet size** (Q1, asked again: "Tighter for small wallets"; it supersedes the first answer, "Same
+   for everyone"). The app picks the default from the wallet's size:
+   - **Wallets up to 5,000 USD:** drift band 0.30 (trade back when BTC or ETH is more than 30% off its target) with a
+     cap of 2 rebalances in any 30 days, that is at least 15 days between trades back to the mix.
+   - **Wallets above 5,000 USD:** drift band 0.50 (more than 50% off its target) with a cap of 1 rebalance in any 30
+     days, that is at least 30 days between trades back to the mix.
+   - **Both are defaults, not limits.** The customer can still pick either band, and any cap up to the limit of 2,
+     fewer too (reading 2). The bands offered (0.30 and 0.50) and the limit are unchanged. A Steady limit hit can add
+     trades, and limit fixes always go through.
+   - **The line.** "Up to 5,000 USD" includes 5,000 USD (the owner's "Up to $5,000"). The study simulated wallets of
+     500, 5,000 and 50,000 USD only, so the 5,000 USD line is the owner's choice, and sizes between 5,000 and 50,000
+     USD were not simulated. What happens when a wallet crosses the line is item (i).
+   - **Neither default is settled.** The 0.50 default is labelled NOT ROBUST: it depends on the placeholder fees of
+     50,000 USD wallets and on which boom years are in. 0.30 with cap 2 is the study's "default under the limit" on
+     its primary values (Kraken, 1x), not its headline, and RESULTS.md reads it for 500 and 5,000 USD wallets from the
+     rule A table, "not a pre-registered output". Both must be rechecked with measured Base costs before customers see
+     a number.
 2. **A hard Steady limit for the hold-this-mix tool only** (Q2 and Q4): at most 2 rebalances in any 30 days, enforced
    as at least 15 days between trades back to the mix, counting band and reset trades.
    - **Limit fixes are exempt.** A limit fix is a trade that brings the wallet back inside a Steady limit (cash under
@@ -78,24 +114,41 @@ These are the lab's readings of the answers, not the owner's words.
    raises are listed below.
 5. Nothing here approves a strategy, sets Balanced's or Bold's budget, or changes the lab's gates.
 
-**The answers fit together.** The default needs 1 rebalance a month, under the limit of 2: N\*_rob(0.50) = 1 ≤ 2, so
-rule D's CONFLICT is "no" (RESULTS.md, headline). Under the limit, a per-size default for wallets up to 5,000 USD would
-have been 0.30 with cap 2 instead of 0.20 with cap 4. Q1's answer sets that aside unless the owner answers it again
-(item (h)).
+**The answers fit together.** Both defaults fit under the limit of 2: N\*_rob(0.30) = 2 and N\*_rob(0.50) = 1
+(RESULTS.md, the recommended cap for each band). For the single 0.50 default, rule D's CONFLICT is "no" (RESULTS.md,
+headline). Without the limit, the study's per-size default for 500 and 5,000 USD wallets was 0.20 with cap 4; the limit
+holds that band back, and under it "those sizes would get 0.30 with cap 2" (RESULTS.md, "Why NOT ROBUST"). The
+re-asked Q1 takes that option.
 
-The default moved in 6 of the 8 boom-year checks (AUDIT.md):
-- to 0.30 in 5 of them (with cap 2, or cap 1 without the best two years), a band the tool still offers;
-- to "no band met the conditions" for 50,000 USD wallets in 1 (without 2019).
+How the two defaults fared in the boom-year checks (RESULTS.md, boom-year addendum):
+- **0.50, cap 1 (now above 5,000 USD)** moved in 6 of the 8 (AUDIT.md):
+  - to 0.30 in 5 of them (with cap 2, or cap 1 without the best two years), a band the tool still offers;
+  - to "no band met the conditions" for 50,000 USD wallets in 1 (without 2019).
+- **0.30, cap 2 (now up to 5,000 USD).** The addendum reports no per-size default under the limit except where
+  CONFLICT was "yes": without 2019 it was 0.3 for both 500 and 5,000 USD. In all 8 removals b\*_rob stayed 0.20 at
+  500 USD, and at 5,000 USD in 7 (0.30 without 2019). The lab's reading of that table: b\* is the narrowest acceptable
+  band with every wider band acceptable too, so the 30% band stayed acceptable at both sizes in all 8. Its
+  recommended cap N\*_rob(0.30) stayed 2 in 7 of the 8, and was 1 without BTC's best two years (2017 and 2020).
 
 ## The evidence behind each answer (SCOUTING)
 
-**Q1, one default.** The headline default is band 0.50 with cap 1 (`decision.json`, `robust.headline`).
-- **Why it is NOT ROBUST.** It is 0.50 because at doubled costs a 50,000 USD wallet pays more than the 0.25% a year
-  limit at narrower bands. On Kraken that is 0.338% at 0.20 (cap 4) and 0.273% at 0.30 (cap 2); only 0.50 passes, at
-  0.189%. On Kraken at normal costs alone, the default would be 0.20 with cap 4.
-- **The per-size default the owner turned down.** 0.20 with cap 4 for wallets up to 5,000 USD. It keeps coins about
-  twice as close to target (typically 9% of the target away, not 20%). It costs 5 times the rebalances and about
-  twice the fees: 0.11% against 0.06% of the wallet a year at 5,000 USD. Every fee here is a placeholder.
+**Q1, the default by wallet size** (first asked as one default for everyone; the evidence for both answers).
+- **Above 5,000 USD: 0.50 with cap 1,** the study's headline default (`decision.json`, `robust.headline`).
+  - **Why it is NOT ROBUST.** It is 0.50 because at doubled costs a 50,000 USD wallet pays more than the 0.25% a year
+    limit at narrower bands. On Kraken that is 0.338% at 0.20 (cap 4) and 0.273% at 0.30 (cap 2); only 0.50 passes,
+    at 0.189%. On Kraken at normal costs alone, the default would be 0.20 with cap 4.
+- **Up to 5,000 USD: 0.30 with cap 2.** On the primary values (Kraken, 1x) it is the default under the limit at every
+  wallet size (`decision.json`, `robust.primary_check.under_limit`: 0.3, cap 2, at 500, 5,000 and 50,000 USD).
+  - **Rule A at 0.30 with cap 2** (medians: at most 1.0 rebalance per 30 days, customer fees at most 0.25% of the
+    wallet a year): 0.412 rebalances per 30 days on Kraken, 0.411 on Binance. Fees at 1x and 2x: Kraken 0.073% and
+    0.146% at 500 USD, 0.087% and 0.173% at 5,000 USD; Binance 0.066% and 0.132%, 0.078% and 0.157%. At 50,000 USD
+    and 2x it fails on Kraken (0.273%) and passes on Binance at 0.249%, just under the limit (RESULTS.md, rule A
+    tables).
+  - **Against 0.50 with cap 1** (5,000 USD, Kraken, 1x): coins typically 13% of their target away instead of 20%, for
+    0.41 against 0.165 rebalances a month, and 0.087% against 0.058% of the wallet a year in fees.
+  - **Against 0.20 with cap 4,** the per-size default without the limit, which the limit rules out: 13% instead of
+    9%, for half the rebalances (0.41 against 0.82 a month) and lower fees (0.087% against 0.110% a year).
+  - Every fee here is a placeholder.
 
 **Q2, the limit of 2.** Rule C: EVIDENCE FOR A LIMIT AT 2, value test SUPPORTED. That held on both sources, at both
 cost levels, at every wallet size, under both other readings of the 60% limit, and in all 8 boom-year checks.
@@ -108,9 +161,15 @@ cost levels, at every wallet size, under both other readings of the 60% limit, a
 - **Where 2 is fragile.** Measured by days outside the customer's own band instead of distance from target, the same
   rule gives 4. Band by band it gives 0.5 to 4.
 
-**Q3, the risk label** (falls at a 5,000 USD wallet, 1x costs; RISK.md section 3 and RESULTS.md, "Falls").
+**Q3, the risk label** (falls at a 5,000 USD wallet, 1x costs; RISK.md section 3 and RESULTS.md, "Falls"). "The
+default" here is band 0.50 with cap 1: the single default when Q3 was asked, and since the re-asked Q1 the default for
+wallets above 5,000 USD.
 - **Only 2 of the 27 mixes stayed within a 35% fall at every band, cap and window, on both sources:** 20% crypto, with
   75% or all of the crypto in BTC.
+- **At 0.30 with cap 2,** the default for wallets up to 5,000 USD since the re-asked Q1, the study tables no falls per
+  mix, so only those 2 mixes are known to stay within 35% there. Over all mixes, its deepest 12-month fall was 78.1%
+  on Kraken and 77.2% on Binance, against 75.6% and 75.8% at 0.50 with cap 1 (RESULTS.md, "Falls of each recommended
+  setting and its comparators").
 - **At 20% crypto, 4 of the 5 mixes stayed within 35% at the default band and cap.** ETH only did not: it fell 35.3%
   on Kraken.
 - **Every mix with 30% crypto or more fell more than 35% in some 12-month window**, even at the default. Some sit just
@@ -161,10 +220,21 @@ study is still being designed.
   - `technical.md` (Strategy settings), `README.md`, `product.md` and `business.md`.
   The scouting caveats stay: every number comes from 2017-2022 in-sample runs on placeholder costs, and is rechecked
   with measured Base costs before customers see it.
+  - **The re-asked Q1** (item 5) replaces "one default for every customer" with the default by wallet size in
+    `features.md` (the decisions at the top of "Hold this mix", "A few trades a month", "The defaults, by wallet size",
+    the band table, "Where it is fragile", "How the owner decided", the limit-fix and falls paragraphs, "What the app
+    shows next to it", "Steady's trade limit for this tool", "The risk label of a mix" (which default its numbers are
+    at), the catalog row, the "Hold a mix of your own" flow and the open questions), `technical.md` (Strategy
+    settings), `README.md` and `product.md` (the "Steady, for now" decisions and the Features list's "Hold this mix"
+    bullet). `business.md` never stated the default and is unchanged. Item (i) is listed as an open question in
+    `features.md`, `technical.md` and `README.md`.
   - `features.md` also closes two questions of 2026-11-21: whether Steady's "at most 60%" is per coin, and whether it
     applies to cash. Both rest on the 2026-11-21 record's answer 4 ("Steady's 'max 60%' applies per coin, not to
     cash", `2026-11-21-owner-answers-trend-steady.md`). "Not the two together" stays `risk-officer`'s reading (RISK.md
     section 1).
+- **The re-asked Q1 changes nothing else.** The defaults are settings the app fills in and the customer can change,
+  not Steady limits, so nothing is written to `config/risk_levels.yaml` and no test changes; the limit of 2 and the
+  bands offered are unchanged.
 - **Not changed:**
   - `research/hold-mix-cap/`. RESULTS.md, AUDIT.md and RISK.md are audited records and stay as written; their open
     owner questions are answered here, not there.
@@ -176,19 +246,23 @@ study is still being designed.
   the checks are unchanged.
 - **It sets no budget for Balanced or Bold.** Both stay TBD in `config/risk_levels.yaml`.
 - **The limit does not bound limit fixes.** Mixes near the limits will still trade more than twice in 30 days at
-  times: 78% crypto, or one coin's target at 45% or more (RISK.md section 2). At 78% crypto, at the default band and
-  cap, that was up to 7 rebalances in 30 days (Kraken).
+  times: 78% crypto, or one coin's target at 45% or more (RISK.md section 2). At 78% crypto that was up to 7
+  rebalances in 30 days at either default, 0.50 with cap 1 or 0.30 with cap 2 (RISK.md section 2, by mix).
 - **The limit does not reduce the falls.** Only the crypto share does that.
 - **It does not cap our own Steady strategies** (Q4).
-- **It does not make the default robust.** The default stays NOT ROBUST until it is rechecked with measured Base costs,
-  and on NautilusTrader once the lab's runner exists (AGENTS.md hard rule 3).
+- **It makes neither default robust.** The 0.50 default stays NOT ROBUST, and the 0.30 default for wallets up to 5,000
+  USD rests on a reading of the study's tables, not a pre-registered output. Both wait for a recheck with measured
+  Base costs, and on NautilusTrader once the lab's runner exists (AGENTS.md hard rule 3).
+- **It does not simulate the line.** Wallets between 5,000 and 50,000 USD were not simulated; the 5,000 USD line is the
+  owner's choice.
 - **The label approves no mix and tests none.** It changes neither the Steady limits nor which mixes can be picked.
 - **No number is ready for customers yet.** The worst fall the app shows will come from Nautilus backtests with
   measured costs, over years agreed with `backtest-auditor` (RESULTS.md, known weaknesses).
 
 ## Still open, and who decides
 
-None of these is decided here. Where a proposal is obvious, it is marked as a proposal.
+None of these is decided here, except (h), which the re-asked Q1 resolved. Where a proposal is obvious, it is marked
+as a proposal.
 
 - **(a) Which number decides the label.**
   - *The problem:* the study's falls are in-sample, scouting and on placeholder costs. Steady's budget is defined as
@@ -232,13 +306,23 @@ None of these is decided here. Where a proposal is obvious, it is marked as a pr
   (`docs/app/features.md`, "Customers choose, we label")?
   - *Who decides:* the owner.
   - *Proposal:* yes, the same warning and confirm.
-- **(h) Raised in review: Q1's premise.** The owner answered Q1 on a premise the study does not support (the note
-  under Q1): the single 0.50 default is the one that rests on placeholder fees, while 0.20 with cap 4 for wallets up
-  to 5,000 USD held across sources, cost levels and most boom-year checks.
-  - *Who decides:* the owner: confirm "Same for everyone", or answer again.
-  - *Background:* under Q2's limit the per-size alternative would be 0.30 with cap 2 for wallets up to 5,000 USD
-    (RESULTS.md, "Why NOT ROBUST"). Until the owner answers, the docs keep one default for every customer, as
-    answered.
+- **(h) Raised in review: Q1's premise. Resolved (2026-11-22) by the re-asked Q1** (item 5 of the questions). The
+  owner answered Q1 on a premise the study does not support (the note under Q1): the single 0.50 default is the one
+  that rests on placeholder fees, while 0.20 with cap 4 for wallets up to 5,000 USD held across sources, cost levels
+  and most boom-year checks.
+  - *Who decided:* the owner, asked again with the per-size alternative under Q2's limit, 0.30 with cap 2 for wallets
+    up to 5,000 USD (RESULTS.md, "Why NOT ROBUST").
+  - *Answer:* "Tighter for small wallets": 0.30 with cap 2 up to 5,000 USD, 0.50 with cap 1 above. It supersedes "Same
+    for everyone", and the docs now state the default by wallet size (reading 1).
+- **(i) Raised by the re-asked Q1: what happens when a wallet crosses 5,000 USD.** Does its default change, or does the
+  line apply only when the tool is set up?
+  - *Who decides:* the owner.
+  - *Proposal:* the default is set when the customer sets up the tool and is never changed by the app afterwards; the
+    customer can change it. A wallet that grows past 5,000 USD, or falls under it, keeps the band and cap it has, so the
+    app never changes how often a customer's wallet trades without the customer.
+  - *Background:* the study simulated wallets of 500, 5,000 and 50,000 USD only, and each window started fresh at its
+    wallet size (RESULTS.md, known weaknesses: "Every window starts fresh"), so it says nothing about a wallet that
+    moves across the line.
 
 **Unchanged and still open:**
 - the auto-trading permission's amount caps, which must allow a full trade back to the mix (RESULTS.md open question 5;
