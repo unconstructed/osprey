@@ -2,19 +2,23 @@
 
 **Status: pre-registration, written 2026-11-22 by `quant-researcher` before any trend-steady result exists;
 reviewed the same day by `backtest-auditor` and `risk-officer`, and revised for every blocking finding of that review
-(amendments M9-M18) and the suggestions taken (M19-M22); committed as the pre-registration, before any result. Not
+(amendments M9-M18) and the suggestions taken (M19-M22); committed as the pre-registration, before any result
+(`16d2363`); [M23] then amendments M23-M25 (2026-11-22, before A0), the records the next step 4 below asks for. Not
 frozen: FROZEN.json is written only before an earned validate look (section 13).** [M22] This file is the draft of
 2026-11-21, kept byte for byte next to it as
 [PLAN_DRAFT_2026-11-21.md](PLAN_DRAFT_2026-11-21.md) (SHA-256
 `95b84fba8c3863cd534c96140ef52260eb950a11daa4062c9d5a03d415f23045`, last written 2026-11-21 16:11 UTC), plus the
-named amendments **M1-M8 of 2026-11-22** and **[M22]** the review amendments **M9-M22 of 2026-11-22**. Their table
-is in section 15. Every place they change is marked **[Mk]**,
+named amendments **M1-M8 of 2026-11-22** and **[M22]** the review amendments **M9-M22 of 2026-11-22**, and **[M23]**
+the pre-A0 records **M23-M25 of 2026-11-22**. Their table is in section 15. Every place they change is marked **[Mk]**,
 and `diff PLAN_DRAFT_2026-11-21.md PLAN.md` shows every changed line. Struck text (~~like this~~) is the draft's,
 kept for the record; it does not apply. Repo HEAD at writing `d5b34bc` (branch `claude/tender-brown-g86h44`);
 `52d7ee1` (2026-11-22 15:09 UTC: `docs/app/` and the 2026-11-22 owner record only, not read) landed while it was
 written, and `config/risk_levels.yaml` is the same in both. **[M22]** The review amendments were written on HEAD
 `52d7ee1`, the parent of the commit that freezes this plan. No trend-steady code exists, no catalog bar was read for
-this plan, and no trend rule has been run on market data.
+this plan, and no trend rule has been run on market data. **[M23]** M23-M25 were written on HEAD `16d2363`, the
+pre-registration commit, while the section 17 build (`lab/runner/trend.py` and its tests, not committed) was in
+progress in the same tree. Still no catalog bar has been read and no trend rule has been run on market data, and A0
+has not started.
 
 The draft's own status (2026-11-21, unchanged in substance): assembled in a scratch folder from four independent plan
 sketches (appendix A), before any trend-following result existed, and audited the same day by an independent
@@ -51,11 +55,16 @@ session scratchpad). Repo HEAD at drafting `652eefc`.
    construction too: with three regimes, "no regime above half the total excess" means no regime's excess below
    zero; a long-or-cash rule usually trails the held mix in bull months, and where it does not, its bear months
    usually hold more than half the excess (section 1, section 10).
-   **Question 6 (section 19), dated 2026-11-22. Owner's answer: none recorded at this commit.** Until the owner
-   answers in writing, G8-excess stands as pinned and is expected to fail. The owner either keeps G8-excess as pinned,
+   **Question 6 (section 19), dated 2026-11-22. Owner's answer: ~~none recorded at this commit~~ [M23] "Keep it as
+   is (Recommended)"** (2026-11-22, about 17:40 UTC, in chat; `2026-11-22-owner-answer-trend-q6.md`; section 19 has
+   the question as asked and how it differed from Q6's text). So G8-excess stays as pinned. Nothing about G8 changes:
+   not G8-excess, its threshold, the other gates or the verdict rules. It is still expected to fail, so the expected
+   best reachable headline stays "EDGE, NOT A CANDIDATE". ~~Until the owner
+   answers in writing, G8-excess stands as pinned and is expected to fail.~~ The owner either keeps G8-excess as pinned,
    or states another rule in his own words; this study proposes none. An answer counts only if it is recorded with its
    date, as a named amendment that cites this finding, committed before any trend-steady result of any kind
-   (amendment A0's synthetic controls included). After that, nothing about G8 changes.
+   (amendment A0's synthetic controls included). After that, nothing about G8 changes. **[M23]** M23 is that
+   amendment, and it cites this finding (M10). It counts once the commit that adds it lands, before A0.
 3. **Sells to cash during a pause** (same record): "Sells to cash go through during a loss-limit pause or while
    waiting for approval (a pause still stops all buying). A product decision for the app docs; the study does not
    model pauses." [M3]
@@ -82,9 +91,11 @@ session scratchpad). Repo HEAD at drafting `652eefc`.
 The owner questions of section 19 therefore stand as follows: Q1 answered (35%, Branch R); Q2 answered "yes" (100%
 USDC); Q3 not asked, so the default (weekly Monday checks) holds, logged here; Q4 answered (sells to cash go
 through); Q5 answered (G8-excess). Q1 and Q5 were answered in writing before this plan's commit, so they count.
-**[M9, M10]** Two new questions are open, put in writing in section 19 on 2026-11-22: **Q6** (G8-excess is expected
-to fail by construction: keep it, or state another rule; no answer at this commit, so G8-excess stands) and **Q7**
-(may a customer's own per-trade or per-day cap block a sell to USDC; a product question that changes no number here).
+**[M9, M10]** Two new questions ~~are open,~~ **[M23]** were put in writing in section 19 on 2026-11-22: **Q6**
+(G8-excess is expected to fail by construction: keep it, or state another rule; ~~no answer at this commit, so
+G8-excess stands~~ **[M23]** answered on 2026-11-22, before A0: keep it as pinned) and **Q7** (may a customer's own
+per-trade or per-day cap block a sell to USDC; a product question that changes no number here; **[M23]** still open,
+and a late answer is fine).
 
 Next steps [M8]:
 1. `backtest-auditor` and `risk-officer` review this plan. Any change they ask for is another named amendment
@@ -98,7 +109,10 @@ Next steps [M8]:
 4. **[M22] Open before A0 starts** (each recorded as a dated named amendment, or A0 and run 0 wait): the owner's
    written answer to Q6, if he gives one (none means G8-excess stands); `risk-officer`'s dated written confirmation of
    the allowed values {0.30, 0.40, 0.50, 0.60} (section 8); and what the `risk-officer` review read (section 20,
-   stop rule 16).
+   stop rule 16). **[M23] All three recorded on 2026-11-22, before A0:** M23, the owner's answer to Q6 (keep
+   G8-excess as pinned; section 19); M24, `risk-officer`'s confirmation of the four values, changing none (section
+   8); M25, the `risk-officer` review's reading (section 20). They count once the commit that adds them lands, and
+   that commit comes before A0.
 
 > **SCOUTING ONLY.** Every number this study produces comes from the lab's reference portfolio engine
 > (`lab/runner/portfolio.py`, driven by a new `lab/runner/trend.py`), not from NautilusTrader (AGENTS.md hard rule
@@ -627,9 +641,29 @@ never be cut down to fixed settings.
   - **[M22]** AGENTS.md has `risk-officer` set the allowed values in the pre-registration. On record at this commit:
     the values were written into the draft's section 8 from its limits sketch (2026-11-21, by 16:11 UTC) and approved
     by the owner (16:31 UTC, decision 1); the 2026-11-22 review re-ran their feasibility against the file as it reads
-    now (`trendrun/riskreview/feas_check.py` in the session scratchpad: all 24 target sets pass). A dated written
-    confirmation by `risk-officer` is not yet in the record. It is recorded as a named amendment before A0 starts, or
+    now (`trendrun/riskreview/feas_check.py` in the session scratchpad: all 24 target sets pass). ~~A dated written
+    confirmation by `risk-officer` is not yet in the record.~~ **[M24]** A dated written confirmation by
+    `risk-officer` is in the next bullet (2026-11-22). It is recorded as a named amendment before A0 starts, or
     A0 and run 0 wait; it can confirm the four values only, never change them (they are fixed before any result).
+  - **[M24] `risk-officer`'s confirmation, 2026-11-22.** I confirm the allowed values of the crypto share, s ∈ {0.30,
+    0.40, 0.50, 0.60}, exactly as pre-registered in this section and approved by the owner on 2026-11-21 (decision 1).
+    I change none of them. I checked them against `config/risk_levels.yaml` as it reads on 2026-11-22, SHA-256
+    `d3f58253dfc2dbbe0ca5e54a4fa12489ab0e08827ecbc309e8ab2b7cc028723e` (the hash this plan quotes), read through
+    `portfolio.risk_limits("steady")`: the coins are exactly BTC, ETH and USDC; `min_cash_pct` is 20 (0.20);
+    `max_coin_pct` is 60 (0.60), applied to each coin and not to USDC (owner decision 4, 2026-11-21); and
+    `max_drawdown_budget_pct` is 35 (0.35, owner-approved 2026-11-21). The four values lie inside the search box
+    `Param("crypto_share", "float", 0.30, 0.60)` (section 5) and include both of its ends. I ran
+    `portfolio.check_targets` with these limits and headroom h = 0.02 on each value in each of the 4 trend states:
+    both up (s/2, s/2), BTC only (s/2, 0), ETH only (0, s/2) and both down (all USDC). It accepts all 16 target sets
+    and refuses none. The tightest set is s = 0.60 with both coins up (each coin 0.30, cash 0.40). That set is 0.18
+    above the cash floor with headroom (0.22) and 0.28 below the per-coin ceiling with headroom (0.58). Two control
+    targets outside the limits, (0.40, 0.40) and (0.59, 0), are refused. The check read no price and no result, so it
+    adds no look at the data. Script: `trendrun/prea0/riskconfirm/confirm_check.py` in the session scratchpad, run
+    with the repo's `.venv/bin/python -I -B` and `PYTHONDONTWRITEBYTECODE=1`; `git status --porcelain` was the same
+    before and after. This confirms the four values only. They stay fixed before any result, and any narrowing after
+    the audit follows this section's rules. Signed: `risk-officer`, 2026-11-22.
+    (Filed as M24: `risk-officer` suggested the name M23, which went to the owner's Q6 answer. The text is otherwise
+    as `risk-officer` wrote it. Section 20 logs what it read.)
   - The **default** is the allowed value nearest θ_final(A)'s s; ties go to the lower value. **[M19]** The distances
     are |s − s_k| in floating point, and when the two smallest distances differ by at most 1e-12 it is a tie, which
     goes to the lower value (in binary 0.35 − 0.30 and 0.40 − 0.35 are not equal).
@@ -1306,7 +1340,9 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
    2026-11-22 (this file), after hold-mix-cap's run and results were committed; the review and the commit are next.
    **[M22]** Reviewed on 2026-11-22 (amendments M9-M22) and committed. Before A0: the items of the header's next
    step 4 (owner question 6, if answered; `risk-officer`'s dated confirmation of the allowed values; the `risk-officer`
-   review's reading in section 20).
+   review's reading in section 20). **[M23]** Recorded on 2026-11-22, before A0: M23 (Q6 answered: keep G8-excess as
+   pinned), M24 (`risk-officer`'s confirmation, changing no value) and M25 (the review's reading). They count once the
+   commit that adds them lands, before A0.
 3. Build `lab/runner/trend.py`, the scripts and their tests (section 17). The full tier with 100% branch coverage,
    the deep profile and ruff must pass.
 4. Amendment A1 (throughput on the built adapter, synthetic) and amendment A0 (procedure controls, synthetic) are
@@ -1406,6 +1442,11 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
   is logged in section 20). M9-M18 resolve the review's blocking findings; M19-M22 take the suggestions judged cheap and
   clearly right (the Review log at the end maps every finding to its amendment). The author's brief held the lead's
   one-sentence summary of hold-mix-cap's results (K10's words, no number), so the last column answers for each.
+- **[M23] Amendments M23-M25** (2026-11-22, after this plan's commit `16d2363` and before A0; no trend rule has been
+  run on market data). The three records that the header's next step 4 requires before A0. They change no rule, gate,
+  threshold, allowed value or verdict rule. Written by `quant-researcher` (its reading is logged in section 20). M24's
+  section 8 text and its row below are `risk-officer`'s own words, filed under M24 (it suggested M23). The author's
+  brief held no summary of hold-mix-cap's results.
 
 | # | What changed (where) | Why | Could hold-mix-cap's results have informed it? |
 |---|---|---|---|
@@ -1431,6 +1472,9 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
 | M20 | **Criteria and the variant, tightened or clarified** (suggestions): E7 also requires E3 and E4, and SL-E7 SL-E3 and SL-E4 (the owner's boom rule covers every comparator); the per-fold s in E5(b), E8, the daily-check variant and the opposite-start check; notes on what EDGE rests on and on E7's bootstrap; P as an information floor, with distinct switch weeks and out-spells described; R_0's rank among the lag offsets; the per-level stop labels; the fresh-customer book; the stop's Nautilus note and its gas; the crash-day scale in the plain words; E2's boundary tests at 499 and 500 resamples | Cheap; each only adds a condition or pins a reading | **No.** The crash-day scale uses K2's BTC figure, already in this plan |
 | M21 | **Procedure controls** (suggestions): A0 reports E1's and SL-E1's own false-positive counts; the one-off size check of E1 under volatility clustering (1000 panels, at most 67); the expected power alarm and the owner's question; the SL-P expectation; the full tier's time measured in A1; the time budget (sections 1, 7, 9, 15, 17) | On shuffled markets E2 almost never holds, which hides a leaky E1; the slow test cannot see a 7.5% size | **No.** Synthetic only |
 | M22 | **Records**: header (status, next steps, the file hash at `52d7ee1`), section 2 (K11's TESTING.md line corrected; the reviews' briefs counted), section 4 (the draft's file hash struck), section 8 (`risk-officer`'s confirmation still to be recorded), stop rule 16 (briefs stop repeating the summary), section 20 (the reviews and this revision), appendix B (24 target sets, not 33; the reruns), the Review log (the review's findings mapped to the amendments), README | Stop rule 16 and the review asked for them | It is the record of those readings |
+| M23 | **Owner question 6 answered: keep G8-excess as pinned** (header: owner decision 2's note, the questions' status, next step 4; section 15, order step 2; section 19: Q6's status, the question as asked and the answer; the Review log's B1; README; the record `reports/director/2026-11-22-owner-answer-trend-q6.md`). Nothing about G8 changes: not G8-excess, its threshold, the other gates or the verdict rules. The expected best reachable headline stays "EDGE, NOT A CANDIDATE" | Header next step 4 and section 19: an answer counts only as a dated named amendment that cites the review's finding (M10; B1 and B11), committed before A0 and before any trend-steady result | **No.** It keeps the gate the owner chose on 2026-11-21 (16:31 UTC, before hold-mix-cap's run 0) and changes nothing. The owner had seen hold-mix-cap's results (K10), but they measure held mixes, not a trend rule's gain over the held mix by regime, and the question as asked held no hold-mix-cap number |
+| M24 | **`risk-officer`'s dated confirmation of the allowed values** s ∈ {0.30, 0.40, 0.50, 0.60} (section 8, answering the [M22] note there) | Section 8 [M22]: required before A0 starts | **No.** It confirms the values set by 2026-11-21 16:11 UTC and approved at 16:31 UTC (K12) and changes nothing; the check read no price and no result |
+| M25 | **What the `risk-officer` review read, recorded** (section 20, the Review row: the pending sentence struck and the reading added; header next step 4; section 15, order step 2) | Stop rule 16: every further reader is logged in section 20, with what was read, before run 0; the Review row left this to be added before A0 | It is the record of a reading. The review read no hold-mix-cap result file and no hold-mix-cap number; the only published numbers it read are rebalance-steady's, quoted in `docs/app/features.md` (already K2) |
 
 **Deviations.** Every departure from the plan goes into a Deviations table in RESULTS.md: what changed, why, when
 relative to which result, and its effect on any number.
@@ -1795,11 +1839,13 @@ guard of stop rule 17).
 answered "yes"; Q3 **not asked**, so its default (weekly Monday checks) holds and is logged here; Q4 answered "yes"
 (sells to cash go through; a pause still stops all buying); Q5 answered: the gain over the held mix (G8-excess). All
 were answered in writing before this plan's commit. `OWNER_QUESTIONS.md` is in the session scratchpad, not in the
-repo; the draft's text below is kept for the record. **[M9, M10]** Two new questions, Q6 and Q7, are open; their text
-is below, written for the owner on 2026-11-22.
+repo; the draft's text below is kept for the record. **[M9, M10]** Two new questions, Q6 and Q7, ~~are open~~
+**[M23]** were added; their text is below, written for the owner on 2026-11-22. **[M23]** Q6 was answered on
+2026-11-22, before A0: keep G8-excess as pinned (below). Q7 is still open; a late answer is fine.
 
 **[M10] Question 6, put to the owner in writing on 2026-11-22 (answer needed before any trend-steady result of any
-kind, A0's synthetic controls included; none at this commit).** In plain words, for the lead to send as written:
+kind, A0's synthetic controls included; ~~none at this commit~~ **[M23]** answered on 2026-11-22, below).** In plain
+words, for the lead to send as written:
 
 > **Q6. The "no single kind of market makes most of the profit" check is expected to fail for this strategy even in
 > the form you chose. Keep it as it is, or give another rule?**
@@ -1822,6 +1868,44 @@ kind, A0's synthetic controls included; none at this commit).** In plain words, 
 > its best result is expected to be "edge, but not a candidate". (b) Give another rule now, in your own words. The
 > study does not propose one; whatever you choose is written into the plan, dated, before any trend-steady result, and
 > after that nothing about this check changes.
+
+**[M23] Q6 as asked, and the owner's answer.** The lead asked it in chat on 2026-11-22 at about 17:40 UTC (a
+multiple-choice prompt), after the owner asked what was being run. Verbatim:
+
+> **Question:** "One of the lab's checks is 'no single kind of market (rising, falling, flat) makes most of the
+> profit'. A strategy that moves to cash in crashes earns most of its edge in falling markets, so it will very likely
+> fail this check whatever its skill. Its best result would then be 'has an edge, but not ready for the next step'.
+> The next step (the real trading engine) is on hold anyway. Keep the check as it is?"
+>
+> **Options:** (1) "Keep it as is (Recommended)": "No change. The test still tells us whether the trend timing beats
+> chance. If it does, the best label is 'edge, not a candidate'. That changes nothing today, because the next step is
+> on hold." (2) "Drop it for this strategy": "The check won't count against this strategy. It could then reach
+> 'candidate', but a strategy that only works in crashes would no longer be flagged by it."
+>
+> **Answer (owner):** "Keep it as is (Recommended)".
+
+- **What it answers.** The review's finding B1 and B11, written into this plan as M10: with three regimes, "none
+  above half the total excess" means none below zero, so G8-excess is expected to fail by construction (section 1).
+- **What it changes: nothing about G8.** G8-excess stays as pinned (section 10), and so do its threshold, the other
+  gates and the verdict rules (section 12). G8-excess is still expected to fail, so the expected best reachable
+  headline stays "EDGE, NOT A CANDIDATE". The literal G8 is still reported.
+- **How it was asked, for the record.** The lead marked option 1 as recommended. The question was shorter than the
+  Q6 text above. It did not repeat the synthetic counts (0 of 40, and 1 of the 13 markets where the strategy beat the
+  held mix), the arithmetic ("none above half" means "none below zero"), that the check is the form the owner chose
+  on 2026-11-21 (on the gain over the held mix; the question spoke of the strategy's "edge"), or that he had not been
+  told then that this form would very likely fail too. It said "very likely fail this check whatever its
+  skill" where the text above says "expected to fail whatever the strategy's skill", and it added that the next step
+  is on hold. Its second option was "Drop it for this strategy", not Q6's (b), "give another rule in your own words"
+  (this study proposes none). The owner chose option 1, which is Q6's (a), the default. The lead reports that its
+  chat earlier the same turn described the rule and the stop-loss variant in plain words, and that no trend-steady
+  result existed then.
+- **Timing.** The answer came after this plan's commit (`16d2363`, 16:18 UTC) and before A0, the deadline that the
+  header's next step 4 sets. The section 17 build was then in progress in the same tree, not committed. Its tests on
+  synthetic data had run: TESTING.md (not committed, last written 17:27 UTC) lists them, including the slow
+  calibration of E1 on synthetic random walks. TESTING.md describes them as tests of the code on hand-built or
+  synthetic data; none is an outcome of the rule on market data, and the question did not mention them. The auditor
+  can judge whether build tests count as "a trend-steady result of any kind". The answer keeps the gate as pinned, so
+  no rule was changed after any test outcome.
 
 **[M9] Question 7, put to the owner in writing on 2026-11-22 (a product question; it changes no number in this
 study, and a late answer is fine).**
@@ -1870,8 +1954,10 @@ Answers that change the plan, decided now:
 | K10 | **[M5]** 2026-11-21, after 22:13 UTC | the lead | hold-mix-cap's RESULTS.md, RISK.md and `decision.json` (section 2) |
 | K11 | **[M5]** 2026-11-22 | `quant-researcher` | The 2026-11-22 owner record, which quotes hold-mix-cap's results, and rebalance-steady's files (section 2) |
 | M1-M8 | **[M5]** 2026-11-22 | `quant-researcher` | No market data: `config/risk_levels.yaml` and the price-free date grid only (appendix B) |
-| Review | **[M22]** 2026-11-22 | `backtest-auditor` and `risk-officer` | Their review of this plan (M1-M8). No market data; synthetic checks only (`trendrun/planstats/`, `trendrun/planreview/`, `trendrun/riskreview/` in the session scratchpad). Their task briefs held the lead's one-sentence summary of hold-mix-cap's results (K10's words: falls of held mixes by crypto share, mostly in 2018; fees from frequent rebalancing; 2017 and 2018 move the results), with no file and no number. The auditor reports reading no hold-mix-cap file, no hold-mix-cap number in `docs/app/features.md` and not the 2026-11-22 owner record. What the `risk-officer` review read beyond this plan is not yet in the record: the lead adds it here before A0 (stop rule 16) |
+| Review | **[M22]** 2026-11-22 | `backtest-auditor` and `risk-officer` | Their review of this plan (M1-M8). No market data; synthetic checks only (`trendrun/planstats/`, `trendrun/planreview/`, `trendrun/riskreview/` in the session scratchpad). Their task briefs held the lead's one-sentence summary of hold-mix-cap's results (K10's words: falls of held mixes by crypto share, mostly in 2018; fees from frequent rebalancing; 2017 and 2018 move the results), with no file and no number. The auditor reports reading no hold-mix-cap file, no hold-mix-cap number in `docs/app/features.md` and not the 2026-11-22 owner record. ~~What the `risk-officer` review read beyond this plan is not yet in the record: the lead adds it here before A0 (stop rule 16)~~ **[M25]** What the `risk-officer` review read beyond this plan (about 15:17-15:25 UTC on HEAD `52d7ee1`; agent `a059b8e2b8597c8fe`, as the lead extracted it from the transcript): the `research/trend-steady/` listing and line counts; this plan in full as it then read (M1-M8); `PLAN_DRAFT_2026-11-21.md`'s SHA-256 only, and a grep of both files for `per-trade`, `per-day`, `30% of the wallet`, `80% of the wallet`, `at entry`, `hold at every daily close`, `riskiest step` and `second paper`; `config/risk_levels.yaml` in full with its SHA-256, and SHA-256 prefixes of `config/costs.yaml`, `config/splits.yaml` and `config/risk_levels.yaml` at `b05109e^`; `lab/runner/portfolio.py` (`risk_limits`, `check_targets`, `_breach_test`, `LIMIT_TOL`, headroom; lines 263-330 and 455-502), `lab/search/report.py` (lines 20-70 and its gate and drawdown lines) and the signature of `montecarlo.block_bootstrap_drawdowns`; the subjects and dates of the last 12 commits (one is "hold-mix-cap: results, audit, risk review and app docs", with no number); the `reports/director/` listing and `2026-11-21-owner-answers-trend-steady.md` in full, **not** the 2026-11-22 owner record; the `docs/app/` listing and, in `docs/app/features.md`, the heading list and lines 39-55 ("Strategies by risk level"), 177-231 ("Adjustable strategy settings", "Steady settings", "What the first Steady study taught": rebalance-steady's published SCOUTING numbers (K2), the 35% budget, and the sentence that the hold-this-mix tool's 2-in-30-days limit does not cap our strategies, decision 7) and 266-297 (the feature catalog rows), **not** lines 56-176 (the "Hold this mix" section, which holds hold-mix-cap's results). It ran only a scratch check of the limits with no market data (`trendrun/riskreview/feas_check.py`: `risk_limits("steady")` and `check_targets` on s ∈ {0.24, 0.30, 0.40, 0.50, 0.60, 0.72} × 4 states, and the growth factors to the limits); nothing under `results/`, no catalog. So it read no hold-mix-cap result file and no hold-mix-cap number; the only published numbers it read are rebalance-steady's, quoted in `features.md` (already a prior look, K2) |
 | M9-M22 | **[M22]** 2026-11-22 | `quant-researcher` | No market data. Read: this plan, the draft's hash only, the README, the review's findings and some of its synthetic scripts (`g8x.py`, `g8_excess_check.py`, `e1_volnull.py`, `gens.py`, `rule_size.py`), the 2026-11-21 owner record, `OWNER_QUESTIONS.md` Q5, the scratch checks of appendix B, `lab/` code (`steady.py`, `report.py`, `montecarlo.py`, `synthetic.py`, the import closure) and rebalance-steady's `frozen_paths()`, and TESTING.md (project instructions; see K11's corrected line). The task brief held the same one-sentence summary of hold-mix-cap's results. Not read: any hold-mix-cap result file, `docs/app/features.md`, the 2026-11-22 owner record (only `git diff --stat` of `52d7ee1`, which lists file names), the catalog and `results/`. Ran only the synthetic and price-free checks of appendix B |
+| M24 | **[M24]** 2026-11-22 | `risk-officer` | Its confirmation of the allowed values (section 8). No market data. Read: `config/risk_levels.yaml` in full, with its SHA-256; this plan's header (lines 1-20), sections 4, 5 and 8, appendix B, and section 15's amendment rules and table (the rows cut to their first 300 characters); in `lab/runner/portfolio.py` the imports and the code of `risk_limits` and `check_targets`; `lab/runner/__init__.py` and `lab/__init__.py` (so that the import does not load `trend.py`); `git log --oneline -3` (HEAD `16d2363`) and `git status --porcelain`, before and after the check; the CLAUDE.md, AGENTS.md and TESTING.md that load automatically (TESTING.md's bug log has hold-mix-cap run 0's test facts, none of its results). Not read: no catalog bar, nothing under `results/` or `data/`, no hold-mix-cap result file, not `docs/app/features.md`, not the 2026-11-22 owner record, not `trend.py` or `test_trend.py`. Ran only `trendrun/prea0/riskconfirm/confirm_check.py` in the session scratchpad (the limits as read, `check_targets` on 16 target sets and 2 controls); no test run, and the tree was unchanged |
+| M23-M25 | **[M23]** 2026-11-22 | `quant-researcher` | Writing M23-M25. No market data, no run and no test run. Read: this plan (the header, sections 1, 2, 8, 15, 19 and 20, parts of sections 4, 12 and 18, and the end of the Critique log and the Review log), the README, `reports/director/2026-11-21-owner-answers-trend-steady.md`, the first 30 lines of `2026-11-21-boom-check.md`, the `reports/director/` listing, `config/risk_levels.yaml`'s SHA-256, `risk-officer`'s scratch output for M24 (`trendrun/prea0/riskconfirm/`), `git log`, `git status` and the file times of the build's files, and the CLAUDE.md, AGENTS.md and TESTING.md that load automatically. TESTING.md (not committed; the build's) holds hold-mix-cap run 0's test facts (as in K11's corrected line) and the build's test outcomes on synthetic data, and no outcome of the rule on market data. The brief held the owner's question and answer verbatim, `risk-officer`'s text and the facts of M25, and no summary of hold-mix-cap's results. Not read: any hold-mix-cap result file, `docs/app/features.md`, the 2026-11-22 owner record, `trend.py`, `test_trend.py`, the catalog, `data/` and `results/` |
 | A0 | reserved, before run 0 | `quant-researcher` | Procedure controls on 40 synthetic panels (no market data) |
 | T1 | reserved | `quant-researcher` | Run 0: Kraken and Binance daily train bars to 2023-01-01 00:00 UTC |
 | V1 | reserved | `quant-researcher` | The single validate look, only if E1-E8 and P hold |
@@ -2101,7 +2187,7 @@ section 19 and the rule for its answer is in the header.
 
 | # | Blocking finding | Resolved by |
 |---|---|---|
-| B1 | G8-excess very likely fails by construction too; no expectation written; "CANDIDATE FOR AUDIT can be reached" | M10: the expectation (section 1), "can be reached only if G8-excess passes, which is unlikely by construction" (header, section 12, weakness 11), Q6 to the owner in writing. No answer at this commit: G8-excess stands, and an answer counts only before any trend-steady result of any kind |
+| B1 | G8-excess very likely fails by construction too; no expectation written; "CANDIDATE FOR AUDIT can be reached" | M10: the expectation (section 1), "can be reached only if G8-excess passes, which is unlikely by construction" (header, section 12, weakness 11), Q6 to the owner in writing. No answer at this commit: G8-excess stands, and an answer counts only before any trend-steady result of any kind. **[M23]** Answered on 2026-11-22, before A0: keep it as pinned (section 19) |
 | B2 | Whether a change of s between folds orders anything was undefined | M11: one order rule for every executor, re-cuts defined and counted, `run_states` on per-row target vectors, the re-cut test; also R_0^φ's fold-boundary entries aligned with R_0's |
 | B3 | E5(a)'s "G1-G8" undefined in Branch R | M12: seeds compared on the gates at S only; a boundary test |
 | B4 | θ_final(A)'s role as a measurement point unclear | M13: the table of measurement points in section 10 (θ_final(A) for R1 only), "holds only if at every point", a test per point |
