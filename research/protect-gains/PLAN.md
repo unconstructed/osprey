@@ -474,6 +474,6 @@ plain held mix without the tool, and a separate code-breaker review.
 | Build | 2026-11-23 | `quant-researcher` | No market data. Built `lab/runner/protect.py`, `run.py` and their tests on synthetic and hand-built bars only. It read none of hold-mix-cap's result files or the "Hold this mix" section of `docs/app/features.md` |
 | A1 | 2026-11-23 | the lead | No market data: `run.py --time` on synthetic bars (seed 21) |
 | T1 | 2026-11-23 | the lead | Run 0 on the train window (Kraken and Binance, 2017-2022), commit `5e99d68`: NO DEFAULT for both lines (`RESULTS.md`). No validate or test bar |
-| V1 | reserved | | The single validate look ([VALIDATE_PLAN.md](VALIDATE_PLAN.md)) |
+| V1 | 2026-11-23 | the lead | The single validate look (2023-01-02 .. 2024-07-01, commit `d8855c9`): A10/30d DOES NOT HOLD UP; whipsaw PASS ([VALIDATE.md](VALIDATE.md)). No test-window bar |
 
-**Validate-window looks used for protect-gains: 0.**
+**Validate-window looks used for protect-gains: 1 (V1).**
