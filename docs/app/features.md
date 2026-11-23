@@ -42,7 +42,7 @@ Customers choose how much risk they want; each level has its own strategies, all
 
 | Risk level | For someone who… | Launch strategy | Add later |
 |---|---|---|---|
-| **Steady** | Wants smaller swings | Rebalancing: BTC, ETH and a slice of cash; trades only when the mix drifts | Trend following that moves to cash in downtrends |
+| **Steady** | Wants smaller swings | Rebalancing: BTC, ETH and a slice of cash; trades only when the mix drifts | Trend following that moves to cash in downtrends (tested 2026-11-23: no edge; [what the trend study taught](#what-the-trend-study-taught)) |
 | **Balanced** | Is OK with normal crypto swings | Dip buying: buys BTC or ETH after a set drop, capped | A second dip strategy with different timing |
 | **Bold** | Accepts big drops for bigger upside | Momentum: holds the strongest few of the most liquid tokens on Base, rotates weekly | Mean reversion, grid trading |
 
@@ -228,6 +228,19 @@ These are the settings of a Steady rebalancing strategy of ours, once one passes
 - **A held mix can still fall far.** The study's comparisons that held a mix with little or no rebalancing were baselines, not tested strategies. The yearly-reset one, which ignored the Steady limits, fell −46.4% at worst with one search and −44.1% with the other. The one that traded back only when a Steady limit was hit fell −43.2% and −36.7%. It ran one year at a time, as the rule did: each year it was bought fresh at that year's mix (34-55% crypto) before the year began, at no cost in these numbers. So it is closest to the tool with a yearly reset. A fixed mix held four years with only the limits was not run. The same mixes held four years with no reset, also without the Steady limits, fell −71% to −75% (both searches). All SCOUTING.
 - **Today's limits alone don't give smaller swings.** RISK.md section 2 says they do not give the "smaller swings" [Product](product.md#strategies-by-risk-level) promises Steady customers, unless the owner tightens them (RISK.md section 3, point 3). The worst fall of a customer's mix depends mostly on its crypto share, and also on how often it is reset.
 - **These are scouting numbers.** The worst fall the app shows will come from Nautilus backtests with all costs included. Still pending: Nautilus results with measured costs.
+
+### What the trend study taught
+
+> **SCOUTING.** From the lab's simple in-house simulator (the reference engine), not NautilusTrader, with placeholder costs. Out of sample, 2018-2022. Nothing was approved; the verdict was NO EDGE. Sources: [RESULTS.md](../../research/trend-steady/RESULTS.md) and [RISK.md](../../research/trend-steady/RISK.md) (2026-11-23).
+
+- **The rule:** once a week, each of BTC and ETH is held while its price is clearly above its own recent average and sold to USDC while it is clearly below; the crypto share (30-60%) is the customer's setting. It applied the owner's rules: sells to cash go through during a pause, and 100% USDC is allowed.
+- **It looked good but could be luck.** It made +212% with a worst fall of −37.5% (Sharpe 0.90). Holding the same mix without timing made +145% and fell −61%; holding only BTC made +18% and fell −81%. But about 1 in 12 random week-shifts of its own timing did as well, and its lead over holding could be luck.
+- **It only helped in crashes.** It beat holding in 2018 and 2022 and lost to it in 2020 and 2021, so it failed the boom-year check (owner, 2026-11-21).
+- **Its bad cases are too deep for Steady.** In 1 of 20 simulated histories it fell more than 59%, against Steady's 35% budget, at every allowed crypto share.
+- **The stop-loss added nothing measurable.** "Sell after a 20/30/40% fall from the top, buy back when the trend turns up" fired 4, 2 and 0 times in five years; at 20% it trimmed the worst fall by about 4 points, but its timing did as well as stops at random weeks.
+- **It traded about once a month** (median; at most 4 times in any 30 days).
+
+**What this means for the app.** Trend following is not a Steady strategy on this evidence. Steady's own tested strategy is still to be found; "hold this mix" stays the self-directed tool for Steady customers meanwhile.
 
 ## Feature catalog
 

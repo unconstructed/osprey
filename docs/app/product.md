@@ -73,7 +73,7 @@ Customers choose how much risk they want, and each risk level has its own strate
 
 | Risk level | For someone who… | Launch strategy | Add later | Guardrails |
 |---|---|---|---|---|
-| **Steady** | Wants smaller swings | **Rebalancing:** holds BTC, ETH and a slice of cash (USDC); trades only when the mix drifts | Trend following that moves to cash in downtrends | BTC and ETH only; always part cash; a few trades a month |
+| **Steady** | Wants smaller swings | **Rebalancing:** holds BTC, ETH and a slice of cash (USDC); trades only when the mix drifts | Trend following that moves to cash in downtrends (tested 2026-11-23: no edge; [Features: What the trend study taught](features.md#what-the-trend-study-taught)) | BTC and ETH only; always part cash; a few trades a month |
 | **Balanced** | Is OK with normal crypto swings | **Dip buying:** buys BTC or ETH after a set drop, with a cap on how much | A second dip strategy with different timing | BTC, ETH and a few vetted large tokens; stop-loss required |
 | **Bold** | Accepts big drops for bigger upside | **Momentum:** holds the strongest few from a vetted list of the most liquid tokens on Base; rotates weekly | Mean reversion, grid trading | Wider token list, more trades, biggest possible drops |
 
