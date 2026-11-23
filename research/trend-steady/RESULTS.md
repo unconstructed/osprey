@@ -17,8 +17,10 @@ chose the average length, the buffer and the crypto share from earlier years onl
 It made **+212%** with a worst fall of **−37%** (Sharpe 0.90). Holding the same mix without timing made +145% and
 fell −61% (Sharpe 0.63). Holding only BTC made +18% and fell −81% (Sharpe 0.43). So the rule looked better, mostly by
 stepping aside in the 2018 and 2022 crashes. But about **1 in 12 randomly timed copies** of the same rule (same
-trades, moved to other weeks) did as well, and its lead over plain holding could be luck (p = 0.18). It **lost to
-plain holding in the boom years 2020 and 2021**, and failed the boom-year check. A second search agrees, and so does
+trades, moved to other weeks) did as well, and its lead over plain holding could be luck (p = 0.18). Simply holding
+S's own average amount of crypto each year, with no timing, did even better (Sharpe 0.98, +294%, worst fall −39%). It
+**lost to plain holding in the bull years 2020 and 2021**, and it failed the boom-year check (without BTC's best years,
+2020 and 2019, it no longer beat random timing or plain holding). A second search agrees, and so does
 a second data source. The basic stop-loss ("sell after a 20/30/40% fall from the top, buy back when the trend turns
 up") added nothing the luck checks could see. It trades about once a month (median), at most 4 times in any 30 days.
 
@@ -31,7 +33,8 @@ further. A synthetic check before the run had already warned that this test is w
 **Train verdict: NO EDGE. Headline: NO EDGE. Stop-loss variant overall: NO EDGE.** PLAN.md section 12, applied
 mechanically: NO EDGE when E1 or E2 fails.
 
-- **E1 fails.** R_0 (the rule's own timing on fold 0's kept rows) has a Sharpe of 0.897. Of the 207 guarded
+- **E1 fails.** R_0 (S's own weekly schedule run as one span from fold 0's start, over all 1820 kept rows) has a
+  Sharpe of 0.897. Of the 207 guarded
   weekly-segment shifts of the same schedule, 17 did as well or better: rank p = 18 / 208 = **0.087** (it needs
   < 0.05). The shifts' 5/50/95 percentiles are −0.14 / 0.39 / 1.03.
 - **E2 fails.** S minus N0 (the same mix, held without timing) is D = 0.275 in Sharpe, with a paired stationary
@@ -64,7 +67,7 @@ mechanically: NO EDGE when E1 or E2 fails.
 |---|---|---|---|---|---|
 | **S** | the rule, each year's search choice, 1x costs | **0.901** | **+212.3%** | **−37.5%** | −11.5% |
 | S at 2x costs | | 0.858 | +192.5% | −38.6% | −11.5% |
-| R_0 | S's timing from fold 0's start (E1's subject) | 0.897 | +198.9% | −37.5% | −11.5% |
+| R_0 | S's schedule as one span from fold 0's start, all 1820 kept rows (E1's subject) | 0.897 | +198.9% | −37.5% | −11.5% |
 | N0 | the same mix (s/2 each), held without timing | 0.626 | +145.4% | −60.6% | −25.3% |
 | N0-span | N0 held from fold 0's start, never re-cut | 0.397 | +47.0% | −60.4% | −15.9% |
 | X | S's average exposure each fold, held (E3) | 0.980 | +294.0% | −39.4% | −24.8% |
@@ -90,13 +93,15 @@ Seed B's S: Sharpe 0.789. Correlations of S's daily returns: B1 0.67, B2 0.69, N
 
 **Boom years and leave one year out** (seed A, descriptions): with each year removed, E1's rank p is 0.096 (no
 2018), 0.125 (no 2019), 0.188 (no 2020), and E1 fails every time. With both bear years (2018 and 2022) removed, the
-rule trails the held mix (Δ −0.455 in Sharpe, D 0.141) and E1's rank p is 0.101: what the timing did in 2019-2021
-alone was to lose to holding.
+rule grows less than the held mix (Δ −0.455 in log growth) while staying slightly ahead on risk-adjusted return
+(D +0.141 in Sharpe), and E1's rank p is 0.101: in 2019-2021 alone the timing gave up return for smaller swings, and
+it was no better than random timing.
 
 ## Gates (AGENTS.md defaults, unchanged; SCOUTING)
 
 At S, the walk-forward choice (seed A): **G1 FAIL** (Sharpe 0.901 < 1.0), G2 PASS (0.858 > 0.5 at 2x), **G3 FAIL**
-(DSR raw 0.039, effective 0.513, strict 0.038; needs ≥ 0.95), **G4 FAIL** (mean PBO 0.665; needs ≤ 0.25), G5 PASS
+(DSR raw 0.039, effective 0.513, strict 0.038, and 0.044 in the active-row reading; needs ≥ 0.95), **G4 FAIL** (mean
+PBO 0.665 over all 12 studies, 0.603 in the active-row reading; needs ≤ 0.25), G5 PASS
 (plateau ratio 0.80 ≥ 0.70), **G6 FAIL** (Monte Carlo 95th-percentile max drawdown −59.3% against the 35% budget;
 seed B −69.6%), G7 PASS (beats B1 and B2 in full, without the best and without the two best bar-years), **G8-excess
 FAIL** (expected: all the lead over the held mix comes in bear months, +1.18, against −1.09 in bull months; the
@@ -116,7 +121,9 @@ literal G8 fails too), G9 NOT RUN, R1 PASS.
 Every grid step fails G6 and G8-excess. The narrowing rule (section 8) cannot apply: "narrowing fails: G6 fails at S,
 the walk-forward choice". **S(s_k)** (the walk-forward with s held at each allowed value): Sharpe 1.036 / 1.026 /
 1.044 / 0.981, E1 holds at each (rank p 0.034 / 0.043 / 0.038 / 0.048), E2 fails at each (p 0.291 / 0.193 / 0.088
-/ 0.220), so the S(s_k) check FAILS.
+/ 0.220). The S(s_k) check FAILS: E2 fails at every share, and G1 (0.981 at s = 0.60) and G6 (MC p5 −43.5%, −52.5%,
+−58.9% and −65.7% at s = 0.30 to 0.60) fail too. E1 holding at each fixed share but not at S is four extra looks
+that can only add conditions; the verdict is decided at S, as planned.
 
 ## The stop-loss variant (section 11A; SCOUTING)
 
@@ -127,7 +134,9 @@ the walk-forward choice". **S(s_k)** (the walk-forward with s held at each allow
 | 0.40 | 0 | 0.901 | −37.5% | NOT TRIGGERED |
 
 **Overall: NO EDGE.** At 20% the stop cut the worst fall by about 4 points, but its own timing did not beat placebo
-stops placed at random weeks (SL-T fails), and the plain criteria fail as above. Seed B agrees at every level.
+stops placed at random weeks (SL-T fails), and the plain criteria fail as above. Seed B is NO EDGE too, but not in
+the same way at every level: at 0.20 it also fails SL-B and SL-E3 (which is one reason SL-E5 fails), and at 0.40 its
+stop fired while seed A's did not.
 
 ## Trade frequency (owner decision 7: reported, not capped; SCOUTING)
 
@@ -138,8 +147,12 @@ Per 30 calendar days, over the kept closes of 2018-2022:
 | S | 1 / 4 | 1 / 6 | 2 / 8 |
 | Default (s = 0.50) | 1 / 4 | 2 / 6 | 2 / 6 |
 
-R1 ("a few trades a month", section 12) passes at S, θ_final(A), the default and every grid step. Whipsaws (a switch reversed within 4 weeks): 36, costing about
-7,108 USD in all on the 10,000 USD book's path. Daily checking instead of weekly: 135 orders, Sharpe 0.84 (weekly
+R1 ("a few trades a month", section 12) passes at S, θ_final(A), the default and every grid step. Whipsaws (a switch
+reversed within 4 weeks): 36. Their orders cost 3,366 USD, each order counted once, of
+the 3,960 USD that all of S's kept fills cost (each fold's run starts with 10,000 USD at the first train close and
+holds 16,100 to 127,500 USD at its fold's start). `summary.json` says 7,108 USD: the run's code counted an order twice
+when two whipsaws shared it (bug #60, found by the audit; fixed after the run, and the corrected total recomputed
+from run 0's logged fold choices; it decides nothing). Daily checking instead of weekly: 135 orders, Sharpe 0.84 (weekly
 0.90).
 
 ## Per fold (seed A; out-of-sample year = fold + 2018; SCOUTING)
@@ -152,14 +165,16 @@ R1 ("a few trades a month", section 12) passes at S, θ_final(A), the default an
 | 3 (2021) | 42 / 0.0051 / 0.327 | 1.65 | 1.86 | +73.9% | −17.1% | 14 | 1.07% |
 | 4 (2022) | 38 / 0.0055 / 0.555 | 1.70 | −0.62 | −15.5% | −27.5% | 12 | 2.10% |
 
+Trades per parameter: 58 kept fills over 3 parameters, about 19 each, **flagged** (below 30), as expected.
 Walk-forward efficiency 0.51. The chosen settings jump from year to year (L from 26 to 128; s from 0.31 to 0.60).
 No Steady limit was broken at a close of S (0 closes in breach, highest coin 43.1%, lowest cash 20.5%).
 
-## Luck statistics
+## Luck statistics (SCOUTING)
 
 - **DSR** (seed A): raw count (2400 trials) 0.039, effective count (16.7 trials) 0.513, strict count (2479) 0.038.
-  The active-row re-scoring (rows 204 on) gives effective 0.044.
-- **PBO:** mean 0.665 over seed A's studies (the gate's number); on the active rows, 0.33 to 0.95 per study, mean 0.603 over all 12.
+  G3's second reading, the active-row report (rows 204 on), gives an effective-count DSR of 0.044.
+- **PBO:** mean 0.665 over all 12 studies (the gate's number; seed A's six alone 0.718, seed B's 0.612); in the
+  active-row reading, 0.33 to 0.95 per study, mean 0.603.
 - **Monte Carlo** of S: block bootstrap p5 / p50 max drawdown −59.3% / −38.0% (block 20) and −61.8% / −38.9% (block
   60); trade-period shuffle −52.2% / −38.2%.
 
@@ -187,6 +202,7 @@ Not taken: the verdict is NO EDGE (stop rule 8). **Validate-window looks used fo
 | A0's power alarm fired (power 0 of 20); run 0 ran on the owner's written answer "run it anyway" | PLAN.md section 9 and stop rule 15 ([M27]) | `reports/director/2026-11-23-owner-answer-trend-a0-power.md`; the lead recommended running it before the owner answered (recorded) |
 | The build agents' briefs held the lead's one-sentence summary of hold-mix-cap's results | The workflow brief predated [M22] | Logged in PLAN.md section 20 (row "Build"); no agent read a hold-mix-cap result file or number |
 | Results written and risk notes drafted by the lead, one independent audit | The owner asked to "finish it lean" (usage limit) | RISK.md is the lead's, not a separate `risk-officer` review; no director review of this study yet |
+| The whipsaw total in `summary.json` (7,108 USD) double-counted shared orders (bug #60, found by the audit) | A code bug in a description, fixed after the run with a regression test; no amendment run, since nothing decisive reads it (stop rule 18 (c)) | RESULTS.md gives the corrected 3,366 USD, recomputed from run 0's logged fold choices on train bars; `summary.json` is left as the run wrote it |
 | This file lists the main tables, not every description of section 16 | Lean reporting | Every number of section 16 is in `results/trend-steady/train/run0/summary.json` (git-ignored); the committed `trials.csv` and `evaluations.csv` hold every trial and every counted run |
 
 ## Known weaknesses

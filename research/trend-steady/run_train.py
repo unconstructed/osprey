@@ -605,6 +605,7 @@ def kept_trades(res: pd.DataFrame, t0) -> np.ndarray:
 def episodes(ctx, b: dict) -> dict:
     """The episode table (INTERPRETATIONS["episodes"], ["whipsaw"])."""
     spells, whipsaws, switches = [], [], 0
+    orders = {}  # (fold, fill bar) -> the order's cost: an order shared by two whipsaws is counted once (#60)
     for i, (r, w) in enumerate(zip(b["runs"], ctx["windows"], strict=True)):
         start = r.index.get_loc(w.t0) + 1
         z = r.attrs["z"]
@@ -641,6 +642,8 @@ def episodes(ctx, b: dict) -> dict:
             switches += len(counted)
             for c, d in zip(counted, counted[1:], strict=False):
                 if (r.index[d] - r.index[c]) <= pd.Timedelta(days=S.WHIPSAW_DAYS):
+                    for bar in (c + 1, d + 1):
+                        orders[(i, bar)] = float(fills.loc[fills["bar"] == bar, "cost"].sum())
                     cost = float(fills.loc[fills["bar"].isin([c + 1, d + 1]), "cost"].sum())
                     whipsaws.append(
                         {
@@ -656,7 +659,8 @@ def episodes(ctx, b: dict) -> dict:
         "whipsaws": {
             "count": len(whipsaws),
             "share": len(whipsaws) / switches if switches else math.nan,
-            "cost_usd": math.fsum(x["cost_usd"] for x in whipsaws),
+            "orders": len(orders),
+            "cost_usd": math.fsum(orders.values()),
             "list": whipsaws,
         },
     }

@@ -300,7 +300,8 @@ INTERPRETATIONS = {
     "trades_per_parameter": "Section 16's 'kept fill rows / 2' is reported as written (the draft's 2 parameters), "
     "with the same over Branch R's 3 free parameters next to it.",
     "whipsaw": "A whipsaw is a coin's counted state change reversed by its next change within 28 days; its cost is "
-    "the USD cost of the fills of both orders.",
+    "the USD cost of the fills of both orders. The total counts each order once, however many whipsaws share it "
+    "(#60).",
     "episodes": "An out-spell is a maximal run of kept closes where S's coin is out (per fold, the fold's run's state "
     "after its t0); the coin's return while out is close(last) / close(the close before the first) - 1, and the "
     "regret is N0's minus S's log growth over the spell's rows.",

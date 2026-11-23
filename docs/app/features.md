@@ -235,8 +235,8 @@ These are the settings of a Steady rebalancing strategy of ours, once one passes
 
 - **The rule:** once a week, each of BTC and ETH is held while its price is clearly above its own recent average and sold to USDC while it is clearly below; the crypto share (30-60%) is the customer's setting. It applied the owner's rules: sells to cash go through during a pause, and 100% USDC is allowed.
 - **It looked good but could be luck.** It made +212% with a worst fall of −37.5% (Sharpe 0.90). Holding the same mix without timing made +145% and fell −61%; holding only BTC made +18% and fell −81%. But about 1 in 12 random week-shifts of its own timing did as well, and its lead over holding could be luck.
-- **It only helped in crashes.** It beat holding in 2018 and 2022 and lost to it in 2020 and 2021, so it failed the boom-year check (owner, 2026-11-21).
-- **Its bad cases are too deep for Steady.** In 1 of 20 simulated histories it fell more than 59%, against Steady's 35% budget, at every allowed crypto share.
+- **It only helped in crashes.** It beat holding in 2018 and 2022 and lost to it in 2020 and 2021. Without BTC's best years (2020 and 2019) it no longer beat random timing or plain holding, so it failed the boom-year check (owner, 2026-11-21). Simply holding the rule's own average amount of crypto each year, with no timing, did even better (Sharpe 0.98, +294%).
+- **Its bad cases are too deep for Steady.** In 1 of 20 simulated histories it fell more than 59%, against Steady's 35% budget; even at the smallest crypto share (30%) it was more than 43%.
 - **The stop-loss added nothing measurable.** "Sell after a 20/30/40% fall from the top, buy back when the trend turns up" fired 4, 2 and 0 times in five years; at 20% it trimmed the worst fall by about 4 points, but its timing did as well as stops at random weeks.
 - **It traded about once a month** (median; at most 4 times in any 30 days).
 

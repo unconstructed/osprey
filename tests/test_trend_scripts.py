@@ -19,6 +19,7 @@ import subprocess
 import sys
 from functools import partial
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -2744,6 +2745,36 @@ def test_a0_s_control_panels_are_the_plan_s():
         assert sd.panel_hash(got) == sd.panel_hash(ref)
     assert sd.panel_hash(A0.control_panel("positive", 3)) != sd.panel_hash(A0.control_panel("negative", 3))
     assert A0.PLAN_SIZES == A0.Sizes(panels=20, vol_panels=1000, n_trials=200, bootstrap_resamples=10_000)
+
+
+def test_the_whipsaw_total_counts_each_order_once():
+    """#60 (the audit of run 0): a whipsaw's own cost is both orders' fills (INTERPRETATIONS["whipsaw"]), and the
+    total counts each order once, however many whipsaws share it (BTC's two chained whipsaws share bar 8, and ETH's
+    shares bars 8 and 10 with BTC's second). The old total summed the per-whipsaw costs: 10 + 26 + 26 = 62, more than
+    every kept fill's cost together (30)."""
+    idx = pd.date_range("2018-01-01", periods=12, freq="D", tz="UTC")
+    z = np.zeros((12, 2), dtype=int)
+    z[3:5, 0] = z[7:9, 0] = 1  # BTC: in 3-4, out 5-6, in 7-8, out 9-11 (counted changes 5, 7, 9)
+    z[3:7, 1] = z[9:, 1] = 1  # ETH: in 3-6, out 7-8, in 9-11 (counted changes 7, 9)
+    legs = [(4, "BTC", 1.0), (4, "ETH", 1.0), (6, "BTC", 2.0), (8, "BTC", 3.0), (8, "ETH", 5.0)]
+    legs += [(10, "BTC", 7.0), (10, "ETH", 11.0)]
+    fills = pd.DataFrame(legs, columns=["bar", "asset", "cost"])
+    run = pd.DataFrame({"ret": np.zeros(12)}, index=idx)
+    run.attrs = {"z": z, "fills": fills}
+    close = pd.DataFrame(
+        1.0, index=idx, columns=pd.MultiIndex.from_tuples([("BTC", "close"), ("ETH", "close")])
+    )
+    ctx = {"windows": [SimpleNamespace(t0=idx[1])], "K": close}
+    b = {"runs": [run], "n0_runs": [pd.DataFrame({"ret": np.zeros(12)}, index=idx)]}
+    w = RT.episodes(ctx, b)["whipsaws"]
+    assert [(x["asset"], x["first"][:10], x["reversed"][:10], x["cost_usd"]) for x in w["list"]] == [
+        ("BTC", "2018-01-06", "2018-01-08", 2.0 + 3.0 + 5.0),
+        ("BTC", "2018-01-08", "2018-01-10", 3.0 + 5.0 + 7.0 + 11.0),
+        ("ETH", "2018-01-08", "2018-01-10", 3.0 + 5.0 + 7.0 + 11.0),
+    ]
+    assert (w["count"], w["share"], w["orders"]) == (3, 3 / 5, 3)
+    assert w["cost_usd"] == 2.0 + (3.0 + 5.0) + (7.0 + 11.0)  # bars 6, 8 and 10, once each: 28
+    assert w["cost_usd"] <= fills.loc[fills["bar"] > 1, "cost"].sum()  # never more than every kept fill
 
 
 def test_r2_r5_count_the_longest_unbroken_all_usdc_stretch():
