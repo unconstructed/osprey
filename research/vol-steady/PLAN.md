@@ -255,6 +255,31 @@ look runs first. Both are disclosed again at the look.
 
 ## 15. Amendments
 
+- **M1 (2026-11-23, after the build, before A1, A0 or any run on real data): readings the build pinned.** The
+  build is `lab/runner/volsteady.py`, `research/vol-steady/` and two test files (TESTING.md #65, #66). Each
+  reading is in `INTERPRETATIONS` and the start record.
+  - **Section 4 overstated what runs unchanged.** `trend.stitched_schedule` takes one share per fold and one
+    share for the rows before the first check, while this rule's share moves every week. So
+    `volsteady.stitched_schedule` builds R_0's schedule, and the rows before its first check take fold 0's share
+    row by row. `trend.shifted`, `span_targets` and `run_span` run unchanged.
+  - **The rule's floats:**
+    - the basket return is `log1p(0.5 (r_BTC − 1) + 0.5 (r_ETH − 1))`, with r the close ratio;
+    - σ̂ is `√365 × √(ss / (L − 1))`, with ss from two `math.fsum` passes over L panel rows;
+    - activation is the first Monday check at row ≥ L of each panel's own rows, so Binance activates earlier in
+      its folds.
+  - **P:** in each fold run, the first share change is the first buy and is not counted. Order reasons are labels
+    only: "switch" is the activation order, "re-cut" a quarter step.
+  - **The strict trial count** stays TP's, N_raw + 49 (the K4-as-15 description + 63). It counts trend-steady's
+    prior looks, which are not all vol-steady's. Keeping it can only lower the strict DSR, so it is the
+    conservative reading.
+  - **Descriptions adapted to this rule** (they decide nothing):
+    - a whipsaw is a share change reversed within 28 days;
+    - spells with q < 1 replace "out of the market" spells;
+    - R3 reports the days at each q, and the exit delay is dropped;
+    - correlations also include trend-steady's S_A.
+  - **The slow calibration on the synthetic build** (null: iid walks, at most 18 of 200 allowed): 3 of 200 at
+    (10, 0.80, 0.50) and 13 of 200 at (120, 0.80, 0.50). Both pass. The second is above the nominal 4.8%; about 17%
+    of null runs would score that high, and it is reported as is.
 - **A1:** the throughput timing (before run 0).
 - **A0:** the procedure controls (before run 0).
 

@@ -3216,3 +3216,33 @@ def test_an_inconclusive_verdict_earns_no_freeze_and_no_look(fresh, clean_git, c
     assert FZ.main(["--out-dir", str(out), "--config-dir", str(cfg), "--any-verdict"]) == 0  # a dry run may
     assert RV.main([a for a in validate_args(out, cfg) if a != "--any-verdict"]) == 2
     assert "no validate look" in capsys.readouterr().err and not (out / "validate").exists()
+
+
+def test_correlations_read_the_other_steady_studies_last_complete_run(tmp_path, monkeypatch):
+    """INTERPRETATIONS["correlations"]: column S_A of oos.parquet of each study's last complete run (a later crashed
+    run or an unreadable summary is skipped); None on synthetic data or when no run is found."""
+    idx = pd.date_range("2018-01-03", periods=6, freq="D", tz="UTC")
+    s = pd.Series([0.01, -0.02, 0.03, 0.0, 0.01, -0.01], index=idx)
+    other = pd.Series([0.02, -0.01, 0.01, 0.01, 0.0, -0.02], index=idx)
+    base = tmp_path / "results" / "trend-steady" / "train"
+    for j, status, values in (
+        (0, "complete", other),
+        (1, "complete", other * -1.0),
+        (2, "crashed: X", other),
+    ):
+        (base / f"run{j}").mkdir(parents=True)
+        (base / f"run{j}" / "summary.json").write_text(json.dumps({"status": status}))
+        pd.DataFrame({"S_A": values}).to_parquet(base / f"run{j}" / "oos.parquet")
+    (base / "run3").mkdir()
+    (base / "run3" / "summary.json").write_text("not json")
+    monkeypatch.setattr(S, "REPO", tmp_path)
+    assert RT.stored_s_a("trend-steady", idx).tolist() == (other * -1.0).tolist()  # run 1, the last complete
+    assert RT.stored_s_a("rebalance-steady", idx) is None
+    b = {"S": s, "N0": s * 0.5}
+    ctx = {"data": "real", "B1": other, "B2": other * 2.0}
+    got = RT.correlations(ctx, b)
+    assert (
+        got["trend_steady_S_A"] == float(np.corrcoef(s, -other)[0, 1]) and got["rebalance_steady_S_A"] is None
+    )
+    assert got["N0"] == pytest.approx(1.0) and got["B1"] == float(np.corrcoef(s, other)[0, 1])
+    assert RT.correlations({**ctx, "data": "synthetic"}, b)["trend_steady_S_A"] is None

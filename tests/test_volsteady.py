@@ -258,6 +258,10 @@ def test_the_share_changes_only_at_check_closes_and_a_missing_monday_is_skipped(
     q = vs.vol_path(gone, 10, 0.4, 0.5)
     assert gone.index[q.checks].day_of_week.tolist() == [0] * len(q.checks)
     assert pd.Timestamp(panel.index[28]) not in gone.index[q.checks]
+    # the share decided at Monday 21 is held for the 13 closes to the next Monday (row 34 once row 28 is gone)
+    moved_gone = np.flatnonzero(np.diff(q.share)) + 1
+    assert set(moved_gone.tolist()) <= set(q.checks.tolist()) and 21 in q.checks and 34 in q.checks
+    assert q.share[21] > 0 and (q.share[21:34] == q.share[21]).all() and (q.q[21:34] == q.q[21]).all()
     daily = vs.vol_path(panel, 10, 0.4, 0.5, weekday=None)
     assert daily.checks.tolist() == list(range(10, 70)) and daily.activation == 10
 
@@ -753,11 +757,13 @@ def test_stop_rule_18_with_no_stop_outcome():
         assert (
             got["verdict"] == b["verdict"] and got["headline"] == b["headline"] and got["superseded"] is False
         )
-    tie_old = run_record("EDGE", "EDGE, NOT A CANDIDATE")
-    tie_new = run_record("EDGE", "EDGE, NOT A CANDIDATE")
-    assert (
-        vs.reported_verdict(tie_old, tie_new, "other, after the verdict")["headline"] is tie_new["headline"]
-    )
+    # a tie (the same outcome, other labels) goes to the amendment run's string (TP #56: two equal string literals
+    # are one interned object, so a tie case built from them cannot tell the runs apart)
+    tie_old = run_record("NO EDGE (LOW POWER: 3 share changes)")
+    tie_new = run_record("NO EDGE (LOW POWER: 9 share changes)")
+    for key in ("verdict", "headline"):
+        assert vs.reported_verdict(tie_old, tie_new, "other, after the verdict")[key] == tie_new[key]
+        assert vs.reported_verdict(tie_new, tie_old, "other, after the verdict")[key] == tie_old[key]
     mixed = vs.reported_verdict(
         run_record("EDGE", "CANDIDATE FOR AUDIT"),
         run_record("EDGE", "EDGE, NOT A CANDIDATE"),
