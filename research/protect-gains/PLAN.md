@@ -353,7 +353,41 @@ Tests (synthetic and hand-built paths only, no catalog):
     - the dip-buyer hook;
     - the config hash;
     - no cost-invariance check on brake runs.
-- **A1:** the throughput timing (before run 0).
+- **A1 (2026-11-23, before run 0): the throughput timing.** `run.py --time` on synthetic bars (no market data),
+  20 repetitions of a 731-row window on the 70% crypto mix (f = 0.75): a reference run 17.8 ms; the busiest setting
+  (A at X = 0.10, rebound 0, "counts") 70.1 ms, with 12 stops and 13 passes at 5.4 ms a pass. Charging every one of
+  the 81,216 brake runs at the busiest run's time and the 834 reference runs at theirs gives **95.1 CPU-minutes**
+  (about 48 minutes on 2 workers), under the 240 limit. The builder's earlier timing gave 68.0 on a quieter machine.
+  `run.py` times again at start and refuses above 240 (stop rule 7).
+- **A2 (2026-11-23, after the build, before any result): readings the build pinned** where the plan is loosely
+  worded. Each is in `protect.READINGS_PINNED` and `run.py`'s `INTERPRETATIONS`, recorded in the start record.
+  - **Stage 2's reading** (section 6, "the reading D6 chooses") is the reading D6 puts **in force**: "counts" unless
+    the owner has approved "separate" in writing (section 13). If D6 recommends "separate", stage 2 still runs
+    "counts", and a "separate" stage 2 is an amendment run after the owner's approval.
+  - **After a buy-back the tool's wait restarts under both readings** (section 5, "as after a limit fix"). The
+    readings differ only in whether the wait can hold the buy-back back and whether it is counted.
+  - **A "counts" buy-back held by the wait** is ordered at the first close after the wait runs out, without checking
+    its signal again.
+  - **R2's dip** is a close strictly after the sale's order close and before the signal close; it may fall inside
+    the 7-day minimum. A close with no SMA200 is neither a dip nor a signal.
+  - **Missed rebound** reads I at the sale's and the buy-back's fill opens (I chain-linked from the previous close to
+    the open); the before-cost overshoot uses V at the open, V_t · (1 + Σ w · g).
+  - **A re-stop** is the next filled stop at most 30 days after the buy-back's fill instant (30 days included). A
+    buy-back near the window's end still counts in the share's denominator. **Days in USDC** run from the sale's
+    fill instant to the buy-back's, or to the last close.
+  - **The share of peak profit kept** (section 7) is (V_end − D) / (P − D) per run where B was active at some
+    close, P the run's highest V; each B stop also records its own kept share.
+  - **The rules:** D2, D3 and D6 break ties on C̃ within D1's 1e-12 before comparing C̄. D2 is MISSING when any
+    automatic mode's or wait-30's D1 is MISSING; D3 is MISSING when either line's D2 is. D6 needs at least one line
+    type with defaults under both readings, and otherwise recommends "counts". D4's labels: NOT ROBUST before
+    MISSING before ROBUST. D5: B's worst sale below D is "none" when there are stops and none sold below D.
+  - **A line crossed at the last close** is not re-run, so a run's passes are its filled stops + 1.
+  - **Start guards added:** the config hash also covers `trend.py`, `lab/validation/*.py` (F is
+    `montecarlo.max_drawdown`), the data loaders, `pyproject.toml` and `uv.lock`. Section 3's snapshot id is
+    recorded, not enforced; the bars and panel hashes decide. The tool's limit as read from
+    `config/risk_levels.yaml` must be 2, or the run refuses to start.
+  - **`runs.csv`** is one row per run, as section 14 says: about 82,050 rows (16-17 MB) with F, C and the brake
+    measures, and no total return, end value, Sharpe or profit-share column.
 
 ## 12. Allowed range and production notes (`risk-officer`, 2026-11-23)
 
@@ -432,6 +466,8 @@ plain held mix without the tool, and a separate code-breaker review.
 | Plan | 2026-11-23 | the lead | No market data. Read: `holdmix.py`'s function list and the `hold_mix` docstring; `config/risk_levels.yaml`'s hold-mix limit line; trend-steady's RESULTS.md, summary and section 3 (P1, and the data pins); the earlier owner decisions; `docs/app/features.md`'s "Strategies and rules" and "Customer controls" tables |
 | Review | 2026-11-23 | `backtest-auditor` | No market data. Read: this plan and its README; `holdmix.py` lines 1-745 and 1600-1697; parts of `portfolio.py` and `trend.py`; `reference.py`'s `Costs` fields; `config/risk_levels.yaml` and `costs.yaml`; hold-mix-cap's PLAN.md (headings, sections 3, 4.3-4.6 and 11; not its results); `docs/app/features.md`'s headings and the two catalog rows; and the instruction files. It read none of hold-mix-cap's result files. Its two scratch checks used the config and the calendar only |
 | Risk | 2026-11-23 | `risk-officer` | No market data. Read: this plan; `config/risk_levels.yaml`; parts of `holdmix.py` and `portfolio.py`; and the instruction files |
+| Build | 2026-11-23 | `quant-researcher` | No market data. Built `lab/runner/protect.py`, `run.py` and their tests on synthetic and hand-built bars only. It read none of hold-mix-cap's result files or the "Hold this mix" section of `docs/app/features.md` |
+| A1 | 2026-11-23 | the lead | No market data: `run.py --time` on synthetic bars (seed 21) |
 | T1 | reserved | | Run 0 on the train window |
 
 **Validate-window looks used for protect-gains: 0.**

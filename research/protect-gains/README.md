@@ -12,6 +12,7 @@ the study claims no edge.
 
 - Plan: [PLAN.md](PLAN.md), the pre-registration (2026-11-23, the small version): reviewed by `backtest-auditor` and
   `risk-officer` with no market data, with the owner's answers (a 'back to where we sold' buy-back; line B starts later;
-  the simulation compares both readings of the tool's trade limit). Next: build the code and tests, then run 0.
-- Status 2026-11-23: plan committed. No code, no run. Validate-window looks used: 0. The test window is never read.
+  the simulation compares both readings of the tool's trade limit). Next: the full test tiers, then run 0.
+- Status 2026-11-23: plan committed; code and tests built (`lab/runner/protect.py`, `run.py`, `tests/test_protect.py`,
+  `tests/test_protect_run.py`); amendments A1 (timing, 95.1 CPU-minutes) and A2 (readings) recorded. No run yet. Validate-window looks used: 0. The test window is never read.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.
