@@ -6,6 +6,15 @@
 
 A crypto app for iPhone and Android where **users own their wallet and our strategies trade inside it**. Users add cash with Apple Pay, a debit card or a bank transfer, pick a risk level and strategies, and let them run automatically or approve each trade with one tap. They cash out to their bank whenever they want.
 
+**Direction (owner, 2026-11-23): "quant trading for dummies with training wheels."**
+- **Suggested rules for stability.** Each rule the app suggests comes with settings the lab's simulations picked by
+  rules fixed in advance.
+- **Moderate customization.** People who aren't trading experts can still run their own simple rule engine, with
+  dials limited to ranges the lab has tested and the owner has approved.
+- **A real edge, if there is one.** The lab keeps looking for rules that beat holding after costs, and suggests one
+  only when it survives the luck checks. Until then, the suggested rules are honest risk tools, not promises of
+  extra return.
+
 **We never hold customer money.** The wallet belongs to the user, licensed ramp partners handle dollars in and out, and trades execute on decentralized exchanges.
 
 **Analogy:** the user's wallet is their own safe. We're the kitchen that cooks up the trades. With auto-trading on, the user hands us a key that opens one drawer only (swaps of allowed coins, within their limits) and never the front door (sending money out).
