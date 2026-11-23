@@ -388,6 +388,11 @@ Tests (synthetic and hand-built paths only, no catalog):
     `config/risk_levels.yaml` must be 2, or the run refuses to start.
   - **`runs.csv`** is one row per run, as section 14 says: about 82,050 rows (16-17 MB) with F, C and the brake
     measures, and no total return, end value, Sharpe or profit-share column.
+- **V1 (2026-11-23, after run 0 and its audit, before any validate bar was read for this study): one validate look**
+  at the setting that looked best after run 0 (line A at 10% with the buy-back 30 days after the sale, "counts"), at
+  the owner's request in chat ("yes"). Its own pre-registration is [VALIDATE_PLAN.md](VALIDATE_PLAN.md). It is a
+  post-hoc pick, so a pass is evidence for the owner's decision, not a lab default. Section 15's "no validate look in
+  this version" no longer holds after V1.
 
 ## 12. Allowed range and production notes (`risk-officer`, 2026-11-23)
 
@@ -469,5 +474,6 @@ plain held mix without the tool, and a separate code-breaker review.
 | Build | 2026-11-23 | `quant-researcher` | No market data. Built `lab/runner/protect.py`, `run.py` and their tests on synthetic and hand-built bars only. It read none of hold-mix-cap's result files or the "Hold this mix" section of `docs/app/features.md` |
 | A1 | 2026-11-23 | the lead | No market data: `run.py --time` on synthetic bars (seed 21) |
 | T1 | 2026-11-23 | the lead | Run 0 on the train window (Kraken and Binance, 2017-2022), commit `5e99d68`: NO DEFAULT for both lines (`RESULTS.md`). No validate or test bar |
+| V1 | reserved | | The single validate look ([VALIDATE_PLAN.md](VALIDATE_PLAN.md)) |
 
 **Validate-window looks used for protect-gains: 0.**

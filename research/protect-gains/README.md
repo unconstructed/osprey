@@ -16,5 +16,7 @@ the study claims no edge.
 - Status 2026-11-23: run 0 done on the train window ([RESULTS.md](RESULTS.md)). **No starting setting for either line**:
   line A at 10% with the trend buy-back was the only setting that cut the bad-case fall enough for every mix (90th
   percentile 26% against 65%), but 36% of its buy-backs were sold again within a month (the plan allows 25%), and it
-  cost a median 23% over two years. The owner decides (RESULTS.md, "For the owner"). Validate-window looks used: 0. The test window is never read.
+  cost a median 23% over two years. The owner decides (RESULTS.md, "For the owner"). Next (owner, 2026-11-23): one validate look at
+  the setting that looked best after run 0, pre-registered in [VALIDATE_PLAN.md](VALIDATE_PLAN.md). Validate-window
+  looks used: 0. The test window is never read.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.
