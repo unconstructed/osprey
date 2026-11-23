@@ -956,6 +956,24 @@ def test_the_tool_copy_equals_hold_mix_bit_for_bit(panel, data):
         assert copy.attrs["brake"] is None
 
 
+def test_the_tool_copy_resets_as_hold_mix_does():
+    """The reset, by hand (#67: the reset branch of ``ToolStep.decide`` was reached only by drawn cases, so 100%
+    coverage depended on the draws). Flat prices keep both coins on target, so nothing but the reset orders: the
+    first buy at close 0, then a reset every 7 days from the last order, and never at the last close. The copy
+    equals ``hold_mix`` bit for bit; with a reset longer than the window nothing follows the first buy."""
+    n = 60
+    panel = panel_on(days(n), path(n))
+    params = tool((0.25, 0.25), NONE, band=0.30, wait=1, reset=7)
+    for costs in (ZERO, COSTS):
+        copy = P.protect(params, panel, costs)
+        P.check_tool_copy(copy, H.hold_mix(params, panel, costs))
+        assert copy.attrs["orders"].tolist() == list(range(0, n - 1, 7))
+        assert copy.attrs["reasons"].tolist() == ["first"] + ["reset"] * 8
+    never = P.protect({**params, "reset_days": 90}, panel, ZERO)
+    P.check_tool_copy(never, H.hold_mix({**params, "reset_days": 90}, panel, ZERO))
+    assert never.attrs["orders"].tolist() == [0] and never.attrs["reasons"].tolist() == ["first"]
+
+
 @given(case=cases(), costs=st.sampled_from([COSTS, COSTS_2X]))
 def test_a_level_that_never_fires_is_the_reference_bit_for_bit(case, costs):
     panel, tp, bp, f = case
