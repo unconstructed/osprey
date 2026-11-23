@@ -1,0 +1,1 @@
+{"commit": "587acfa0ad3cef2adcb2c7b9805d0e3fb472d9ea", "config_hash": "eed7f8b885e08eadcfb0350d5b611d347dbbe8402db891469c714c9979c0051d", "data": "real", "dirty": false, "out_dir": "/home/user/osprey/results/trend-steady", "run": 0, "script": "run_train.py", "snapshot_id": "1746a21b75683e76", "trigger": null, "utc": "2026-11-23T03:14:12.113551+00:00"}
