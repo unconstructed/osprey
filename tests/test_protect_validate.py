@@ -764,31 +764,44 @@ def test_the_verdict_and_missing_by_hand():
     assert (ahead["ahead_share"], ahead["fire_rate"]) == (0.5, 0.5)
 
 
-def test_the_full_span_never_enters_a_pool_and_the_robustness_labels_by_hand():
+def decided(pools: dict[tuple[str, str], tuple[float, int]]) -> dict:
+    """``decide`` on a hand table: per (source, cost), the candidate's C and buy-backs (no re-stop) on windows j0 and j1,
+    R's F = the candidate's F = 0.3, and a full-span candidate run with C = 9 (it would fail V-a in a pool)."""
     rows = []
-    for source, cost, c in (("KRAKEN", "1x", 0.0), ("BINANCE", "1x", 0.0), ("KRAKEN", "2x", 0.5)):
+    for (source, cost), (c, buybacks) in pools.items():
         for window in ("j0", "j1", "full"):
+            rows.append({"source": source, "cost": cost, "setting": "R", "window": window, "F": 0.3})
             rows.append(
-                {"source": source, "cost": cost, "setting": "R", "s": 0.5, "window": window, "F": 0.3}
+                {
+                    "source": source,
+                    "cost": cost,
+                    "setting": CANDIDATE,
+                    "window": window,
+                    "F": 0.3,
+                    "C": 9.0 if window == "full" else c,
+                    "buybacks": buybacks,
+                }
             )
-            cc = 9.0 if window == "full" else c  # the full span would fail V-a if it entered a pool
-            rows.append(
-                {"source": source, "cost": cost, "setting": CANDIDATE, "s": 0.5, "window": window, "C": cc}
-            )
-    table = hand_table(rows)
-    table["f"] = 0.5
     stops = pd.DataFrame(columns=["source", "cost", "setting", *V.STOP_SUMMARY])
-    got = V.decide(
-        table,
-        stops,
-        V.Grid(("KRAKEN", "BINANCE"), ("1x", "2x"), ("j0", "j1", "full"), ((0.5, 0.5),), ("R", CANDIDATE)),
-    )
+    grid = V.Grid(("KRAKEN", "BINANCE"), ("1x", "2x"), ("j0", "j1", "full"), ((0.5, 0.5),), ("R", CANDIDATE))
+    return V.decide(hand_table(rows), stops, grid)
+
+
+def test_the_full_span_never_enters_a_pool_and_the_robustness_labels_by_hand():
+    k1, b1, k2 = ("KRAKEN", "1x"), ("BINANCE", "1x"), ("KRAKEN", "2x")
+    got = decided({k1: (0.0, 0), b1: (0.0, 0), k2: (0.5, 0)})
     assert got["headline"] == "HOLDS UP; whipsaw FAIL" and got["checks"]["runs"] == 2
     assert got["robustness"]["BINANCE 1x"]["label"] == "same"
-    assert got["robustness"]["KRAKEN 2x"]["label"] == "differs"
+    assert got["robustness"]["KRAKEN 2x"]["label"] == "differs"  # the verdict differs
     assert got["robustness"]["KRAKEN 2x"]["headline"] == "DOES NOT HOLD UP; whipsaw FAIL"
     assert len(got["full_span"]) == 6
     assert {r["C"] for r in got["full_span"] if r["setting"] == CANDIDATE} == {9.0}
+    whipsaw = decided({k1: (0.0, 0), b1: (0.0, 1), k2: (0.0, 0)})  # the same verdict, V-c differs on Binance
+    assert whipsaw["robustness"]["BINANCE 1x"]["headline"] == "HOLDS UP; whipsaw PASS"
+    assert (whipsaw["robustness"]["BINANCE 1x"]["label"], whipsaw["robustness"]["KRAKEN 2x"]["label"]) == (
+        "differs",
+        "same",
+    )
 
 
 # ------------------------------------------------------------------------------------- no look-ahead
