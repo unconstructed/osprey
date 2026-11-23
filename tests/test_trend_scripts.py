@@ -13,6 +13,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -160,9 +161,28 @@ PRIOR_ROWS = (
 )
 
 
+def without_prior_rows(text: str) -> str:
+    """``text`` with every amendment A1 and A0 item (its first line and its indented continuation lines) removed
+    from section 15's amendment list: the plan as it read before A1 and A0 were written into it. Once the real
+    PLAN.md holds its own A1 and A0 lines, a stand-in built from it must not hold them twice (#59)."""
+    start = text.index("\n**Amendments.**") + 1
+    end = text.index("\n**Deviations.**", start) + 1
+    kept, dropping = [], False
+    for line in text[start:end].splitlines(keepends=True):
+        if re.match(r"- \*\*Amendment A[01]\b", line):
+            dropping = True
+            continue
+        if dropping and line.startswith("  ") and line.strip():
+            continue
+        dropping = False
+        kept.append(line)
+    return text[:start] + "".join(kept) + text[end:]
+
+
 def plan_with(rows: str, text: str | None = None) -> str:
-    """``text`` (default: the real PLAN.md) with ``rows`` added at the end of section 15's amendment list."""
-    text = S.PLAN.read_text() if text is None else text
+    """``text`` (default: the real PLAN.md without its own A1 and A0 lines) with ``rows`` added at the end of section
+    15's amendment list."""
+    text = without_prior_rows(S.PLAN.read_text()) if text is None else text
     i = text.index("\n**Deviations.**") + 1
     return text[:i] + rows + text[i:]
 
@@ -3266,23 +3286,47 @@ def test_prior_amendments_by_hand(tmp_path):
         check("", text=a1 + ok0)
 
 
+def test_stand_in_plans_hold_amendments_a1_and_a0_once(tmp_path, monkeypatch):
+    """#59: the real-data stand-in plan holds exactly one A1 and one A0 line, whether or not the real PLAN.md holds
+    its own; `without_prior_rows` drops those items (continuation lines included) and nothing else."""
+    base = without_prior_rows(S.PLAN.read_text())
+    rows = (
+        "- **Amendment A1 (2026-12-01).** N = 200 on the first line,\n  and a continuation line.\n"
+        "- **Amendment A01.** not an A0 line\n"
+        "- **Amendment run 1 (2026-12-01).** not an A0 or A1 line\n"
+        "- **Amendment A0 (2026-12-01).** stop rule 15: no alarm; power: no alarm.\n"
+    )
+    kept = "- **Amendment A01.** not an A0 line\n- **Amendment run 1 (2026-12-01).** not an A0 or A1 line\n"
+    assert without_prior_rows(plan_with(rows, base)) == plan_with(kept, base)
+    assert without_prior_rows(base) == base
+    section = S.amendments_section(base)
+    assert "\n- **Amendment A1" not in section and "\n- **Amendment A0" not in section
+    real = tmp_path / "PLAN.md"
+    real.write_text(plan_with(PRIOR_ROWS, base))  # the real plan once A1 and A0 are written into it
+    monkeypatch.setattr(S, "PLAN", real)
+    real_folders(monkeypatch, tmp_path / "stand-in")
+    got = S.prior_amendments(S.PLAN.read_text(), S.PLAN_SETTINGS.n_trials)
+    assert (got["A1"], got["A0"]) == tuple(PRIOR_ROWS.splitlines())
+
+
 def test_a_real_run_needs_amendments_a1_and_a0_first(train0, tmp_path, clean_git, monkeypatch, capsys):
     """Section 15, order of work step 4: a real run 0 refuses (exit 2, nothing written) until A1 (with this build's N)
     and A0 (no alarm, or the owner's written decision) are in the committed PLAN.md. Dry runs are exempt."""
     out, catalog_dir = real_folders(monkeypatch, tmp_path)
     plan = tmp_path / "PLAN2.md"
     monkeypatch.setattr(S, "PLAN", plan)
-    real = S.REPO / "research" / "trend-steady" / "PLAN.md"
+    real = without_prior_rows((S.REPO / "research" / "trend-steady" / "PLAN.md").read_text())
     for text, match in (
-        (real.read_text(), "exactly one '- **Amendment A1' line"),  # the plan as committed today
-        (plan_with(PRIOR_ROWS.replace("N = 200", "N = 150"), real.read_text()), "does not say 'N = 200'"),
-        (plan_with(PRIOR_ROWS.replace("power: no alarm", "power 2 of 20"), real.read_text()), "says neither"),
+        (real, "exactly one '- **Amendment A1' line"),  # the plan before A1 and A0 were written (#59)
+        (plan_with(PRIOR_ROWS.replace("N = 200", "N = 150"), real), "does not say 'N = 200'"),
+        (plan_with(PRIOR_ROWS.replace("power: no alarm", "power 2 of 20"), real), "says neither"),
+        (plan_with(PRIOR_ROWS + PRIOR_ROWS, real), "found 2"),
     ):
         plan.write_text(text)
         assert RT.main([]) == 2
         assert match in capsys.readouterr().err
         assert not out.exists() and not (tmp_path / "here").exists()
-    plan.write_text(plan_with(PRIOR_ROWS, real.read_text()))
+    plan.write_text(plan_with(PRIOR_ROWS, real))
     assert RT.main([]) == 2  # past A0 and A1: no SNAPSHOT.json here
     assert "SNAPSHOT.json" in capsys.readouterr().err and not out.exists()
     assert summary(train0["out"])["start"]["prior_amendments"] is None  # the dry run 0 ran without the rows
