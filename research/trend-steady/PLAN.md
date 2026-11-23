@@ -9,7 +9,8 @@ frozen: FROZEN.json is written only before an earned validate look (section 13).
 [PLAN_DRAFT_2026-11-21.md](PLAN_DRAFT_2026-11-21.md) (SHA-256
 `95b84fba8c3863cd534c96140ef52260eb950a11daa4062c9d5a03d415f23045`, last written 2026-11-21 16:11 UTC), plus the
 named amendments **M1-M8 of 2026-11-22** and **[M22]** the review amendments **M9-M22 of 2026-11-22**, and **[M23]**
-the pre-A0 records **M23-M25 of 2026-11-22**. Their table is in section 15. Every place they change is marked **[Mk]**,
+the pre-A0 records **M23-M25 of 2026-11-22**, and **[M26]** the code-review amendments **M26-M27 of 2026-11-22**
+(before any run on real data, and before A0). Their table is in section 15. Every place they change is marked **[Mk]**,
 and `diff PLAN_DRAFT_2026-11-21.md PLAN.md` shows every changed line. Struck text (~~like this~~) is the draft's,
 kept for the record; it does not apply. Repo HEAD at writing `d5b34bc` (branch `claude/tender-brown-g86h44`);
 `52d7ee1` (2026-11-22 15:09 UTC: `docs/app/` and the 2026-11-22 owner record only, not read) landed while it was
@@ -1194,6 +1195,7 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
 ## 13. The single validate look
 
 - **It runs only if E1-E8 and P all hold.** Otherwise the validate window stays unlooked for trend-steady.
+  **[M26]** They must hold in the reported run and in every earlier run it is reported beside under stop rule 18.
 - **Before it:** the train results are written, and `freeze.py` writes `results/trend-steady/FROZEN.json`.
   - `freeze.py` first recomputes the config hash and every per-file hash and compares them with the reported run's
     `summary.json` start fields. On any difference it exits without writing (the only exception is stop rule 10).
@@ -1349,6 +1351,12 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
    written into PLAN.md and committed. **[M1, M4, M7]** A1 is timed with the Branch R box; A0 includes the stop-loss
    variant; both run under stop rule 17's projection guard. **[M21]** A0 also holds the one-off size check of E1
    under volatility clustering (section 9), and A1 records the full tier's expected wall time (section 7).
+   **[M27]** `run_train.py` enforces this order on real data: before the snapshot is read it refuses (exit 2, nothing
+   written) unless the amendment list below holds exactly one line starting `- **Amendment A1` that says `N = <n>`,
+   with n the trials per study the scripts run (`study.PLAN_SETTINGS.n_trials`, which `controls.py` also uses), and
+   exactly one line starting `- **Amendment A0` that says either both `stop rule 15: no alarm` and `power: no
+   alarm`, or `owner decision: reports/director/<file>.md`, naming the owner's written decision on file (after a stop
+   rule 15 alarm or the power alarm of section 9). Dry runs are exempt.
 5. Run 0, the train phase: both seeds, every comparator. Then RESULTS.md, the audit and the risk review.
 6. The validate look, only if earned (section 13).
 
@@ -1402,7 +1410,8 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
     stop-loss variant at any level. **[M17]** It also holds for SL-T on its own, at any level. **[M21]** And for the
     one-off size check: more than 67 of its 1000 volatility-clustering panels passing E1 (section 9). A triage that
     finds no bug and no design fault goes to the owner in writing, and run 0 waits for his written decision; the
-    controls are never rerun with other seeds.
+    controls are never rerun with other seeds. **[M27]** The wait is enforced: run 0 starts only once the A0 line
+    names that decision (order of work, step 4).
 16. ~~**hold-mix-cap ordering.** This plan is committed before anyone working on trend-steady reads hold-mix-cap's
     RESULTS.md. If that is not possible, the reading is logged in section 2 before run 0, and every change made after
     it is a named amendment.~~ **[M5] hold-mix-cap ordering, as it happened.** The first sentence could not be met:
@@ -1427,7 +1436,15 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
     headline is then the less favourable of the two verdicts (NO EDGE < INCONCLUSIVE < EDGE; section 12). RESULTS.md
     lists every run's E1 rank p and E2 p side by side. The RUNLOG line of an amendment run records which of (a)-(c)
     found the bug, or "other, after the verdict". Why: each optional rerun redraws E1, E2 and the verdict, which no
-    trial count adjusts for, so the decision to rerun must not depend on the verdict.
+    trial count adjusts for, so the decision to rerun must not depend on the verdict. **[M26]** Over a chain of runs:
+    an amendment run found by (a)-(c) supersedes the run before it alone, and any earlier run that one was reported
+    beside stays beside the new run; "other, after the verdict" needs the run before it complete (a crashed or stopped
+    run has no verdict; its rerun is (a), stop rule 6). Which earlier runs a run is reported beside is fixed in its
+    start record before any bar. The validate look is earned only if it is earned in the run and in every earlier run
+    it is reported beside (so a NO EDGE or INCONCLUSIVE run beside it means no look, stop rule 8); `freeze.py` and
+    `run_validate.py` read that reported reading, never the run's own alone. At the look, the frozen run's verdict
+    and headline after E9 are combined the same way with those earlier runs' train values (the less favourable), and
+    that is the look's verdict and headline; the frozen run's own values after E9 are reported next to them.
 
 **Amendments.**
 - Dated, written in the plan's amendment section and committed before the run they affect.
@@ -1447,6 +1464,12 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
   threshold, allowed value or verdict rule. Written by `quant-researcher` (its reading is logged in section 20). M24's
   section 8 text and its row below are `risk-officer`'s own words, filed under M24 (it suggested M23). The author's
   brief held no summary of hold-mix-cap's results.
+- **[M26] Amendments M26-M27** (2026-11-22, after the code review of the build of section 17 and before any run on
+  real data; A0 and A1 have not run; no trend rule has been run on market data). Written by `quant-researcher` while
+  fixing the review's blocking findings (TESTING.md #58; its reading is logged in section 20). They change no rule,
+  gate, threshold, allowed value or verdict rule: M26 pins how stop rule 18 reads over a chain of runs and at the
+  look, and M27 makes the scripts enforce the order of work that section 15 already set. The author's brief held the
+  lead's one-sentence summary of hold-mix-cap's results (K10's words, no number), so the last column answers for each.
 
 | # | What changed (where) | Why | Could hold-mix-cap's results have informed it? |
 |---|---|---|---|
@@ -1475,6 +1498,8 @@ holds only if it holds at each of them (section 10's table); R2-R5 are reported 
 | M23 | **Owner question 6 answered: keep G8-excess as pinned** (header: owner decision 2's note, the questions' status, next step 4; section 15, order step 2; section 19: Q6's status, the question as asked and the answer; the Review log's B1; README; the record `reports/director/2026-11-22-owner-answer-trend-q6.md`). Nothing about G8 changes: not G8-excess, its threshold, the other gates or the verdict rules. The expected best reachable headline stays "EDGE, NOT A CANDIDATE" | Header next step 4 and section 19: an answer counts only as a dated named amendment that cites the review's finding (M10; B1 and B11), committed before A0 and before any trend-steady result | **No.** It keeps the gate the owner chose on 2026-11-21 (16:31 UTC, before hold-mix-cap's run 0) and changes nothing. The owner had seen hold-mix-cap's results (K10), but they measure held mixes, not a trend rule's gain over the held mix by regime, and the question as asked held no hold-mix-cap number |
 | M24 | **`risk-officer`'s dated confirmation of the allowed values** s ∈ {0.30, 0.40, 0.50, 0.60} (section 8, answering the [M22] note there) | Section 8 [M22]: required before A0 starts | **No.** It confirms the values set by 2026-11-21 16:11 UTC and approved at 16:31 UTC (K12) and changes nothing; the check read no price and no result |
 | M25 | **What the `risk-officer` review read, recorded** (section 20, the Review row: the pending sentence struck and the reading added; header next step 4; section 15, order step 2) | Stop rule 16: every further reader is logged in section 20, with what was read, before run 0; the Review row left this to be added before A0 | It is the record of a reading. The review read no hold-mix-cap result file and no hold-mix-cap number; the only published numbers it read are rebalance-steady's, quoted in `docs/app/features.md` (already K2) |
+| M26 | **Stop rule 18 over a chain of runs, and at the look** (stop rule 18 and section 13, marked [M26]; `study.py` INTERPRETATIONS "reported", "look_due", "reported_run" and "look_hash_check"). (a)-(c) supersede the previous run alone, and the runs it was reported beside stay; "other, after the verdict" needs the previous run complete; the beside runs are fixed in the start record before any bar and rechecked at the freeze; the look is earned only in every run reported together; the look's verdict and headline are the less favourable of the frozen run's after E9 and those runs' train values | The code review (blocking, TESTING.md #58): `freeze.py` and `run_validate.py` read only the reported run's own look_earned, so after a NO EDGE run 0 an amendment run with trigger "other, after the verdict" and its own EDGE could freeze and spend the validate window, the outcome-driven rerun stop rule 18 exists to stop. While fixing it: an amendment run after a crashed run (stop rule 6) would have crashed at its end (it read the previous run's results, which a crashed run does not have), and the plan did not say what (a)-(c) do to a run the superseded run was reported beside; the reading taken is the cautious one, which keeps that run | **No.** It reads stop rule 18 (M18) as written, changes no threshold and uses no result of any kind; it can only withhold a look or lower a headline |
+| M27 | **A1 and A0 before a real run, enforced** (section 15 order of work step 4 and stop rule 15, marked [M27]; `study.py` INTERPRETATIONS "prior_amendments"). A real `run_train.py` refuses until the amendment list holds one A1 line with `N = <n>` equal to the N the scripts run and one A0 line saying no alarm (stop rule 15 and the power alarm) or naming the owner's written decision on file; `controls.py` (A0) takes its N and resamples from the same setting | The code review (blocking, TESTING.md #58): a clean commit and SNAPSHOT.json were enough to start run 0, before A1 and A0 or after an alarm, and N was typed in two places; run 0 runs once, so starting it out of order spends the study's train look for good | **No.** It enforces the order of work and the waits that M1, M4, M7 and M21 already pinned, from the scripts' own code; it uses no result of any kind |
 
 **Deviations.** Every departure from the plan goes into a Deviations table in RESULTS.md: what changed, why, when
 relative to which result, and its effect on any number.
@@ -1958,6 +1983,7 @@ Answers that change the plan, decided now:
 | M9-M22 | **[M22]** 2026-11-22 | `quant-researcher` | No market data. Read: this plan, the draft's hash only, the README, the review's findings and some of its synthetic scripts (`g8x.py`, `g8_excess_check.py`, `e1_volnull.py`, `gens.py`, `rule_size.py`), the 2026-11-21 owner record, `OWNER_QUESTIONS.md` Q5, the scratch checks of appendix B, `lab/` code (`steady.py`, `report.py`, `montecarlo.py`, `synthetic.py`, the import closure) and rebalance-steady's `frozen_paths()`, and TESTING.md (project instructions; see K11's corrected line). The task brief held the same one-sentence summary of hold-mix-cap's results. Not read: any hold-mix-cap result file, `docs/app/features.md`, the 2026-11-22 owner record (only `git diff --stat` of `52d7ee1`, which lists file names), the catalog and `results/`. Ran only the synthetic and price-free checks of appendix B |
 | M24 | **[M24]** 2026-11-22 | `risk-officer` | Its confirmation of the allowed values (section 8). No market data. Read: `config/risk_levels.yaml` in full, with its SHA-256; this plan's header (lines 1-20), sections 4, 5 and 8, appendix B, and section 15's amendment rules and table (the rows cut to their first 300 characters); in `lab/runner/portfolio.py` the imports and the code of `risk_limits` and `check_targets`; `lab/runner/__init__.py` and `lab/__init__.py` (so that the import does not load `trend.py`); `git log --oneline -3` (HEAD `16d2363`) and `git status --porcelain`, before and after the check; the CLAUDE.md, AGENTS.md and TESTING.md that load automatically (TESTING.md's bug log has hold-mix-cap run 0's test facts, none of its results). Not read: no catalog bar, nothing under `results/` or `data/`, no hold-mix-cap result file, not `docs/app/features.md`, not the 2026-11-22 owner record, not `trend.py` or `test_trend.py`. Ran only `trendrun/prea0/riskconfirm/confirm_check.py` in the session scratchpad (the limits as read, `check_targets` on 16 target sets and 2 controls); no test run, and the tree was unchanged |
 | M23-M25 | **[M23]** 2026-11-22 | `quant-researcher` | Writing M23-M25. No market data, no run and no test run. Read: this plan (the header, sections 1, 2, 8, 15, 19 and 20, parts of sections 4, 12 and 18, and the end of the Critique log and the Review log), the README, `reports/director/2026-11-21-owner-answers-trend-steady.md`, the first 30 lines of `2026-11-21-boom-check.md`, the `reports/director/` listing, `config/risk_levels.yaml`'s SHA-256, `risk-officer`'s scratch output for M24 (`trendrun/prea0/riskconfirm/`), `git log`, `git status` and the file times of the build's files, and the CLAUDE.md, AGENTS.md and TESTING.md that load automatically. TESTING.md (not committed; the build's) holds hold-mix-cap run 0's test facts (as in K11's corrected line) and the build's test outcomes on synthetic data, and no outcome of the rule on market data. The brief held the owner's question and answer verbatim, `risk-officer`'s text and the facts of M25, and no summary of hold-mix-cap's results. Not read: any hold-mix-cap result file, `docs/app/features.md`, the 2026-11-22 owner record, `trend.py`, `test_trend.py`, the catalog, `data/` and `results/` |
+| M26-M27 | **[M26]** 2026-11-22 | `quant-researcher` | Fixing the code review's blocking findings of the build (TESTING.md #58). No market data, no catalog bar, nothing under `data/` or `results/`. Read: this plan's header, sections 2, 9 (A0), 12, 13, 15 and 20; the README; the study scripts (`study.py`, `run_train.py`, `freeze.py`, `run_validate.py`, `controls.py`) and their tests, and parts of `lab/runner/trend.py` and `tests/test_trend.py`; the review's scratch tests (`trendrun/breaks/cb/`) and the `summary.json` verdict of a synthetic dry run (`trendrun/review/dry1`, seed 7: NO EDGE on synthetic bars, no market data); the `reports/director/` listing; and the CLAUDE.md, AGENTS.md and TESTING.md that load automatically (TESTING.md holds hold-mix-cap run 0's test facts, as in K11's corrected line, and the build's test outcomes on synthetic data only). Ran only tests and synthetic dry runs, in `tmp_path` and in scratch copies of the repo (`trendrun/fix58/`). The task brief held the lead's one-sentence summary of hold-mix-cap's results (K10's words: falls of held mixes by crypto share, mostly the 2018 crash; fees from frequent rebalancing; the 2017 and 2018 boom and crash years move the results), with no file and no number. Not read: any hold-mix-cap result file, `docs/app/features.md`, the 2026-11-22 owner record (`2026-11-22-owner-answers-hold-mix.md`), `trials.csv` or `evaluations.csv` of any study. The readings of the agents who built `trend.py` and the scripts and who reviewed the build are not in this record; the lead adds them here before run 0 (stop rule 16) |
 | A0 | reserved, before run 0 | `quant-researcher` | Procedure controls on 40 synthetic panels (no market data) |
 | T1 | reserved | `quant-researcher` | Run 0: Kraken and Binance daily train bars to 2023-01-01 00:00 UTC |
 | V1 | reserved | `quant-researcher` | The single validate look, only if E1-E8 and P hold |
