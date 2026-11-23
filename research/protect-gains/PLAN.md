@@ -468,6 +468,6 @@ plain held mix without the tool, and a separate code-breaker review.
 | Risk | 2026-11-23 | `risk-officer` | No market data. Read: this plan; `config/risk_levels.yaml`; parts of `holdmix.py` and `portfolio.py`; and the instruction files |
 | Build | 2026-11-23 | `quant-researcher` | No market data. Built `lab/runner/protect.py`, `run.py` and their tests on synthetic and hand-built bars only. It read none of hold-mix-cap's result files or the "Hold this mix" section of `docs/app/features.md` |
 | A1 | 2026-11-23 | the lead | No market data: `run.py --time` on synthetic bars (seed 21) |
-| T1 | reserved | | Run 0 on the train window |
+| T1 | 2026-11-23 | the lead | Run 0 on the train window (Kraken and Binance, 2017-2022), commit `5e99d68`: NO DEFAULT for both lines (`RESULTS.md`). No validate or test bar |
 
 **Validate-window looks used for protect-gains: 0.**
