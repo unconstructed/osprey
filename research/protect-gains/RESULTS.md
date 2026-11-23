@@ -20,16 +20,17 @@ plan. That is 82,050 simulations.
   USDC about two thirds of the time. After 36% of its buy-backs it sold again within a month; the plan allows at
   most 25%.
 - **It also cost a lot in normal times.** A two-year wallet ended a median 23% below the same wallet without the
-  brake, and the brake did better in only 28% of the periods.
+  brake, and the brake did better in only 28% of the runs (one run is one period and one mix).
 - **Every looser line A level, and every line B level, failed to cut the bad-case fall by the plan's one third for
-  every mix.** Line A at 15-20% (trend or wait-180) cut the pooled bad case by a third, but not for every mix;
-  most settings cut it by less than a quarter, and some made the worst fall deeper.
+  every mix.** Line A at 15% (trend or wait-180) and at 20% (trend) cut the pooled bad case by a third, but not
+  for every mix; most settings cut it by less than a quarter, and about half (35 of 72) made the worst fall deeper
+  than the tool alone.
 - **"Buy back when prices return to where we sold" did not work.** At tight levels it sold and bought back again and
   again; the bad-case fall barely moved (87-93% of the fall without the brake at 10%), and up to half of its
   buy-backs were sold again within a month.
 - **Line B ("keep Y% of my profit") rarely helped.** It cut the bad-case fall by at most 22% and protected no mix to
-  the plan's standard. It sold below the deposit 101 times, the worst 17% below. The check is daily, so a crash day
-  can carry it through the line.
+  the plan's standard. Every sale below the deposit came from one day, the 12 March 2020 crash, the worst 17% below
+  it. The check is daily, so a crash day can carry it through the line.
 - **Should the brake's trades count against the tool's 2-a-month limit?** The run cannot say, because no line had a
   starting setting under either reading. "Counts" stays in force.
 
@@ -63,8 +64,8 @@ windows:
 | 70%, 75% | 52.5% | 69.5% | 69.4% |
 | **All 6 (the pool)** | **40.6%** | **74.2%** | **Q0 = 64.9%** |
 
-The tool keeps buying crypto back to its mix as prices fall, so in 2018 and 2022 a 30% crypto mix still fell
-about 40%. The median two-year total return was +114%.
+The tool keeps buying crypto back to its mix as prices fall, so in 2018 a 30% crypto mix still fell about 40% (its
+worst 2022 fall was 33%). The median two-year total return was +114%.
 
 ## The one setting that protected: line A at 10%, trend buy-back
 
@@ -76,18 +77,20 @@ held by the tool's wait.
   - All 6 mixes pass on their own.
   - The worst fall was 31.1% against 74.2%.
 - **Robustness:** it is meaningful on Binance too (Q 25.6%) and at 2x costs (Q 26.7%), with re-stop shares of 34.5%
-  and 36.4%. It fails D2 there as well.
+  and 36.4%, so it fails D2 there as well. Without the windows that overlap 2017 (BTC's best year) it protects only
+  5 of 6 mixes (the 30% mix with 75% BTC is at 0.73 of its own Q0), so it is not meaningful there. Without 2017 and
+  2020 only 2 windows remain, so had it been the default its D4 label would have been MISSING.
 - **How often it acts:**
-  - It fired in every window: a median of 3 stops per two years, at most 6.
+  - It fired in every run: a median of 3 stops per two years, at most 6.
   - Over the pool the stops fall on 92 distinct sale dates: 18 in 2017, 30 in 2018, 22 in 2019, 9 in 2020, 12 in
     2021 and 1 in 2022.
-  - Median time in USDC: 68% of the days. A median stop stayed out 91 days, and 196 stops were never bought back
-    before the window ended.
+  - Median time in USDC: 68% of the days. 196 stops were never bought back before the window ended; the stops that
+    were bought back stayed out a median 73 days (91 days counting the others up to the window's end).
 - **Whipsaw:** 282 of its 774 buy-backs (36.4%) were followed by another stop within 30 days. D2 allows 25%.
 - **Cost against the tool alone:**
-  - Median C 22.8%, mean 21.4%. The brake ended ahead in 28% of the windows.
+  - Median C 22.8%, mean 21.4%. The brake ended ahead in 28% of the runs.
   - By the window's start year (median C): 2017 +31%, 2018 +0.4%, 2019 +51%, 2020 +18%, 2021 −27% (the brake
-    helped).
+    helped; this year holds only one window, 6 runs).
   - Per mix the median cost was 15-20% at 30% crypto, 36-40% at 50% and 54-59% at 70%.
   - The brake's own trading fees came to a median 0.33% of the wallet a year, plus 0.01% of gas (the tool's own:
     0.02% and 0.004%).
@@ -110,12 +113,14 @@ of 6 mixes.
     the gap plus costs.
 - **wait-30 (an attentive customer):** at best 0.66 of Q0 with 2 of 6 mixes (X = 10%), with 38% re-stops.
 - **Line B (Y = 40-80%):**
-  - It was active in 69-92% of windows and fired in 63-74%.
+  - It was active in 69-92% of runs and fired in 63-73%.
   - It cut Q to at best 0.78 of Q0 (wait-180, Y = 70%), with no mix passing, and its worst fall reached 84.0% in
     places.
   - Where it was active, a wallet kept a median 67-71% of its peak profit at the window's end (wait-30).
-  - It sold below the deposit 101 times over the stage-1 pool, the worst 17.2% below D.
-- **Loose line A levels (X ≥ 25%):** fired in 52-85% of windows, with Q at 0.78-1.08 of Q0 and no mix passing.
+  - Its sales below the deposit were all the stop ordered at the close of 12 March 2020 (timestamp 2020-03-13
+    00:00 UTC): 101 runs under the "counts" reading (202 with both readings), across 10 (mix, Y) pairs, the
+    overlapping windows and the buy-back modes. The worst was 17.2% below D.
+- **Loose line A levels (X ≥ 25%):** fired in 52-85% of runs, with Q at 0.78-1.08 of Q0 and no mix passing.
 
 ## For the owner
 
@@ -123,22 +128,25 @@ The pre-registered rules give no starting setting. Options, each the owner's cal
 
 1. **Offer the brake with no suggested setting.** The customer picks a line and a buy-back, and the app shows this
    study's table for their mix: how often it fires, how much it cut the bad case, what it cost, and how far below
-   the line it sold. This keeps the tool honest about the trade-off.
+   the line it sold. This keeps the tool honest about the trade-off. Before customers see these numbers they need
+   a NautilusTrader rerun with measured costs: today they are scouting numbers from overlapping two-year windows
+   of the train years, and the promise number (D5) is MISSING.
 2. **Suggest line A at 10% with the trend buy-back anyway.** This overrides the whipsaw rule (36% re-stops against
    25%) after seeing the result, so it would be the owner's written decision, not a lab default. Its cost is large
-   in normal markets: a median 23% over two years, and more for higher-crypto mixes.
+   in normal markets: a median 23% over two years, and more for higher-crypto mixes. It is not robust either:
+   without 2017 it protects only 5 of 6 mixes, and its D4 label would be MISSING.
 3. **Don't offer the brake for now.** Point customers who want less risk to a lower crypto share instead. In this
    run, going from 70% to 30% crypto cut the tool's bad-case fall from 74% to about 41% with no brake at all.
 
 Whichever is chosen, the app should not promise a floor. Even the 10% line sold up to 19% below it on 2020-03-13.
 
-## Full table (stage 1: Kraken 1x, "counts" reading, 294 windows per row)
+## Full table (stage 1: Kraken 1x, "counts" reading, 294 runs per row: 49 windows × 6 mixes)
 
 Q0 = 64.9% and R's worst fall is 74.2% for every row. A row passes D1 only with Q / Q0 ≤ 0.667, 6 of 6 mixes
 protected and a worst fall ≤ 74.2%. C > 0 means the brake ended below the tool alone. The "separate" reading's table
 and the Binance 1x and Kraken 2x tables are in `decision.json` (`stage2.tables`).
 
-| Line | Level | Buy-back | Fires (share of windows) | Q, 90th-pct fall | Q / Q0 | Mixes protected | Worst fall | C̃ (median cost) | C̄ (mean cost) | Re-stops | Median time in USDC | Largest sale below the line |
+| Line | Level | Buy-back | Fires (share of runs) | Q, 90th-pct fall | Q / Q0 | Mixes protected | Worst fall | C̃ (median cost) | C̄ (mean cost) | Re-stops | Median time in USDC | Largest sale below the line |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | A | X = 10% | trend | 100% | 25.9% | 0.40 | 6 of 6 | 31.1% | +22.8% | +21.4% | 36% | 68% | 19.0% |
 | A | X = 15% | trend | 100% | 39.7% | 0.61 | 3 of 6 | 48.4% | +26.0% | +18.0% | 17% | 48% | 26.1% |
@@ -224,6 +232,10 @@ and the Binance 1x and Kraken 2x tables are in `decision.json` (`stage2.tables`)
   - 753 s on 3 worker processes; A1 had projected 95.1 CPU-minutes. Results do not depend on the number of
     workers (tested).
 - **Data:** train window only. No validate or test bar was read. Validate-window looks used: 0.
+
+**Audit:** `backtest-auditor`, 2026-11-23, PASS with no blocking finding ([AUDIT.md](AUDIT.md)). Its independent
+recomputation of D1-D6 matches `decision.json`, and 285 runs re-run by an independent engine matched to 7e-15. Its
+corrections to this file's wording were applied the same day; no number in the tables changed.
 
 **Deviations:** none from the plan as amended (A1, A2). The two-best-years boom check is MISSING, as section 8
 expected.
