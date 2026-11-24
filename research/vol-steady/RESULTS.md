@@ -18,19 +18,29 @@ wilder than a target level. Over 2018-2022, out of sample:
 - **The edge over holding was small, and could be luck.** Its risk-adjusted return (Sharpe 0.80 against 0.72) beat
   holding by 0.08, but a test that resamples the history says a gap that size happens by chance about 1 time in 4.
 - **It did not cut falls any better than simply holding less crypto.** Holding its own average mix, never stepping
-  back, did better on every measure: Sharpe 0.98, +391%, worst fall 45%.
-- **The timing looked meaningful with one search seed and not with the other.** With seed A, only 3 of 207 copies
-  of its schedule shifted to other weeks did as well. With seed B, 57 of them did, and without the two bear years
-  even seed A's lead disappears. A result that depends on the seed is fragile.
-- **After 2018 the search mostly switched the scaling off.** Trained on 2017 only, it stepped back half the time in
-  2018, and the 2018 crash is where its timing helped. From 2019 on, each fold chose a target near 100% a year,
-  above crypto's usual volatility. So it held the full share about 90-97% of the days.
+  back, did better on Sharpe, return and worst fall: 0.98, +391% and 45%. It did worse only on the worst single day
+  (−22.6% against −14.7%).
+- **The timing test passed with one search seed, but it is not evidence of volatility timing** (the audit). With
+  seed A, only 3 of 207 copies of its schedule shifted to other weeks did as well; with seed B, 57 did.
+  - Seed A's pass comes mostly from the share s it chose in each fold. That share travels with the shifted schedule,
+    and seed A happened to pick a low s in both bear years.
+  - Shifting only the volatility steps, with each fold's s kept in its year, gives a rank p of 0.067 (A) and 0.082
+    (B). Both fail.
+  - At a constant allowed share the test fails at all four shares (rank p 0.17-0.28).
+  - Without 2018 alone, seed A's rank p is 0.19.
+- **After 2018 the search mostly switched the scaling off.** Trained on 2017 only, it was below the full share on 85%
+  of 2018's days, with a mean step of 0.52. From 2019 on, each fold chose a target near 100% a year, above crypto's
+  usual volatility. So it held the full share on 69-94% of the days (mean step 0.92-0.98).
 
 So scaling by plain volatility, as tested here, gives no edge we can trust. The owner's other angles were written down
 before this run read any price
 ([the record](../../reports/director/2026-11-24-owner-answer-vol-a0-power.md)): downside volatility only, the
-volatility trend, a forecast, and volatility as a crash warning. Downside volatility fits what this run saw: wild
-up-moves in 2020-21 made the rule step back from rallies.
+volatility trend, a forecast, and volatility as a crash warning.
+
+**This run does not support the downside angle** (the audit; an earlier draft of this file said it did).
+- At the four step-downs of 2020-21, up days carried only 21%, 40%, 39% and 46% of the window's variance.
+- The 2020 step-back came after the March crash, and then missed a +29% rebound.
+- A downside-only measure would likely have stepped back about as often.
 
 ## Numbers (seed A, Kraken, 1820 out-of-sample days, 2018-01-03 .. 2023-01-01, costs 1x)
 
@@ -54,7 +64,7 @@ up-moves in 2020-21 made the rule step back from rallies.
 | E3 | Cuts falls beyond holding less crypto | S −47.3% / MC p5 −69.4% against X −45.0% / −67.7% | S −45.4% / −66.9% against X −39.3% / −67.4% | No |
 | E4 | Survives doubled costs | S 0.79 > N0 0.72 | 0.66 > 0.59 | Yes |
 | E5 | Not fragile (seeds and check day) | (a) E1 and G5(a) differ between seeds; (b) every weekday keeps ≥ 0.7 × Sharpe | | No |
-| E6 | Not one year | the excess over N0 is negative in 2021 (−0.144), 2018 and 2022 | | No |
+| E6 | Not one year | without 2020 the excess over N0 is −0.028 (it is also negative in 2018, 2021 and 2022) | | No |
 | E7 | Not the boom years | without 2020: E1 holds, E2 fails | | No |
 | E8 | Binance | E1 rank p 0.090, E2 p 0.148 | | No |
 | P | Enough information | 45 share changes in all 5 folds | 47 | Yes |
@@ -72,7 +82,7 @@ up-moves in 2020-21 made the rule step back from rallies.
 | G7, beats buy-and-hold BTC and 50/50 | PASS (also without the best year and the best two years) |
 | G8-excess, no regime carries the excess | FAIL |
 | R1, a few trades a month | PASS (0.74 orders per 30 days; at most 5) |
-| The allowed shares S(s_k) | FAIL (G6 at every share from 0.30 to 0.60) |
+| The allowed shares S(s_k) | FAIL: E1 and E2 fail at every allowed share (rank p 0.17-0.28), and G6 too |
 
 ## What the search chose
 
@@ -86,8 +96,12 @@ up-moves in 2020-21 made the rule step back from rallies.
 
 - **The final pick on all the train years** (θ_final, seed A) is L = 15, τ = 1.05 and s = 0.40. With τ = 1.05, the
   rule steps back only when crypto's volatility runs above 105% a year.
-- **The 2018 step-back** ran from 2018-01-03 to 2018-07-08, while the 50/50 basket fell 42%. It is the bulk of the
-  rule's timing value.
+- **The 2018 step-back** ran from 2018-01-03 to 2018-07-08, while the 50/50 basket fell 42%.
+  - It carries most of the rule's lead over the shifted schedules (with finding 1's caveat).
+  - It is not the lead over holding the same share (N0). Against N0, S's 2018 is −0.004 in log terms: +0.106 while
+    stepped back and −0.110 at the full share.
+  - The lead over N0 comes from 2019 (mostly the July 2019 step-back) and 2020. The 2020 part (+0.169) all comes after
+    the 7 April re-buy to the full share, which is a rebalancing effect, not timing.
 
 ## Descriptions (decide nothing)
 
@@ -96,10 +110,14 @@ up-moves in 2020-21 made the rule step back from rallies.
   - with N0 0.95, and with rebalance-steady's S 0.96, so the rule is close to holding;
   - with trend-steady's S 0.75.
 - **Check days:** every weekday gives a Sharpe of 0.71-0.82, and daily checks 0.75 (95 orders).
-- **Costs:**
+- **Costs (R4, θ_final(A) run in-sample, not S):**
   - customer fees about 0.29% a year at a 10,000 USD wallet;
   - gas about 1.3 USD a year;
   - the Sharpe with gas charged is 0.88 at 500 USD.
+- **Fills per parameter:** 45 kept fills for 3 parameters is 15 each, under the checklist's 30 (flagged in
+  `summary.json`); 27 of the 45 are in 2018.
+- **N0 never rebalances,** so part of E2's lead D is a rebalancing effect. This is the reviewed design, and E2 fails
+  anyway.
 
 ## Record
 
@@ -110,5 +128,9 @@ up-moves in 2020-21 made the rule step back from rallies.
   - Amendments M1 (the build's readings), A1 (N = 200) and A0 (the power alarm; the owner: run it), all synthetic.
   - The full tier first failed on `2bdd7fd` for a test that read the committed plan (TESTING.md #68, a test bug). It
     was fixed on `efab65a` and formatted on `cc03c2a`, and the tiers passed there.
+- **Audit:** `backtest-auditor`, 2026-11-24, PASS ([AUDIT.md](AUDIT.md)).
+  - Its own recompute matches `summary.json` to round-off, and nothing can flip NO EDGE.
+  - Its corrections to this file's claims were applied the same day; no table number changed.
+- **For future plans:** judge E1 with the share s held fixed, so a per-fold share cannot pass for timing.
 - **Deviations:** none from the plan as amended.
 - **No validate look:** NO EDGE earns none (TP 13).
