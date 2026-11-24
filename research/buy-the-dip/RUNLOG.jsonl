@@ -1,0 +1,2 @@
+{"commit": "e62233ed037fc5b212f4de7051a13c5b5b8170cf", "config_hash": "086fffac12e5df137ec2b3c5c7bf14d759ca580caf7c64f815fee04f24a572a6", "data": "real", "dirty": false, "out_dir": "/home/user/osprey/results/buy-the-dip", "run": 0, "script": "run.py", "snapshot_id": "1746a21b75683e76", "utc": "2026-11-24T18:08:49.280060+00:00"}
+{"data": "real", "event": "complete", "run": 0, "script": "run.py", "utc": "2026-11-24T18:21:53.344412+00:00"}

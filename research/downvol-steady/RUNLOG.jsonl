@@ -1,0 +1,1 @@
+{"commit": "e62233ed037fc5b212f4de7051a13c5b5b8170cf", "config_hash": "04d418e9899a96d44bb4a070ccb0d65178b6fba577f9cc45b1aca428c19a07e1", "data": "real", "dirty": false, "out_dir": "/home/user/osprey/results/downvol-steady", "run": 0, "script": "run_train.py", "snapshot_id": "1746a21b75683e76", "trigger": null, "utc": "2026-11-24T18:08:56.302950+00:00"}
