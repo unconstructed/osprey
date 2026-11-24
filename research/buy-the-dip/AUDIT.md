@@ -23,7 +23,7 @@ myself, from PLAN.md, and reran **all 90,628 runs** from scratch. Every run matc
 - **The default is a knife-edge pick.** It passes the bad-case test by 0.08 of a point, at one start wallet, in a
   comparison of two single windows. None of its one-step neighbours in the grid passes. Had that 0.08 gone the other
   way, the rules would have named (10%, 20%, 25%, 100%).
-- **The label is solid.** Two checks move the default to NO DEFAULT, each by 1 to 5 points at several starts.
+- **The label is solid.** Two checks move the default to NO DEFAULT, each by 0.8 to 3.5 points at one or more starts (section 2).
 
 **The write-up is not final yet.** RESULTS.md's tables are right cell for cell: I checked both 54-row tables, the D2
 table and the 80 by-year cells. But several claims are wrong or misleading. The main one: "spreading the same money
@@ -324,3 +324,8 @@ look is planned (PLAN.md section 12), and the test window stays unread for buy-t
   "Hold this mix" section of `docs/app/features.md`.
 - **Written:** this file only, plus scratch scripts in the session scratchpad (`dipaudit/`).
 - **Validate-window looks used for buy-the-dip: 0.** The test window was not read.
+
+> **Lead's correction after the final check (2026-11-24).** The Result's margin line said "each by 1 to 5 points at
+> several starts". Recomputed from `decision.json`'s check tables: on Binance the default fails Q at B by 2.17 points
+> and at D by 0.80; without 2017 it fails Q at A, B, C and D by 2.95, 3.35, 1.87 and 3.53, and the worst fall at B by
+> 3.26 and at D by 1.49. The line now says 0.8 to 3.5, as section 2 already did. No finding, number or result changed.

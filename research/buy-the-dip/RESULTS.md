@@ -23,12 +23,13 @@ without the best 2: MISSING)".
 
 ## In plain words
 
-**The default setting, as the app would say it.** "When crypto falls 30% from its highest close of the past year,
-buy crypto with 25% of my cash, and buy another 25% at each further fall of 10%, until at most 100% of my cash is
-used." Its four buy lines sit 30%, 37%, 43% and 49% below that high. A buy never takes the wallet below 22% USDC
-(the Steady limit of 20% plus a 2-point margin), or a coin above 58%. So in most runs the caps cut more than one whole
-piece of each ladder: the last piece, and from a 30%-crypto start part of the third as well. They cut a median 27-37%
-of what the ladder ordered, by start.
+**The default setting, as the app would say it.** "When crypto falls 30% from its highest close of the past year, buy
+crypto with 25% of my cash, and buy another 25% at each further fall of 10%, until at most 100% of my cash is used."
+Its four buy lines sit 30%, 37%, 43% and 49% below that high. A buy never takes the wallet below 22% USDC (the Steady
+limit of 20% plus a 2-point margin), or a coin above 58%. So the caps cut part of most ladders: from an all-USDC start
+the first ladder loses most of its last piece (a median 19.5% and 21% of its order), from a 30%-crypto start the last
+piece and part of the third (a median 31%), and later ladders, which start near the cap, lose more (a median 37-57%).
+Over a run they cut a median 27-37% of what the ladder ordered, by start.
 
 **What it did in 2017-2022.** Kraken prices, 49 two-year windows (one starting each month, January 2017 to January
 2021), a 5,000 USD deposit, four start wallets: 196 runs. The four start wallets are:
@@ -84,8 +85,8 @@ The findings:
     was 68% for the ladder, 67% for dca-same and 68% for lump-same (the cap is 78%). At the end the twins held more
     cash (Readings).
 - **It also sold.** With M = 100% the wallet sits near the Steady limits, so a rise pushes it past them. The limit fix
-  then sells back until cash is at 22% or one coin at 58%, whichever is reached first: a median 14-18 sales per
-  two-year window.
+  then sells crypto, in its BTC:ETH proportion, until cash is back to at least 22% and each coin is at most 58%: a
+  median 14-18 sales per two-year window.
 - **Costs:** customer fees were a median 0.07-0.11% of the wallet a year, by start, and gas (sponsored by us) about
   0.02-0.03%. Fees a year leave out a window's first fill (the start purchase at C and D). In the 50 all-USDC runs
   whose ladder bought on day one, that first ladder buy (a median 0.19% of the wallet) falls there too, so those runs
@@ -257,7 +258,7 @@ What each measure means:
 
 - Above the 35% budget (`above_budget` in `decision.json`): Q, Q_dca and Q_lump at every start, and Q_hold at C and
   D. Q_hold is 0 at A and B, where hold is cash. At C and D, a rise lifts hold's crypto share, and the limit fix
-  sells only back to 22% cash or 58% in one coin, whichever is reached first, so a held wallet can ride a crash at up
+  sells only until cash is back to at least 22% and each coin is at most 58%, so a held wallet can ride a crash at up
   to about 78% crypto.
 - Over all four starts the knife's median is 14.0% and its worst 76.4% (446 ladders, all with an order sent). By the
   year the ladder started, the worst knives were 2018's (median 66%, worst 76%), then 2022's (median 42%, worst 48%)

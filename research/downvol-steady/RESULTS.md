@@ -29,8 +29,9 @@ out.
 **In plain words.** The rule holds BTC and ETH half and half, up to a crypto share s. Every Monday it steps back in
 quarters when crypto's falling days have been wilder than a target level τ. Over 2018-2022, out of sample:
 
-- **It made +26%, with a worst fall of 61%.** Holding the same share without the scaling (N0) made +221%, with a worst
-  fall of 63%.
+- **It made +26%, with a worst fall of 61%.** Holding (N0) made +221%, with a worst fall of 63%. N0 starts each year
+  from the rule's own wallet. If the rule had stepped back below its full share at that moment, N0 buys the year's
+  share s; otherwise it keeps the rule's wallet as it is. After that it never trades except to fix the limits.
 - **It also did worse than holding.** Its risk-adjusted return (Sharpe) was 0.31, against 0.77 for holding. A test
   that resamples the history found the rule ahead of holding in only 62 of 10,000 resampled histories. That reading is
   a description, not a pre-registered test, and most of it is one year, 2020 (below).
@@ -41,26 +42,39 @@ quarters when crypto's falling days have been wilder than a target level τ. Ove
 - **Most of the shortfall is the walk-forward's 2020 pick.** Trained on 2017-2019, the search chose an 85-day window
   and a 0.35 target for 2020. The March 2020 crash then kept the rule out of crypto for 12 weeks, during which the
   basket nearly doubled. For the rest of the year it held half its share (three quarters for four weeks from 10
-  August) while prices tripled. It ended 2020 up 33%, against 166% for holding (by bar-year; section "2020, step by
-  step").
+  August) while prices tripled. It ended 2020 up 33%, against 166% for holding (section "2020, step by step"). These
+  are counted by bar-year: each day's return goes in the year of the day it covers, so the daily bar that closes at
+  midnight UTC on 1 January, which covers 31 December, counts in the year before.
 - **That pick, more than the downside measure, made the 2020 gap** (the audit's reruns, below). At this run's 2020
   settings, plain volatility also sat out about 11 weeks and made +48% (this rule: +32% over the same days). With
   vol-steady's 2020 settings, the downside rule made +141%.
 
 **What the shortfall against holding means, and what it does not.**
 - **What it means.** E2 is one-sided: it asks only "did the rule beat holding?". Here the gap D is −0.46, and p is
-  0.994. Read backward, the rule came out ahead in under 1% of resampled histories (0.4-0.6% with four different
-  random draws; 1.6% for the second search, seed B).
+  0.994. Read backward, the rule came out ahead in under 1% of resampled histories: 62 of 10,000 with the run's own
+  random draw (seed 0, p 0.9938), and 50 and 46 with the draws of seeds 1 and 2 (p 0.9950 and 0.9954). For the second
+  search (seed B) it was 164, 164 and 154 of 10,000 at seeds 0, 1 and 2 (p 0.9836, 0.9836 and 0.9846).
 - **The backward reading is not a pre-registered test.** It is a description. It decides nothing, and no correction is
   made for the other things looked at.
 - **It is mostly one year, and one settings pick.** Without 2020 the rule is still behind (D −0.17), but it came out
   ahead in about 12% of the resamples (E7's row). The 2020 part is mostly the window and target the search picked for
   that year (above). The bootstrap's p is also optimistic: the plan notes that five years hold few independent blocks
   (TP 11).
-- **Part of it may be the comparator, but this is not measured.** N0 re-cuts to the year's share at the start of each
-  year and then drifts, so its crypto grew from 41% to about 78% in 2020. The rule drifts between its steps too (from
-  21% to 39% crypto after its September 2020 step). And even a holding bought once at the start of 2018 and never
-  re-cut, apart from limit fixes (N0-span), beat the rule: Sharpe 0.40 against 0.31.
+- **Part of it may be the comparator, but how much is not measured.** N0 is not a fresh "hold the share" each year.
+  It starts from the rule's own wallet at the year's start, buys the year's share s only if the rule had stepped back,
+  and after that never trades except to fix the limits.
+  - **In 2018 and 2020 it bought the year's share,** because the rule then held only a quarter and a half of its
+    share. In 2020 it bought 41% crypto, and its crypto then grew to about 78% by year-end.
+  - **In 2019, 2021 and 2022 the rule held its full share at the year's start,** so N0 kept the rule's wallet as it
+    had drifted. At the year's first close that was about 61% crypto in 2019 (share 52%), 78% in 2021 (share 42%; a
+    limit fix at the 4 January close trimmed it) and 33% in 2022 (share 34%; N0 made no trade all year).
+  - **So in 2021 "holding" carried about 59% crypto on average, against the rule's 46%,** in a year when crypto rose.
+    Part of the rule's 2021 shortfall (+67% against +96%, by bar-year) is that holding had more crypto, not the rule's
+    timing. In 2019 the two held about the same on average (holding 53%, the rule 56%), and the gap was small (+40%
+    against +43%, by bar-year).
+  - **The rule drifts between its steps too** (from 21% to 39% crypto after its September 2020 step).
+  - **Even a holding bought once at the start of 2018 and never re-cut,** apart from limit fixes (N0-span), beat the
+    rule: Sharpe 0.40 against 0.31.
 - **It is about this rule as the walk-forward chose it, not about downside volatility in general.** The settings fitted
   on all the train years (θ_final, below) look very different, but they were picked on these same years, so they are no
   evidence either way.
@@ -68,15 +82,18 @@ quarters when crypto's falling days have been wilder than a target level τ. Ove
 
 **Compared with vol-steady run 0** ([RESULTS.md](../vol-steady/RESULTS.md), [AUDIT.md](../vol-steady/AUDIT.md)):
 - Both are NO EDGE. vol-steady made +210% against +170% for holding, a small lead that could be luck (E2 p 0.25).
-  This rule made +26% against +221%. Each study's "holding" uses its own yearly shares s, so the two holding figures
-  differ.
+  This rule made +26% against +221%. Each study's "holding" starts from its own rule's wallet and uses its own yearly
+  shares s, so the two holding figures differ.
 - Both rules stepped down on these four Mondays of 2020-21: 16 March 2020, and 25 January, 24 May and 28 June 2021.
   This rule also stepped down on 7 September 2020.
   - On 16 March this rule went from half its share to nothing, vol-steady from full to a quarter. On 24 May this rule
     went from full to half, vol-steady to three quarters.
   - vol-steady's audit (finding 2) expected these shared step-backs, because falling days carried most of the variance
     at those checks (amendment M1). Counting only falling days did not remove them.
-  - In 2021 this rule trailed holding by 0.16 in log terms (vol-steady: 0.14).
+  - In 2021 this rule trailed holding by 0.16 in log terms (vol-steady: 0.14). A log gap compares the two end
+    values: −0.16 means the rule ended 2021 with e^−0.16 = 0.85 times what holding ended with (1.67 against 1.96 per
+    dollar). Likewise 2020's gap of −0.69 (below) means the rule ended with about half of what holding ended with
+    (e^−0.69 = 0.50).
 - The two runs part in 2020, mostly through the window and target each search picked for that year (15 days and τ 1.03
   there, 85 days and τ 0.35 here), more than through the measure (below).
 - The two rules' daily returns correlate at 0.89.
@@ -100,7 +117,7 @@ days smaller than a steadily held mix's?
 |---|---|---|---|---|
 | S, the rule (walk-forward) | 0.31 | +26% | −60.6% | −11.6% |
 | R_0, S's schedule run as one book | 0.20 | +6% | −60.6% | −11.6% |
-| N0, always hold the fold's share s | 0.77 | +221% | −62.5% | −20.4% |
+| N0, holding: the rule's wallet at each year's start, set to the year's share s only if the rule had stepped back, then only limit fixes | 0.77 | +221% | −62.5% | −20.4% |
 | X, hold S's average mix of each fold | 0.74 | +186% | −47.5% | −18.0% |
 | B1, buy and hold BTC | 0.43 | +18% | −81.4% | −38.9% |
 | B2, 50/50 BTC/USDC monthly | 0.43 | +56% | −53.6% | −17.3% |
@@ -117,7 +134,7 @@ days smaller than a steadily held mix's?
 | ID | Question | Seed A | Seed B | Holds |
 |---|---|---|---|---|
 | E1 | Timing beats chance: the rule's step pattern, moved to other weeks with each year's share s kept, does worse (the q-only shifts of M1; at most 9 of 207 may be at or above) | rank p 0.827 (171 of 207 shifts at or above) | rank p 0.721 (149) | No |
-| E2 | Beats holding the same share (N0), by more than chance | D = −0.460, p 0.994 | D = −0.394, p 0.984 | No |
+| E2 | Beats holding (N0, as in the Numbers table), by more than chance | D = −0.460, p 0.994 | D = −0.394, p 0.984 | No |
 | E3 | Cuts falls beyond holding less crypto (X): actual and Monte Carlo falls both shallower | S −60.6% / MC p5 −79.6% against X −47.5% / −71.0% | S −60.3% / −78.1% against X −47.7% / −66.5% | No |
 | E4 | Still beats holding with costs doubled | S 0.28 against N0 0.77 | 0.35 against 0.76 | No |
 | E5 | Not fragile: the two search seeds agree, and other check days keep ≥ 0.7 × the Sharpe | (a) the seeds differ on G5(a) only (A fails, B passes); Sharpes 0.31 and 0.37, within 0.25. (b) Sunday checks give 0.214, just under 0.7 × 0.308 = 0.215 | | No |
@@ -138,9 +155,9 @@ days smaller than a steadily held mix's?
 |---|---|
 | G1, out-of-sample Sharpe ≥ 1.0 | FAIL (0.31; also every allowed share S(s_k), 0.29-0.45, and every grid step, 0.90-0.92) |
 | G2, the same with costs doubled > 0.5 | FAIL (0.28; every S(s_k) fails too, 0.26-0.43; the grid steps pass, 0.89-0.92) |
-| G3, deflated Sharpe ≥ 0.95 | FAIL (0.00003 effective; 2,400 trials, about 18 effective; 0.00002 on active rows) |
-| G4, PBO ≤ 0.25 | FAIL (0.78; 0.76 on active rows) |
-| G5, ±20% plateau | FAIL: (a) s × 1.2 keeps 0.67 of S's Sharpe; (b) the default's L × 1.2 (143 days) also 0.67. Both steps reach outside the search box, which the plan allows |
+| G3, deflated Sharpe ≥ 0.95 (how sure we can be that the Sharpe is not luck, allowing for how many settings the searches tried) | FAIL (0.00003 effective; 2,400 trials, about 18 effective; 0.00002 on active rows) |
+| G4, PBO ≤ 0.25 (the chance that the setting that looked best on one part of the history ranks below the middle on the rest) | FAIL (0.78; 0.76 on active rows) |
+| G5, ±20% plateau (moving each setting 20% up or down keeps at least 70% of the Sharpe) | FAIL: (a) s × 1.2 keeps 0.67 of S's Sharpe; (b) the default's L × 1.2 (143 days) also 0.67. Both steps reach outside the search box, which the plan allows |
 | G6, Monte Carlo 95th-percentile fall within 35% | FAIL (−79.6% at S; −63% to −87% at every S(s_k); −35.8% at the default) |
 | G7, beats buy-and-hold BTC and 50/50 | FAIL at S (0.31 against 0.43 and 0.43). It passes without the best year and the best two, and at the default and every grid step |
 | G8-excess, no regime carries the lead over N0 | FAIL (S trails N0 in bull, bear and sideways months; the default and the grid trail in bull months) |
@@ -197,8 +214,9 @@ each allowed s). The default is s = 0.60, the allowed value nearest θ_final(A)'
 
 ### 2020, step by step (a description; seed A)
 
-The rule's 2020 settings: an 85-day window, a target of 0.35 and a share of 0.41. Holding (N0) bought 41% crypto at
-the start of the year (decided at the 3 January close) and then only drifted.
+The rule's 2020 settings: an 85-day window, a target of 0.35 and a share of 0.41. The rule held only half its share
+when the year began, so holding (N0) bought the year's share, 41% crypto (decided at the 3 January close, filled at
+the next open), and then only drifted.
 
 | 2020 stretch (check closes) | The rule held | Basket (50/50 BTC/ETH, bought and held) | S | N0 | S minus N0 (log) |
 |---|---|---|---|---|---|
@@ -226,7 +244,8 @@ In plain words:
 - **The target was out of reach all year.** Outside the crash window, downside volatility ran at 0.43-0.70 a year,
   above the 0.35 target. So the rule never held its full share in 2020, while BTC went from about 7,000 to about
   29,000 (from about 9,800 after the June buy-back).
-- **Holding let its crypto grow** from 41% to about 78% of the wallet by year-end.
+- **Holding let its crypto grow** from the 41% it bought (43% by the year's first close, 4 January) to about 78% of
+  the wallet by year-end.
 - **The cost in log terms:** 0.30 for the 12 weeks in USDC, and 0.46 for half a share through the two rallies. The two
   falls gave back 0.06, for −0.69 in all (the parts are rounded).
 
@@ -242,7 +261,7 @@ share (0.414):
 | 2020, at s = 0.414 | Steps (check dates) | 2020 return | Against its own N0 (log) |
 |---|---|---|---|
 | Downside measure, 85 days, τ 0.35 (this run) | nothing from 16 March to 8 June; never the full share | +32% | −0.69 |
-| Plain volatility, 85 days, τ 0.35 | nothing from 23 March to 8 June; never the full share | +48% | −0.59 |
+| Plain volatility, 85 days, τ 0.35 | nothing from 23 March to 8 June; never the full share | +48% | −0.58 |
 | Downside measure, 15 days, τ 1.03 (vol-steady's 2020 settings) | a quarter for two weeks, back to full on 30 March | +141% | +0.01 |
 | Plain volatility, 15 days, τ 1.03 (vol-steady's 2020 rule) | a quarter, back to full on 6 April | +156% | +0.16 |
 
@@ -322,7 +341,9 @@ share (0.414):
     writes only into `results/downvol-steady/` and its own RUNLOG and CSVs.
   - Otherwise the two shared only CPU time and the read-only catalog.
 - **For this file:** the q paths, the 2020 path and the audit's 2020 reruns (finding 1) were recomputed on the Kraken
-  train panel, through a loader that refuses any request or bar after 2023-01-01 00:00 UTC. No validate or test bar
+  train panel, through a loader that refuses any request or bar after 2023-01-01 00:00 UTC. So was N0 per year
+  (`trend.always_in_n0`, equal to `oos.parquet`'s N0_A bit for bit), for its start of each year and its crypto share.
+  E2 at seeds 1 and 2 was recomputed from `oos.parquet` (equal to `steady.paired_bootstrap`). No validate or test bar
   was read.
 - **PLAN.md** is byte-identical to run 0's start (M3). Its section 20 row for run 0, and a run 0 line in README.md,
   can be added now that no look is earned.

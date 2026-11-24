@@ -19,9 +19,11 @@ look, and the test window was never read.
 **As the owner asked, this NO EDGE means "the test could not tell".** A0, the pre-check on made-up markets, confirmed
 an edge on only 1 of 20 markets built to have one, with 0 false alarms in 20 markets without one.
 
-**The write-up is close, but not final.** RESULTS.md's tables are right cell for cell. Five of its claims need fixing
-(findings 1-5). The most important is finding 1: the 2020 shortfall comes mostly from the settings the search picked
-for 2020, not from counting only the falling days. None of the five changes the verdict, a gate or a criterion.
+**The write-up is close, but not final.** RESULTS.md's tables are right cell for cell. Six of its claims need fixing
+(findings 1-6; finding 6 was raised from a note by the corrections after the final check, at the end of the
+Findings). The most important is finding 1: the 2020 shortfall comes mostly from the settings the search picked
+for 2020, not from counting only the falling days. None of the six changes the verdict, a gate or a criterion. The
+same corrections fix this audit's own text in four points; none of them changes the verdict either.
 
 **The strategy: RETURN TO RESEARCHER (not ready for risk review).** It is NO EDGE, and it fails every gate except R1
 (trade frequency). No fix to this run can change that; the plan stops here. The final test window (G9) was not run,
@@ -48,10 +50,12 @@ so it is still unused for downvol-steady.
 **The tests, in one line each:**
 - **E1 (timing):** does the rule's real step pattern beat the same steps moved to other weeks? It needs at most 9 of
   207 moved copies at or above it. Under M1, each year keeps its own share s and only the steps move.
-- **E2 (beats holding):** is the rule's risk-adjusted return (Sharpe) above holding the same share all year (N0), by
-  more than chance? A resampling test must give p < 0.05.
-- **E3 (smaller falls):** are the rule's worst fall and its Monte Carlo worst fall both shallower than X's, a fixed mix
-  holding the rule's average crypto each year?
+- **E2 (beats holding):** is the rule's risk-adjusted return (Sharpe) above N0's, by more than chance? N0 is "buy
+  or keep, then hold": it starts from the rule's own wallet at each year's start, buys the year's share only if the
+  rule was then stepped back, and after that trades only to fix the limits (finding 6). A resampling test must give
+  p < 0.05.
+- **E3 (smaller falls):** are the rule's worst fall and its Monte Carlo worst fall both shallower than X's? X buys the
+  rule's average crypto of each year at the year's start and then holds it, trading only to fix the limits.
 - **E4:** does E2's lead survive doubled costs?
 - **E6 (not one year):** does the lead over N0 survive dropping any one year?
 - **P (enough information):** at least 20 share changes, spread over at least 4 years.
@@ -78,7 +82,7 @@ I also ran E2 with my own stationary bootstrap at other seeds.
 | R_0 (one book, the share path stitched by fold, fold 0's per-row head) | Equal to `oos.parquet` to 6.7e-16. Sharpe 0.2015 (A), 0.2978 (B). R_0 equals S bit for bit on fold 0's kept rows | the same | yes |
 | E1 (q-only shifts, M1) | A: W = 260; 171 of the 207 guarded shifts at or above; rank p 172 / 208 = **0.827**. B: 149, **0.721**. Each shift's Sharpe matches its `evaluations.parquet` row to 5.7e-15 | 0.827 (171); 0.721 (149) | yes |
 | E1-whole (VP's shifts, a description) | A: 172, 0.832. B: 145, 0.702. Matches to 6.3e-15 | the same | yes |
-| E2 | A: D = **−0.460**, p **0.994**. B: D = −0.394, p 0.984. Other draws: the lab's sampler at seeds 1-2 gives 0.993-0.997 (A) and 0.982-0.984 (B); my own sampler at seeds 11-13 gives 0.994-0.995 (A) and 0.982-0.985 (B) | 0.994; 0.984 | yes, and robust to the draw |
+| E2 | A: D = **−0.460**, p **0.9938** (seed 0, 10,000 resamples, mean block 60). B: D = −0.394, p 0.9836. Other draws, 10,000 resamples each: `steady.paired_bootstrap` at seeds 1, 2 and 3 gives A 0.9950, 0.9954 and 0.9956, B 0.9836, 0.9846 and 0.9849; my own sampler at seeds 11, 12 and 13 gives A 0.9932, 0.9943 and 0.9936, B 0.9821, 0.9807 and 0.9821. Seed A's rule is ahead in 62, 50, 46 and 44 of the 10,000 resamples at seeds 0-3 (0.44-0.62%) | 0.9938; 0.9836 | yes, and robust to the draw |
 | E3 | A: S −60.6% / MC p5 −79.6% against X −47.5% / −71.0%: both deeper, so it fails. B: S −60.3% / −78.1% against X −47.7% / −66.5%: fails | the same | yes |
 | E4 | A: S at 2x 0.282 < N0 at 2x 0.765. B: 0.347 < 0.761 | the same | yes |
 | E6 (Δ_y = Σ ln(1+S) − ln(1+N0) by bar-year) | A: 2018 −0.056, 2019 −0.021, 2020 **−0.694**, 2021 −0.161, 2022 −0.002; Δ = **−0.933 < 0**, so it fails. B: Δ = −0.849, positive only in 2022 (+0.037) | the same | yes |
@@ -91,8 +95,8 @@ I also ran E2 with my own stationary bootstrap at other seeds.
 
 **Nothing can flip the verdict.** NO EDGE needs only E1 or E2 to fail (TP 12), and both fail by far:
 - **E1** needs at most 9 of 207 shifts at or above the rule. It has 171 (seed A) and 149 (seed B).
-- **E2** needs the rule to be ahead (D > 0). It is behind in both seeds (D −0.46 and −0.39), with p 0.98-0.99 under
-  every draw I tried.
+- **E2** needs the rule to be ahead (D > 0). It is behind in both seeds (D −0.46 and −0.39), with p between 0.980
+  and 0.996 under every draw I tried.
 - **No reading comes close.** The closest is E1 and E2 without 2020: rank p 0.365, D −0.17, p 0.88. E1-whole and
   E1 without the bear years fail too.
 
@@ -127,24 +131,32 @@ No finding is blocking.
 **1. Should fix: the 2020 shortfall is mostly the search's 2020 settings, not the downside measure.** RESULTS.md says
 "the plain rule forgot the crash in three weeks, this one in twelve", and "This run cannot tell whether the downside
 measure or that choice is to blame". The audit can tell, at least for 2020. I reran 2020 (fold 2, s = 0.414) with the
-two measures and the two searches' 2020 settings, all at this run's 2020 share (s = 0.414) and from the same book. These are descriptions;
-they decide nothing:
+two measures and the two searches' 2020 settings, all at this run's 2020 share (s = 0.414). Each run starts from the
+panel's first row with the same 10,000 USD, as the fold runs do, so each enters 2020 with its own wallet. These are
+descriptions; they decide nothing:
 
 | 2020 (fold 2) | Steps | 2020 return | Against its own N0 (log) |
 |---|---|---|---|
 | Downside measure, this run's 2020 settings (85 days, τ 0.35), the run itself | 0 from 16 March to 8 June; never the full share | +32% | −0.69 |
-| **Plain** volatility, the same 85 days and τ 0.35 | 0 from 23 March to 8 June; never the full share | +48% | −0.59 |
+| **Plain** volatility, the same 85 days and τ 0.35 | 0 from 23 March to 8 June; never the full share | +48% | −0.58 |
 | Downside measure, vol-steady's 2020 window and target (15 days, τ 1.03) | a quarter for two weeks, back to full on 30 March | +141% | +0.01 |
 | Plain volatility, the same 15 days and τ 1.03 (vol-steady's 2020 rule, at this run's s) | a quarter, back to full on 6 April | +156% | +0.16 |
+
+The last column compares each run with its own N0, as the plan defines it (finding 6). In the two 85-day runs the
+rule was at half its share when 2020 began, so N0 bought the year's share, 41%, and made +165% in 2020. In the two
+15-day runs the rule already held its full share, so N0 kept that run's wallet as it was, 35% crypto (downside) and
+30% (plain), and made +138% and +118%. So compare the returns first.
 
 - **At the same settings, the two measures behave almost alike.** With an 85-day window and a 0.35 target, plain
   volatility would also have sat out about 11 weeks and never held the full share in 2020.
 - **With a 15-day window, the downside rule would have forgotten the crash faster than vol-steady did:** two weeks,
   not three.
 - **So "three weeks against twelve" is the window** (15 days against 85), not the measure.
-- **The measure did cost something at fixed settings,** about 0.10-0.15 log in 2020 at either pair. Over all five
-  years at this run's own settings, plain volatility gives Sharpe 0.41 against 0.31. The steps differ at 61 of the 260
-  checks, mostly in the 10-day windows of 2018 and 2022.
+- **The measure did cost something at fixed settings.** On the 2020 returns, the downside rule made 0.11 log less
+  than plain volatility at the 85-day pair and 0.06 less at the 15-day pair (0.11 and 0.15 against each run's own
+  N0; the 15-day pair's two N0s differ, as said under the table). Over all five years at this run's own settings,
+  plain volatility gives Sharpe 0.41 against 0.31. The steps differ at 61 of the 260 checks, mostly in the 10-day
+  windows of 2018 and 2022.
 
 **Fix:** replace the two sentences with these numbers, labelled as audit descriptions. Whether the downside measure
 made the search more likely to choose (85 days, 0.35) for 2020 cannot be told from one run. The walk-forward's picks
@@ -158,7 +170,8 @@ reader can take this as evidence that downside timing harms, which the run does 
 - **The timing itself was ordinary.** E1's rank p is 0.83, inside what chance gives about 1 time in 5 or 6.
 - **The shortfall is one year.** Without 2020, D is −0.17, and the rule is ahead in about 12% of the resamples.
 - **And that year is one settings pick** (finding 1). At vol-steady's 2020 settings, the same downside rule ends
-  2020 level with holding.
+  2020 level with its own N0 (+0.01 log). That N0 kept the rule's wallet (35% crypto) instead of buying 41%. Against
+  this run's N0, which did buy 41%, it trails by 0.09 log, where the run itself trails by 0.69.
 
 **Fix:**
 - Put the power caveat ("the test could not tell") before the shortfall bullets.
@@ -192,16 +205,42 @@ On 24 May 2021 it also stepped further than vol-steady: from 1 to 0.5, where vol
 - **Fix:** "27 per parameter: under the audit's 30, flagged (summary.json divides by 2 as TP wrote it)".
 - 68 of the 82 fills are in the two 10-day-window years, 2018 (37) and 2022 (31).
 
-**6. Note: "Part of it is the comparator" is not measured.**
-- **N0 is not a buy-once holding.** It re-cuts to each year's share at the start of the year, and drifts within the
-  year. Its 2020 drift from 43% to 78% crypto is real.
+**6. Should fix (raised from a note on 2026-11-24): what N0 is, and "part of it is the comparator".**
+- **What N0 is.** Each year N0 starts from the rule's own wallet at the year's start (the close t0). If the rule was
+  then stepped back (below its full share), N0 buys the year's share, half BTC and half ETH. Otherwise it keeps the
+  rule's wallet as it is, even where that wallet has drifted above or below the year's share. After that it never
+  trades except to fix the limits. So N0 is "buy or keep, then hold"; it does not re-cut to the year's share every
+  year, and it does not hold a constant share. This is the plan's reviewed design (TP 9; VP and this plan unchanged).
+  My first version of this finding said N0 "re-cuts to each year's share at the start of the year", which was wrong.
+- **Seed A, year by year.** I rebuilt N0 with `trend.always_in_n0` on the guarded train panel; it equals
+  `oos.parquet`'s N0_A (and N0_B) bit for bit. The crypto shares below are of the wallet. "At the start" is the
+  first kept close, the day after t0, where the year's returns begin:
+
+| Year | Share s | Rule's step at t0 | N0 at the start | N0's average crypto | Rule's average crypto | N0's trades in the year |
+|---|---|---|---|---|---|---|
+| 2018 | 0.57 | a quarter | bought the share, 57%; 60% at the start | 42% | 38% | the purchase only |
+| 2019 | 0.52 | full | kept the rule's wallet: 61% | 53% | 56% | a limit fix at the 26 June close |
+| 2020 | 0.41 | half | bought the share, 41%; 43% at the start; 78% at the end | 57% | 20% | the purchase only |
+| 2021 | 0.42 | full | kept the rule's wallet: 78% | 59% | 46% | a limit fix at the 4 January close, back to 42% |
+| 2022 | 0.34 | full | kept the rule's wallet: 33% | 21% | 23% | none |
+
+- **What this means for E2's gap.** In 2019, 2021 and 2022 N0 started from the same wallet as the rule, so the gap
+  there comes from the rule's steps afterwards (in 2021 the same limit fix cut both back to 42% two days in). In the
+  rising years N0's crypto drifted up well above its share: 57% on average in 2020 against a share of 41%, and 59% in
+  2021 against 42%. The rule held 20% and 46%. So "holding the same share" meant holding more crypto than s in 2020 and
+  2021, and part of E2's gap there is that. It is not so in 2019: N0 held less crypto than the rule on average (53%
+  against 56%).
 - **The rule drifts too.** Between steps it trades nothing, and it went from 21% to 39% crypto after its September
-  step.
+  2020 step.
 - **The draft's own 2020 breakdown is about level, not drift:** 0.30 log for 12 weeks in USDC, and 0.46 for half a
   share through the rallies.
-- **Even a buy-once holding beat the rule.** N0-span (bought once in January 2018, never re-cut) has Sharpe 0.40,
-  against the rule's 0.31.
-- **Fix (optional):** say the drift's part of the gap is not measured.
+- **Even a buy-once holding beat the rule.** N0-span (bought once at the start of 2018, then limit fixes only) has
+  Sharpe 0.40, against the rule's 0.31.
+- **Not measured:** how much of the gap would remain against a comparator held at a constant share. That is close to
+  the follow-up's question (finding 7), so I did not compute it.
+- **Fix:** RESULTS.md should describe N0 as above wherever it says N0 re-cuts each year or always holds the fold's
+  share, and say that in 2020 and 2021 "holding" carried more crypto on average than the rule (57% against 20%, 59%
+  against 46%).
 
 **7. Note: E3 and the follow-up.**
 - **E3 failed even though it leans toward the rule.** The follow-up's design note warns that the plan's X drifts up
@@ -239,6 +278,31 @@ On 24 May 2021 it also stepped further than vol-steady: from 1 to 0.5, where vol
   (`s_fold(c_k) × q(c_(k+u) mod W)`) reproduces every stored shift.
 - **z under the shift.** M2's reading that z moves with q changes no number here: activation comes before every check
   of the span.
+
+**Corrections after the final check, 2026-11-24.** A final verifier checked this audit against the outputs. I
+recomputed each point myself (scratch scripts in the session scratchpad under `dvaudit/fix2/`; the train panel loaded
+through `load_panel` with `last_close` 2023-01-01 00:00 UTC behind a loader that refuses any later request or bar)
+before changing anything:
+- **Finding 6's description of N0 was wrong.** It said N0 re-cuts to each year's share at the start of the year. N0
+  buys the year's share only where the rule was stepped back at t0 (seed A: 2018 and 2020); in 2019, 2021 and 2022 it
+  kept the rule's wallet (61%, 78% and 33% crypto at the first kept close). Rewritten with a year-by-year table, from
+  N0 rebuilt with `trend.always_in_n0` (bit for bit equal to `oos.parquet`). Because RESULTS.md made the same claim,
+  the finding is now "should fix", and the Result counts six findings to fix instead of five. The E2 and E3 lines in
+  section 2 now say what N0 and X are.
+- **Finding 1's table:** plain volatility at 85 days and τ 0.35 against its own N0 is −0.5849 log, so −0.58, not
+  −0.59. In the same finding, "about 0.10-0.15 log at either pair" mixed in the two 15-day runs' different N0s; on the
+  2020 returns the measure cost 0.11 log at the 85-day pair and 0.06 at the 15-day pair. A note under the table now
+  says what each run's own N0 is, and finding 2's "level with holding" now names its N0 and gives the gap against
+  this run's N0 (−0.09 log). The sentence before the table said the reruns start "from the same book"; they start
+  from the same 10,000 USD at the panel's first row, and enter 2020 with different wallets. It now says so.
+- **Finding 6's 2020 starting figure:** 41% is the share N0 bought, decided at the 3 January 2020 close; 43% (42.7%)
+  is N0's crypto at the next close, the first kept close of 2020. Both are now named. (The first version said 43%
+  only.)
+- **Section 2's E2 row:** the "other draws" I first quoted were 4,000-resample runs, given as ranges. They are
+  replaced by 10,000-resample values at named seeds (the lab's `steady.paired_bootstrap` at seeds 1-3, my own sampler
+  at seeds 11-13), and the stored p values are given to four places (0.9938 and 0.9836).
+- None of these changes the verdict (NO EDGE), a criterion, a gate, the checklist or "RETURN TO RESEARCHER". These
+  rechecks repeat computations already listed in finding 10 and add no new kind of look at the train years.
 
 ## Checklist (backtest-auditor)
 

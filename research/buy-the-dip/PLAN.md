@@ -482,5 +482,7 @@ from its riskiest end after D3's numbers, as AGENTS.md allows.
 | Risk | 2026-11-24 | `risk-officer` | No market data. Read: this plan's sections 4, 5, 7 and 13; `config/risk_levels.yaml`; `portfolio.risk_limits`, `check_targets` and `LIMIT_TOL`; protect-gains' section 12. A scratch check on random weights (config only). It read no result file |
 | Build | 2026-11-24 | `quant-researcher` | No market data: synthetic bars and hand-built paths only (TESTING.md #71, #72) |
 | Review | 2026-11-24 | two reviewers, a verifier, a fixer | No market data: the code, the tests and synthetic dry runs (#74; R2) |
+| Run 0 | 2026-11-24 | the lead | The train years (Kraken and Binance daily bars, 2017-2022), commit `e62233e`: 90,628 runs; default (0.30, 0.10, 0.25, 1.00), NOT ROBUST (`RESULTS.md`). No validate or test bar |
+| Audit | 2026-11-24 | `backtest-auditor`, a fact-checker, a verifier | The train years only: all 90,628 runs rebuilt with the auditor's own ladder and book, D1-D3 recomputed, tamper checks, the other reading of the one-year high, and descriptions behind RESULTS.md (`AUDIT.md`). No validate or test bar |
 
 **Validate-window looks used for buy-the-dip: 0.**
