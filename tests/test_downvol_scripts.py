@@ -1306,10 +1306,24 @@ def test_the_gate_summary_and_the_narrowing_line_by_hand():
 
 def test_share_changes_risk_and_trade_frequency_by_hand():
     """R3's q days (INTERPRETATIONS["r3"]), the fold description's share changes and the order-log helpers on a
-    hand-built path: a flat market whose one jump makes sigma large for L days, so q steps down and back up."""
+    hand-built path: a flat market whose one fall makes the downside deviation large for L days, so q steps down and
+    back up (a jump UP would move nothing: up days do not count)."""
     idx = T.train_grid()[:120]
     c = np.full(len(idx), 100.0)
-    c[40:] = 200.0  # one 2x jump on row 40: the 10-row window holds it on rows 40..49
+    c[40:] = 50.0  # one halving on row 40: the 10-row window holds it on rows 40..49
+    up = np.where(np.arange(len(idx)) >= 40, 200.0, 100.0)  # the same path with a doubling instead
+    up_panel = make_panel(
+        {
+            a: pd.DataFrame(
+                {"open": up, "high": up * 1.01, "low": up * 0.99, "close": up, "volume": 1.0}, index=idx
+            )
+            for a in ("BTC", "ETH")
+        },
+        snapshot_id="hand",
+    )
+    up_q = D.downvol_path(up_panel, 10, 0.6, 0.5).q
+    assert (up_q[14:] == 1.0).all()  # never steps back on a rise
+    assert (V.vol_path(up_panel, 10, 0.6, 0.5).q[42:56] == 0.0).all()  # vol-steady's sigma does
     bars = {
         a: pd.DataFrame({"open": c, "high": c * 1.01, "low": c * 0.99, "close": c, "volume": 1.0}, index=idx)
         for a in ("BTC", "ETH")
@@ -1319,7 +1333,7 @@ def test_share_changes_risk_and_trade_frequency_by_hand():
         {"lookback": 10, "target_vol": 0.6, "crypto_share": 0.5}, panel, limits=LIMITS, costs=Costs()
     )
     q = res.attrs["q"]
-    assert res.attrs["activation"] == 14 and (q[14:42] == 1.0).all()  # sigma = 0 before the jump: m = 1
+    assert res.attrs["activation"] == 14 and (q[14:42] == 1.0).all()  # sigma_down = 0 before the fall: m = 1
     # Mondays 42 and 49 hold the jump in their 10-row windows (rows 33-42 and 40-49); Monday 56 no longer does
     assert (q[42:56] == 0.0).all() and (q[56:] == 1.0).all()
     assert (
@@ -1360,7 +1374,8 @@ def test_run_0_names_its_studies_and_counts_every_trial_and_run(train0):
     ]
     assert S.study_dirs(out / "train") == names
     assert s["status"] == "complete" and r["trials"]["n_raw"] == 12 * n
-    assert r["trials"]["n_strict"] == 12 * n + 49 and r["trials"]["n_strict_k4_15"] == 12 * n + 63
+    assert r["trials"]["n_strict"] == 12 * n + 49 + 2400 and r["trials"]["n_strict_k4_15"] == 12 * n + 63 + 2400
+    assert r["trials"]["prior_trials"] == 2400
     trials = pd.read_parquet(out / "train" / "run0" / "trials.parquet")
     assert len(trials) == 12 * n and set(trials["run"]) == {0} and set(trials["seed"]) == {0, 1}
     ctx = json.loads(trials["context"].iloc[0])
@@ -1394,6 +1409,8 @@ def test_run_0_names_its_studies_and_counts_every_trial_and_run(train0):
         range(53, 260)
     )
     assert (ev["kind"] == "lead").sum() == 2 * 52 and (ev["kind"] == "shift_sk").sum() == 4 * 207
+    whole = ev[ev["kind"] == "shift_whole"]  # E1-whole: a description, never counted
+    assert len(whole) == 2 * 207 and not whole["counted"].any() and set(whole["offset"]) == set(range(53, 260))
     assert not ev["kind"].str.contains("phi|placebo|fresh").any()  # no stop-loss variant (section 11A)
     # the executor runs tallied equal the projection's table (stop rule 17); the bootstraps fit inside it
     units = S.run_counts()
