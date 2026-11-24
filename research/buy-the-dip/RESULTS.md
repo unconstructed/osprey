@@ -2,12 +2,16 @@
 
 > **SCOUTING ONLY:** the reference engine (`lab/runner/dipbuy.py` driving `lab/runner/portfolio.py`), the placeholder
 > costs of `config/costs.yaml`, and Kraken and Binance daily candles in place of Base prices. Not NautilusTrader.
-> Written 2026-11-24 from `results/buy-the-dip/run0/`.
+> Written 2026-11-24 from `results/buy-the-dip/run0/`, and revised the same day after the audit
+> ([AUDIT.md](AUDIT.md): PASS) and an independent fact-check.
 > - Run 0 ran on commit `e62233e` with a clean tree. On that commit the full tier passed (2646 tests, 100% branch
 >   coverage of `lab/`), the deep profile passed (2628), ruff was clean and the dashboard passed (86).
 > - Every number below was recomputed from `runs.parquet`, `ladders.parquet` and `decision.json` with scratch code
 >   that shares nothing with `dipbuy.py` or `run.py`. It agrees with `decision.json` exactly: every D1, D2 and D3
 >   number, and the three per-setting tables.
+> - A few descriptions added in the revision (dca-same's first cut, the time-average crypto share, the index around
+>   the worst knife, the other reading of the one-year high) come from the audit's own rerun. All but the last were
+>   reproduced with `dipbuy.py` on train bars (Record).
 > - It claims no edge. It picks a suggested starting setting for a tool the customer owns.
 > - Validate-window looks used: 0 (none is planned). The test window was not read. No bar after 2023-01-01 00:00 UTC
 >   was read.
@@ -22,7 +26,9 @@ without the best 2: MISSING)".
 **The default setting, as the app would say it.** "When crypto falls 30% from its highest close of the past year,
 buy crypto with 25% of my cash, and buy another 25% at each further fall of 10%, until at most 100% of my cash is
 used." Its four buy lines sit 30%, 37%, 43% and 49% below that high. A buy never takes the wallet below 22% USDC
-(the Steady limit of 20% plus a 2-point margin), so the last piece is usually cut short.
+(the Steady limit of 20% plus a 2-point margin), or a coin above 58%. So in most runs the caps cut more than one whole
+piece of each ladder: the last piece, and from a 30%-crypto start part of the third as well. They cut a median 27-37%
+of what the ladder ordered, by start.
 
 **What it did in 2017-2022.** Kraken prices, 49 two-year windows (one starting each month, January 2017 to January
 2021), a 5,000 USD deposit, four start wallets: 196 runs. The four start wallets are:
@@ -35,59 +41,98 @@ The findings:
 - **It bought in every window.** So did all 54 settings, at every start: every two-year window of 2017-2022 held a
   30% fall from a one-year high.
   - At the default a window held a median of 2 ladders and 7 buy orders.
-  - In 100 of the 196 runs the first buy came on the window's first day, because crypto was already 30% below its
-    one-year high (windows starting in 2018, 2019 and early 2020).
-- **Against spreading the same money monthly** ("dca-same": the same dollars in 12 monthly pieces):
-  - it ended ahead in 94 of 196 runs (48%);
+  - In 100 of the 196 runs the ladder's first order came on the window's first day, because the mix was already 30%
+    below its one-year high. These are the windows starting February 2018 to May 2019 and September 2019 to May 2020
+    (k = 13..28 and 32..40).
+  - In 58 of those 100 runs all four lines were already crossed, so the whole ladder went in as one order that day
+    (windows starting April 2018, June 2018 to May 2019 and April 2020, and January 2020 at the 50/50 starts). There
+    the ladder was a one-shot buy, not small pieces as the price kept dipping.
+- **The two yardsticks are the ladder's own total on a schedule, cut at the Steady limits.** Each run is compared with
+  twins that order the same total the ladder ordered (before the caps), with the same caps and limit fixes:
+  - **dca-same** orders it in 12 pieces 30 days apart. At the default the limits cut every one of these twins (196 of
+    196), by a median 35-47% of its total, by start. The ladder ordered a median 1.73 times the starting cash, so
+    each monthly piece is about 14% of the starting cash, and the wallet reaches its 78% crypto cap within a few
+    months: dca-same's first cut came at a median of day 120 (1 in 10 by day 45). It got less money into crypto than
+    the ladder in 173 of the 196 runs (a median 84% of what the ladder sent). So it is a monthly schedule of the
+    ladder's total that hit the limit after about four months in the median window, not the same money spread calmly
+    over a year;
+  - **lump-same** orders the total on day one. The limits cut it harder still (a median 46-65%).
+- **Against dca-same** (the capped monthly schedule):
+  - it ended ahead in 94 of 196 runs (48% over the four start wallets; 43-51% by start wallet);
   - the median difference in end value was small: −3.4% to +0.3% by start;
   - single windows swung widely. At start A, 1 window in 10 ended more than 65% behind and 1 in 10 more than 38%
     ahead;
-  - per dollar it ordered, it ended a median 0.6 cents behind (G̃ = −0.0057).
-- **Against putting the same money in at once** ("lump-same"): ahead in 122 of 196 runs (62%), median +5%. It fell
-  behind where prices rose soon after a window began (windows starting in 2017, and from June 2020 on), because
-  it waited with cash.
+  - per dollar it ordered (before the limits cut it), it ended a median 0.6 cents behind (G̃ = −0.0057).
+- **Against lump-same** (the same total on day one, capped): ahead in 122 of 196 runs (62%), median +5%.
+  - It fell behind mostly in the windows starting in 2017 (8 or 9 of the 12, by start; it was ahead in the June and
+    July 2017 windows at every start) and in every window from June 2020 on. There it mostly waited with cash while
+    prices rose.
+  - It also trailed in the April 2018 window (all four starts) and the May 2020 window (three starts). In both it
+    bought on day one.
 - **Against keeping the start wallet** ("hold"):
   - for an all-USDC start, hold means keeping the cash. The ladder ended ahead in 65-67% of windows, median +61% to
     +62%;
   - for a 30%-crypto start, it ended ahead in 61-73%, median +22% to +29%.
 - **How much cash it put to work.**
-  - It ordered a median 1.73 times the starting cash (δ). That counts the amounts the limits then cut, which were 36%
-    of everything it ordered.
+  - It ordered a median 1.73 times the starting cash (δ). That counts the amounts the limits then cut: 36% of all it
+    ordered, pooled (a median 27-37% per run, by start).
   - It actually sent a median 1.12 times the starting cash into crypto. That is more than 100% because sales by the
     limit fix refill the cash, and later ladders spend it again.
-  - At the end of a window a median 26% of the wallet was USDC (the floor is 22%).
-- **It also sold.** With M = 100% the wallet sits near the Steady limits, so a rise pushes it past them and the limit
-  fix sells back to 22% cash and 58% a coin: a median 14-18 sales per two-year window.
-- **Costs:** customer fees were a median 0.07-0.12% of the wallet a year, and gas (sponsored by us) about 0.02-0.03%.
+  - At the end of a window a median 26% of the wallet was USDC. Buys stop at 22% USDC; the Steady limit is 20%, and 53
+    of the 196 runs ended between 20% and 22%.
+  - Over a window the ladder and its twins were similarly invested on average: the median time-average crypto share
+    was 68% for the ladder, 67% for dca-same and 68% for lump-same (the cap is 78%). At the end the twins held more
+    cash (Readings).
+- **It also sold.** With M = 100% the wallet sits near the Steady limits, so a rise pushes it past them. The limit fix
+  then sells back until cash is at 22% or one coin at 58%, whichever is reached first: a median 14-18 sales per
+  two-year window.
+- **Costs:** customer fees were a median 0.07-0.11% of the wallet a year, by start, and gas (sponsored by us) about
+  0.02-0.03%. Fees a year leave out a window's first fill (the start purchase at C and D). In the 50 all-USDC runs
+  whose ladder bought on day one, that first ladder buy (a median 0.19% of the wallet) falls there too, so those runs
+  show a median 0.07% a year against 0.12% for the other all-USDC runs.
 - **The bad-case fall** (Q: the fall from a peak that 1 window in 10 exceeded):
   - 65% to 72% by start, about twice the Steady budget of 35%. The budget is shown here, not enforced;
   - the worst window fell 74%, and every one of the 196 runs fell more than 35% at some point (the smallest worst
     fall was 42%);
-  - spreading the money monthly was a little worse (Q 69-75%), and putting it in at once a little better (64-69%);
-  - a wallet that only held its 30% crypto start also passed the budget (Q 59-61%). In a rise its crypto share grows,
-    and the limit fix sells only back to 22% cash, so it can meet a crash at up to about 78% crypto.
+  - dca-same was a little worse (Q 69-75%), and lump-same a little better (64-69%);
+  - a wallet that only held its 30% crypto start also fell further than the budget (Q 59-61%). In a rise its crypto
+    share grows, and the limit fix sells only back to 22% cash (or 58% in BTC at the 75/25 start), so it can meet a
+    crash at up to about 78% crypto.
 - **The falling knife.** After a ladder's last buy, the BTC/ETH mix fell a median 14% further before its next
   one-year high (or the window's end). The worst was 76%: a ladder that bought its last piece in mid-March 2018 and
-  then rode the 2018 crash. The mix's next one-year high came only in June 2019.
+  then rode the 2018 crash. The mix's next one-year high came only on 2019-06-27, and it was a high of the past year
+  only: the mix was still about half its January 2018 level (51% below it), and 2% below that last buy's price.
 
-**The app's wording** (PLAN.md section 9's example, filled in from D3): "In 2017-2022 tests, buying on dips beat
-spreading the same money monthly in **48%** of two-year periods. After its last buy the price fell up to **76%**
-further." Two facts belong next to it: the bad-case fall was about 70% of the wallet, twice the Steady budget; and the
-default is NOT ROBUST.
+**The app's wording** (PLAN.md section 9's example, filled in from D3 and corrected after the audit): "In 2017-2022
+tests, about half the time (**43-51%** of two-year periods, by start wallet), buying on dips ended ahead of a monthly
+schedule of the same total, cut at the Steady limits. After its last buy, the BTC/ETH mix fell up to **76%** (a 50/50
+split) or **68%** (75/25) further."
+- It must not say "the same money spread monthly": the monthly yardstick hit the limits after about four months in
+  the median window.
+- 48% is the pooled figure (94 of 196 runs over four start wallets); the 49 windows overlap heavily.
+- Two facts belong next to it: the bad-case fall was about 70% of the wallet, twice the Steady budget; and the default
+  is NOT ROBUST.
 
 **Why NOT ROBUST.**
-- The rules pick a default only among settings whose bad-case falls are no deeper than spreading the money monthly,
-  at all four starts. On Kraken, 10 of the 54 settings passed. Among them the default lost least per dollar against
-  spreading the money monthly (its G̃, the median G, is the least negative).
+- The rules pick a default only among settings whose bad-case falls are no deeper than their dca-same twins', at all
+  four starts. On Kraken, 10 of the 54 settings passed. Among them the default trailed dca-same least per dollar
+  ordered (its G̃, the median G, is the least negative).
 - Doubled costs gave the same default.
-- But the bad-case test rests on the windows that start in 2017, where spreading the money monthly bought into the
-  late-2017 top. Binance's windows start in September 2017. On Binance, and on Kraken without the windows that touch
-  2017, no setting passes, so there is no default.
+- But the bad-case test rests on the windows starting May to December 2017, where dca-same bought into the late-2017
+  top. In the windows starting January to April 2017 the ladder fell deeper than dca-same at the 30%-crypto starts.
+  Binance's windows start in September 2017. On Binance, and on Kraken without the windows that touch 2017, no setting
+  passes, so there is no default.
 - Without both 2017 and 2020, only 2 windows are left: too few to decide (MISSING).
 
-**So:** (30%, 10%, 25%, 100%) is the best of the 54 settings by the rules fixed before the run. Its bad-case test holds
-only narrowly (start D: 71.19% against 71.27%), and only with the 2017 windows. Against spreading the money monthly it
-is close to a coin flip, and its bad-case fall is far beyond the Steady budget.
+**So:** (30%, 10%, 25%, 100%) is the best of the 54 settings by the rules fixed before the run, but it is an isolated,
+knife-edge pick.
+- Its bad-case test holds only narrowly (start D: 71.19% against 71.27%, a margin of 0.08 of a point), and only with
+  the 2017 windows.
+- None of its five one-step neighbours in the grid passes that test. One of them, (30%, 5%, 25%, 100%), fails it by
+  0.04 of a point.
+- Had start D's margin gone the other way, the rules would have named (10%, 20%, 25%, 100%).
+- Against the capped monthly schedule it is close to a coin flip, and its bad-case fall is far beyond the Steady
+  budget.
 
 ## The default and the robustness checks (D1, D2)
 
@@ -106,12 +151,20 @@ all four starts:
 | 20% | 5% | 25% | 50% | −0.2778 | 1.35 | |
 | 20% | 5%, 10%, 20% | 25% | 25% | −0.5033 | 0.77 | the same runs: with X = M there is one line, so Z changes nothing |
 
-- **Every usable setting has a negative G̃:** in the median run, each lost money per dollar moved against spreading the
-  same dollars monthly. The default loses least.
+- **Every usable setting has a negative G̃:** in the median run, each ended behind its dca-same twin, per dollar it
+  ordered (before the limits cut it). The default trails least.
 - **Six settings had a positive G̃** (up to +0.036, at Y 10%, Z 20%, X 10%, M 100%). None was usable: each had a deeper
   bad-case fall than dca-same at one or more starts.
 - **The default sits at a corner of the range:** the largest Y, X and M on offer.
-- **Its narrowest margin** is start D's worst fall: 71.19% against dca-same's 71.27%.
+- **It is an isolated passing point.** Each of its five one-step neighbours in the grid fails the bad-case test:
+  - Y 20%: (20%, 10%, 25%, 100%) has the deeper worst fall at B (by 2.4 points) and D (by 1.0);
+  - Z 5%: (30%, 5%, 25%, 100%) at D, by 0.04 of a point (71.53% against 71.49%);
+  - Z 20%: (30%, 20%, 25%, 100%) at D, by 5.0 points;
+  - X 10%: (30%, 10%, 10%, 100%) fails Q at A, C and D, and the worst fall at A and D;
+  - M 50%: (30%, 10%, 25%, 50%) fails Q at A and the worst fall at D.
+- **Its narrowest margin** is start D's worst fall: 71.19% against dca-same's 71.27%, 0.08 of a point, in a comparison
+  of two single windows (the ladder's worst is window 0, dca-same's window 10). Had it gone the other way, D1 would have
+  named the next usable setting, (10%, 20%, 25%, 100%) (G̃ −0.0187).
 
 **D2, check by check.** The default's own numbers in each pool (Q / Q_dca; max F / max F_dca, in %; a failing pair
 in bold):
@@ -136,8 +189,10 @@ in bold):
     (30%, 5%, 25%, 50%) at D, 62.74% against 62.14%; (30%, 5%, 25%, 100%) at B, 60.39% against 60.14%;
     (30%, 20%, 10%, 100%) at D, 62.92% against 61.13%; (30%, 20%, 25%, 100%) at D, 65.50% against 62.29%;
   - a description (decides nothing; this file's recompute, not in `decision.json`): Kraken's own runs on Binance's 41
-    windows (k = 8..48) also give NO DEFAULT. So the move comes from the windows Binance lacks (starting January to
-    August 2017), not from Binance's prices.
+    windows (k = 8..48) also give NO DEFAULT, failing at the same starts. So the windows Binance lacks (starting
+    January to August 2017) are enough to move it; Binance's prices are not needed for the move. The counts differ a
+    little: the Q condition held at start D for 3 settings on Kraken's k = 8..48 against 5 on Binance, and the
+    worst-fall condition at A for 35 against 37.
 - **Without BTC's best year (2017, +1,304% on Kraken): NO DEFAULT, so it moved.** The windows that touch 2017 are
   k = 0..11; 37 remain (k = 12..48, starting January 2018 to January 2021).
   - No setting was usable. The Q condition held at all four starts for no setting; at start C it held for 1 setting
@@ -152,10 +207,13 @@ in bold):
 
 **What the checks say together** (a description from `runs.parquet`, at the default):
 - In every window starting from May to December 2017 (k = 4..11), at all four starts, dca-same's worst fall was deeper
-  than the ladder's by more than a point. Buying monthly through 2017 bought into the late-2017 top.
+  than the ladder's by more than a point. dca-same's monthly pieces through 2017 bought into the late-2017 top.
+- In the windows starting January to April 2017 (k = 0..3) it went the other way at the 30%-crypto starts: the
+  ladder's worst fall was the deeper one, by 0.3 to 7.9 points (and at start A in the January and February 2017
+  windows). So the windows that carry the test are those starting May to December 2017.
 - The ladder's worst fall was the deeper one in 20 to 24 of the 49 windows (by start), always including the windows
   starting from March 2020 on (k = 38..48). In those from June 2020 on (k = 41..48) it waited with cash through the
-  2020-21 rise (its first buy came 138 to 352 days in) and bought in the 2021-22 falls.
+  2020-21 rise (its first ladder order came 138 to 352 days in) and bought in the 2021-22 falls.
 - Remove the 2017 windows, or only the January-August 2017 ones that Binance lacks, and Q tips against the ladder at
   some start. On Kraken's windows k = 8..48 the default fails Q at B (62.70% against 60.45%) and D (64.31% against
   63.95%), the same starts as on Binance.
@@ -163,10 +221,11 @@ in bold):
 ## D3: the description at the default (Kraken 1x)
 
 What each measure means:
-- **G:** the end value against dca-same, per dollar the ladder ordered: (V_end − V_end(dca-same)) / ordered. Over the
-  runs with a ladder order (all 49 here).
+- **G:** the end value against dca-same, per dollar the ladder ordered before the limits cut it:
+  (V_end − V_end(dca-same)) / ordered. Over the runs with a ladder order (all 49 here).
 - **T_dca, T_lump, T_hold:** how much more (or less) the ladder's wallet was worth at the window's end than dca-same,
-  lump-same and hold. For an all-USDC start, hold is the cash, so T_hold is the ladder wallet's own gain.
+  lump-same and hold. For an all-USDC start, hold is the cash, so T_hold is the ladder wallet's own gain. dca-same and
+  lump-same are the ladder's total on a schedule, cut at the Steady limits (In plain words).
 - **Q of each kind:** the 90th percentile of its 49 worst falls from a peak (1 window in 10 fell further).
 - **The knife:** after a ladder's last buy, the further fall of the BTC/ETH mix from its price at that buy's fill (the
   next open) to its lowest close before the next one-year high (or the window's end). Positive is a further fall.
@@ -183,7 +242,8 @@ What each measure means:
 | C | 49 | +0.003 [−0.597, +0.244], 51% | +0.3% [−38.9%, +15.2%], 51% | +4.8% [−41.0%, +14.2%], 63% | +28.7% [−14.0%, +86.0%], 61% |
 | D | 49 | −0.004 [−0.564, +0.272], 49% | −0.5% [−35.5%, +12.7%], 49% | +5.2% [−37.7%, +16.1%], 63% | +22.0% [−8.5%, +80.0%], 73% |
 
-- G and T_dca have the same sign in every run (G is T_dca rescaled by the money moved), so their shares above 0 match.
+- G and T_dca have the same sign in every run, so their shares above 0 match: both divide the same end-value gap, G by
+  the dollars the ladder ordered (before the limits cut them) and T_dca by dca-same's end value.
 - Across the 196 runs: ahead of dca-same in 94 (48%), of lump-same in 122 (62%), of hold in 131 (67%).
 
 **Bad case, knife and cash, per start** (against the Steady budget as read, 35%; shown, not enforced):
@@ -197,7 +257,8 @@ What each measure means:
 
 - Above the 35% budget (`above_budget` in `decision.json`): Q, Q_dca and Q_lump at every start, and Q_hold at C and
   D. Q_hold is 0 at A and B, where hold is cash. At C and D, a rise lifts hold's crypto share, and the limit fix
-  sells only back to 22% cash and 58% a coin, so a held wallet can ride a crash at up to about 78% crypto.
+  sells only back to 22% cash or 58% in one coin, whichever is reached first, so a held wallet can ride a crash at up
+  to about 78% crypto.
 - Over all four starts the knife's median is 14.0% and its worst 76.4% (446 ladders, all with an order sent). By the
   year the ladder started, the worst knives were 2018's (median 66%, worst 76%), then 2022's (median 42%, worst 48%)
   and 2019's (median 27%, worst 30%); ladders started in 2017 never saw the mix fall below their last buy's price.
@@ -234,8 +295,11 @@ What each measure means:
 
 What the years show (descriptions):
 - **Windows starting in 2019** were the ladder's best against dca-same: ahead in 83-100% of them, median +6% to +8%.
-- **Windows starting in 2018 and 2020** were its worst: ahead in 17-42%. In 2018 it mostly bought on the window's first
-  day, early in the 2018 fall. From June 2020 it waited with cash through the rise.
+- **Windows starting in 2018 and 2020** were its worst: ahead in 17-42%.
+  - In 11 of the 12 windows starting in 2018 (February to December) it bought on the window's first day; from the
+    April window on (May aside) that first order took all four lines at once. The fall went on for months: at start A
+    the mix fell another 26-75% after those whole-ladder orders, while dca-same's later pieces bought lower.
+  - From June 2020 it waited with cash through the rise.
 - **Windows starting in 2017** were mixed against dca-same (42-58% ahead), and mostly behind lump-same (25-33% ahead):
   money put in at once in early 2017 rode the 2017 rise.
 - The overlapping windows share their years, so these rows are not independent: one crash or one boom stands behind
@@ -431,15 +495,23 @@ in the config hash and the start record, and settled in PLAN.md amendment R2):
     does not count. That is section 5's exact rule. Section 11's test list had said the opposite.
   - On the daily grid the other reading would use 366 closes. It can move a trigger or a re-arm only where the year's
     highest close sits exactly 365 days back.
-  - Its effect on these results was not measured; that would need a rerun.
+  - The audit measured its effect (AUDIT.md section 2): rerun under the other reading, the ladder's events change in 8
+    of the 30,024 dip runs. D1 gives the same results in all three pools, and the without-2017 check is still NO
+    DEFAULT.
 - **"Ordered (before caps)"** = the amounts sent + cut by a cap + blocked by a limit fix (R2.3). Lines crossed on the
   last close are "not filled" and not ordered. This total feeds δ, G and the twins.
   - So δ counts money the limits never let in. At the default it is 1.45-1.95 times the starting cash, while the ladder
     sent 1.06-1.17 times.
-  - The twins spend the same total. At the default, dca-same's pieces were cut by a median 35-47% and lump-same's by
-    46-65%, and both end near the 22% cash floor (median USDC left: dca-same 31-39%, lump-same 36-43%).
-  - So the comparison measures when the money goes in, all three near full investment. It does not compare dip-buying
-    with a half-invested wallet.
+  - The twins order the same total, and the limits cut them harder. At the default the ladder's own orders were cut by
+    a median 27-37% (by start), dca-same's by 35-47% and lump-same's by 46-65%.
+  - So the twins got less money into crypto: in the median run lump-same sent 61% and dca-same 84% of what the ladder
+    sent. They ended holding more cash (median USDC left: the ladder 24-29%, dca-same 31-39%, lump-same 36-43%), and
+    only 16-20% of the twins' runs ended below 25% USDC, against 39-57% of the ladder's.
+  - Over a window the three were similarly invested on average: the median time-average crypto share was 68% for the
+    ladder, 67% for dca-same and 68% for lump-same (the cap is 78%).
+  - So T_dca and T_lump mix when the money went in with how much of it got in. The comparison does not set dip-buying
+    against a half-invested wallet, but neither twin is "the same money spread out": each is the ladder's total on a
+    schedule, cut at the Steady limits.
 - **The cost check** reads "order closes equal at 1x and 2x" as the ladder's decisions (R2.2; above).
 - **Smaller readings:**
   - the knife from the open of the last order's fill row through the re-arm close (or the last close), signed;
@@ -458,12 +530,16 @@ in the config hash and the start record, and settled in PLAN.md amendment R2):
 - **Overlapping windows:** 49 two-year windows a month apart. One crash (2018, 2022) or one boom (2017, 2020-21)
   stands behind many windows. The D2 checks show how much the default leans on the 2017 windows.
 - **The twins use the run's own total,** known only at the end, and at M = 100% that total is above the starting cash,
-  so the twins are capped too. They are yardsticks, not strategies a customer could follow.
+  so the twins are capped too. At the default the limits cut every dca-same twin, from a median of day 120, and
+  lump-same harder still. They are the ladder's total on a schedule, cut at the Steady limits: yardsticks, not the
+  same money spread out, and not strategies a customer could follow.
 - **One wallet size** (5,000 USD), no later deposits, one lookback for the high (365 days), daily checks only.
 - **The ladder never sells except by the limit fix.** At the default the limit fix sold a median 14-18 times a window.
 - **f is 50% or 75% only;** other BTC/ETH splits are untested.
 - **The default sits at a corner of the range** (the largest Y, X and M), and its bad-case margin is thin (start D:
-  71.19% against 71.27%).
+  71.19% against 71.27%). It is an isolated passing point: none of its five one-step neighbours passes the bad-case
+  test, and with D's margin the other way D1 would have named (10%, 20%, 25%, 100%). It is also picked in sample, on
+  the same 49 windows it is described on.
 - **The scouting engine, the placeholder costs and exchange candles,** not NautilusTrader and not Base prices.
 
 ## Record
@@ -478,8 +554,10 @@ in the config hash and the start record, and settled in PLAN.md amendment R2):
   - amendment A1: 36.1 CPU-minutes projected, under the 240 limit.
   - On `e62233e`: the full tier, 2646 passed with 100% branch coverage of `lab/`, in 3488 s at `-n 3`; the deep
     profile, 2628 passed in 1095 s; ruff clean; dashboard 86 passed; the tree clean before and after.
-- **Alongside:** downvol-steady run 0 started on the same commit 7 s later (its RUNLOG line at 18:08:56 UTC). Both start
-  records show a clean tree, and the two runs shared the machine.
+- **Alongside:** downvol-steady run 0 started at the same moment on the same commit. Both read a clean tree before
+  either wrote its RUNLOG line: this study's RUNLOG did not exist at `e62233e`, and its line (18:08:49 UTC) would have
+  made the tree dirty for any later check. downvol-steady's line is at 18:08:56 UTC, after its own re-timing. The two
+  runs shared the machine and no hashed file.
 - **Outputs:**
   - `results/buy-the-dip/run0/` (git-ignored): `start.json`, `summary.json`, `decision.json`, `runs.parquet`,
     `ladders.parquet`, `failures.parquet` (empty) and `blocks/` (139 blocks);
@@ -491,6 +569,19 @@ in the config hash and the start record, and settled in PLAN.md amendment R2):
     check;
   - T_dca, T_lump, T_hold, G and δ were also recomputed from the runs' end values and ordered totals, with no
     difference;
-  - writing it read run 0's outputs only. No bar was loaded.
-- **Audit:** pending.
+  - the first draft read run 0's outputs only and loaded no bar;
+  - the revision reran the default's 196 Kraken 1x dip runs and their dca-same and lump-same twins with
+    `lab/runner/dipbuy.py` (each run's end value equal to `runs.parquet`'s), for the time-average crypto share,
+    dca-same's first cut and the index around the worst knife. The bars came through
+    `load_panel("KRAKEN", "1d", last_close=2023-01-01 00:00 UTC)` behind a guard that refuses a request with no end or
+    a later end and any returned close after the cut. Each load made two requests (BTC and ETH, 2017-01-01 to
+    2023-01-01), and the panel's last close, 2023-01-01, was asserted. No Binance bar and no validate or test bar was
+    requested or received;
+  - the other reading of the one-year high (8 of 30,024 dip runs) is the audit's rerun, read from its scratch tables.
+- **Audit: PASS** for the run and its decision ([AUDIT.md](AUDIT.md), `backtest-auditor`, 2026-11-24).
+  - It reran all 90,628 runs with its own ladder, twins, book and costs, written from PLAN.md (a match to about 1e-14),
+    and its own statement of D1-D3 gives the same default and label. It also ran 300 tamper-the-future cases on real
+    train bars, and its guarded loader showed that no bar after 2023-01-01 00:00 UTC was requested or returned.
+  - Nothing it found can change the default or its label. Its corrections to this file's claims were applied the same
+    day, together with an independent fact-check's; no decided number changed.
 - **Validate-window looks used for buy-the-dip: 0.** None is planned (section 12). The test window was not read.

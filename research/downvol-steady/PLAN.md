@@ -224,5 +224,7 @@ None blocking. As in VP, run 0 waits for A0's alarms.
 |---|---|---|---|
 | Plan | 2026-11-24 | the lead | No market data. Read: VP and vol-steady's RESULTS.md (W1) |
 | Build, review | 2026-11-24 | `quant-researcher`, three reviewers, a verifier | No market data: synthetic bars and hand-built paths only (TESTING.md #69, #70, #73) |
+| T1 | 2026-11-24 | the lead | Run 0 on the train window (Kraken and Binance, 2017-2022), commit `e62233e`: NO EDGE (`RESULTS.md`). No validate or test bar. Added after run 0 earned no look (M3) |
+| Audit | 2026-11-24 | `backtest-auditor`, a fact-checker, two verifiers | The train window only: S, R_0, N0 and X rebuilt, E1, E2 and the gates recomputed, tamper checks, and reruns of the 2020 fold at other settings and with plain volatility (descriptions; `AUDIT.md` finding 1). No validate or test bar |
 
 **Validate-window looks used for downvol-steady: 0.**
