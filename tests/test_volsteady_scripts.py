@@ -3114,7 +3114,8 @@ def test_a_real_run_needs_amendments_a1_and_a0_first(train0, tmp_path, clean_git
     committed = (S.REPO / "research" / "vol-steady" / "PLAN.md").read_text()
     real = without_prior_rows(committed)
     placeholders = plan_with(  # the plan as committed before A1 and A0 ran (#68: not today's committed plan)
-        "- **A1:** the throughput timing (before run 0).\n- **A0:** the procedure controls (before run 0).\n", real
+        "- **A1:** the throughput timing (before run 0).\n- **A0:** the procedure controls (before run 0).\n",
+        real,
     )
     for text, match in (
         (placeholders, "does not say 'N = 200'"),
