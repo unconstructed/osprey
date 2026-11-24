@@ -8,8 +8,10 @@ run 0 (NO EDGE), from the angles written down before that run.
   and changes only the volatility measure.
 - Status 2026-11-24: plan committed, with amendment M1: vol-steady's audit showed the plan's stated reason was wrong,
   and E1 now holds each fold's share fixed. The owner chose to run it anyway. Validate-window looks used: 0. The test window is never read.
-- Build (2026-11-24, not yet committed): `lab/runner/downvol.py` (the measure, its live twin, the seam to vol-steady's
+- Build (2026-11-24, commit `3c5de48`): `lab/runner/downvol.py` (the measure, its live twin, the seam to vol-steady's
   rule and the q-only shift), the scripts here (vol-steady's, adapted) and `tests/test_downvol.py` and
-  `tests/test_downvol_scripts.py` (TESTING.md #69-#70). Synthetic dry runs only; no market bar read, no A1, A0 or run 0
-  on real data.
+  `tests/test_downvol_scripts.py` (TESTING.md #69-#70). Code review: four test gaps closed (#73), amendment M3.
+  Synthetic dry runs only; no market bar read, no A1, A0 or run 0 on real data.
+- PLAN.md stays byte-identical from run 0's start until the look, or until run 0 earns no look (M3): it is in the
+  config hash, and an edit would make `freeze.py` refuse.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.

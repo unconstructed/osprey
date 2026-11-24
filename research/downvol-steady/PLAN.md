@@ -171,6 +171,15 @@ holds if at most 18 of 200 pass E1 at each point.
     the measure as an argument; a test pins that with VP's σ̂ passed in, each equals vol-steady's bit for bit.
   - The 2,400 prior trials are a pinned value; the parameter parse is VP's (lookback ≥ 2); the correlations also use
     vol-steady's S_A.
+- **M3 (2026-11-24, after the code review of the build, before A1, A0, run 0 or any bar):**
+  - **One more description:** next to the lag rank, run 0 records the lag shifts' p5, p50 and p95 Sharpe
+    (`descriptions.stitched.lags`, u = 208..259, q-only as M2). A review found that R_0 can sit above every lag shift
+    under both nulls, so the rank alone cannot show which null was used; the percentiles can. It decides nothing.
+  - **This file stays byte-identical from run 0's start until the look**, or until run 0's verdict earns no look. It is
+    in the config hash, so an edit after run 0 would make `freeze.py` refuse an earned look (stop rule 10). Run 0 is
+    recorded in RESULTS.md, README.md and the RUNLOG; section 20's row for it is added after the look, or once no look
+    is earned.
+  - The review's other test gaps (TESTING.md #73) were closed in the tests; no rule or number changed.
 - **A1:** the throughput timing (before run 0).
 - **A0:** the procedure controls (before run 0).
 
@@ -214,5 +223,6 @@ None blocking. As in VP, run 0 waits for A0's alarms.
 | # | Date | By | What |
 |---|---|---|---|
 | Plan | 2026-11-24 | the lead | No market data. Read: VP and vol-steady's RESULTS.md (W1) |
+| Build, review | 2026-11-24 | `quant-researcher`, three reviewers, a verifier | No market data: synthetic bars and hand-built paths only (TESTING.md #69, #70, #73) |
 
 **Validate-window looks used for downvol-steady: 0.**

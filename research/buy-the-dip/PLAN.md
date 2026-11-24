@@ -353,6 +353,35 @@ for this study.
 - **R1 (2026-11-24, after `risk-officer`'s review, before any code, run or bar):** the caps never give a negative
   amount (section 5); every order's targets are checked (section 10); section 13 confirmed with the exact values the
   app offers and the wording notes.
+- **R2 (2026-11-24, after the build and its code review, before A1, run 0 or any market bar): readings settled.**
+  The build (TESTING.md #71, #72) and the review (#74) found four places where this plan is loose or contradicts
+  itself. Each is settled here without any result, and the code already follows it (`dipbuy.READINGS_PINNED`,
+  `run.py`'s `INTERPRETATIONS`, both in the config hash and the start record):
+  1. **H's window is section 5's**: t − 365 days < close ≤ t, so a high exactly 365 days back does **not** count and
+     one 365 days minus one microsecond back does (365 daily closes, close t included). Section 11's test-list line
+     "a high 365 days back counts; one 365 days and one microsecond back does not" contradicted section 5. Section 5
+     is the exact rule, so section 11's line is read as "a high exactly 365 days back does not count; one 365 days
+     minus one microsecond back does; a missing close".
+  2. **Section 10's "order closes equal at 1x and 2x"** is read as the ladder's own decisions: the triggers, the
+     crossed lines and the re-arms (`dipbuy.events_hash`), compared exactly on every Kraken dip run's 1x/2x pair (a
+     stop rule 5). They come from I and H alone, which hold no cost, and the one-pass recompute checks them on every
+     run. The orders actually sent can differ, since a cap or a limit fix reads the wallet, which costs move by a hair.
+     Those pairs are counted (`orders_differ_1x_2x`) as a description. Section 11's identity "the order closes are
+     equal at 1x, 2x and five wallet sizes" is read the same way: the events always, and the orders where no limit is
+     near.
+  3. **"Ordered (before caps)"** = the amounts sent + capped + blocked by a limit fix. Lines crossed at the last close
+     are "not filled" and are not in it. It feeds δ, G and the twins' totals.
+  4. **"A dip run with no order"** (twins equal to hold) is a run whose ordered total is 0.
+  Smaller readings, recorded with the code and listed here so nothing is chosen after a result: a cut that leaves at
+  most 1e-9 of the wallet (`LIMIT_TOL`) is "no a > 0"; the knife is 1 − (lowest I from the last order's fill row
+  through the re-arm close, or the last close) ÷ (I at that fill row's open), signed, the worst the largest; D1 is
+  MISSING if any run of any kind in its pool failed, "active" is 2 × active windows ≥ windows (boom pools too), the
+  median δ is over every run of the setting and G̃ over the runs with an order filled; D3 is described at the default
+  only and shows the drawdown budget as read; behind a brake the buy-back restores the start's targets and the ladder
+  is armed afresh (tests only, not in the grid); the snapshot id is recorded and the hashes decide, as in
+  protect-gains; the config hash's "data loaders" are `panel.py`, `catalog.py`, `external.py` and `loaders.py` with
+  the files they import (`interface.py`, `steady.py`, `lab/config.py`); a failed dip run's twins are logged as
+  failed; the `--fast` grid is 4 settings × 2 starts.
 - **A1:** the throughput timing (before run 0).
 
 ## 13. Allowed range (`risk-officer`, 2026-11-24, config only) [R1]
@@ -446,5 +475,7 @@ from its riskiest end after D3's numbers, as AGENTS.md allows.
 | P1-P5 | before this plan | section 2 | Prior looks, disclosed |
 | Plan | 2026-11-24 | the lead | No market data. Read: protect-gains' PLAN.md; dip-timing's RESULTS.md summary; `protect.py`'s function list, `Step` protocol, `run_overlay` and `index_signal`; `portfolio._simulate`'s signature; `docs/app/features.md`'s buy-the-dip and protect-gains rows |
 | Risk | 2026-11-24 | `risk-officer` | No market data. Read: this plan's sections 4, 5, 7 and 13; `config/risk_levels.yaml`; `portfolio.risk_limits`, `check_targets` and `LIMIT_TOL`; protect-gains' section 12. A scratch check on random weights (config only). It read no result file |
+| Build | 2026-11-24 | `quant-researcher` | No market data: synthetic bars and hand-built paths only (TESTING.md #71, #72) |
+| Review | 2026-11-24 | two reviewers, a verifier, a fixer | No market data: the code, the tests and synthetic dry runs (#74; R2) |
 
 **Validate-window looks used for buy-the-dip: 0.**

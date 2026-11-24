@@ -1450,6 +1450,8 @@ def describe(ctx, bundles, items, theta, theta_params, grid, default, weekdays, 
             "rank_p": (1 + sum(S.sharpe(r) >= sh_r0 for r in lead.values())) / (len(lead) + 1),
         },
         "r0_rank_among_lags": (1 + sum(S.sharpe(r) >= sh_r0 for r in lag.values())) / (len(lag) + 1),
+        # the lag offsets' spread next to R_0's rank among them: the rank alone can sit at 1/53 under either null
+        "lags": mc.percentiles([S.sharpe(r) for r in lag.values()]),
     }
     out["trade_frequency"] = {
         "S": S.frequency(a_i["log"], kept, windows),

@@ -66,6 +66,9 @@ RV = _load("downvol_steady_run_validate", "run_validate.py")
 A0 = _load("downvol_steady_controls", "controls.py")
 A1 = _load("downvol_steady_throughput", "throughput.py")
 S = RT.S
+# The plan file the guards read (A1/A0, the branch line, the amendment rows), as the module sets it: captured at
+# import, before the autouse ``stand_in_plan_file`` fixture replaces it in every test (#73).
+REAL_PLAN = S.PLAN
 CLEAN = {"commit": "0" * 40, "dirty": False, "changes": []}
 DIRTY = {"commit": "0" * 40, "dirty": True, "changes": ["?? stray.txt"]}
 SEED = 7
@@ -335,7 +338,8 @@ def test_the_committed_plan_reads_as_a_real_run_will_read_it():
     good: its header's branch line reads Branch R at 35% (stop rule 11: the branch never changes after run 0), and its
     section 15 is found from '## 15.' to '## 17.' (not the '## 14-16.' heading before it). Amendments A1 and A0 are not
     read here: their state changes when they are recorded, and the stand-in plans test both states."""
-    text = (S.HERE / "PLAN.md").read_text()
+    assert REAL_PLAN == HERE / "PLAN.md" and S.HERE == HERE  # the guards read this study's own plan (#73)
+    text = REAL_PLAN.read_text()
     assert S.HERE.name == "downvol-steady" and S.plan_branch(text) == {"branch": "R", "budget_pct": 35}
     section = S.amendments_section(text)
     assert section.startswith("## 15. Amendments") and "\n## " not in section
@@ -844,6 +848,47 @@ def test_the_branch_guard_refuses_before_anything_is_written(tmp_path, clean_git
     assert "stop rule 11" in capsys.readouterr().err and not out.exists()
 
 
+def test_a_run_reads_the_branch_from_its_plan(tmp_path, clean_git, monkeypatch, capsys):
+    """Stop rule 11 at run level: run_train.py reads the branch line from the plan it runs under (``S.PLAN``), so a
+    plan whose header says Branch F, or quotes 30%, stops a dry run and a real run before anything is written, with
+    config/ at 35% (#73). The re-timing and the run itself are stubbed, so a guard that ignores the plan fails at
+    once (exit 3) instead of starting a run; the same real run under the plan's own branch line gets past it."""
+    monkeypatch.setattr(S, "measure_timing", quick_timing())
+
+    def stop(args, summary, run_dir, ctx, settings):
+        raise S.Stop("the branch guard let the run start")
+
+    monkeypatch.setattr(RT, "train_phase", stop)
+    good = "- Branch: R. Steady drawdown budget **35%**"
+    bad_lines = {
+        "- Branch: F. Steady drawdown budget **35%**": "PLAN.md's branch is F",
+        "- Branch: R. Steady drawdown budget **30%**": "quotes a budget of 30%",
+    }
+    assert good in BRANCH_LINE
+    cfg = copy_config(tmp_path / "config")
+    plan = tmp_path / "bad" / "PLAN.md"
+    plan.parent.mkdir()
+    monkeypatch.setattr(S, "PLAN", plan)
+    for i, (bad, message) in enumerate(bad_lines.items()):
+        plan.write_text(stand_in_plan().replace(good, bad))
+        out = tmp_path / f"out{i}"
+        assert RT.main(train_args(out, cfg)) == 2
+        err = capsys.readouterr().err
+        assert "stop rule 11" in err and message in err and not out.exists()
+    out, catalog_dir = real_folders(monkeypatch, tmp_path)
+    write_snapshot(catalog_dir)
+    for bad, message in bad_lines.items():
+        S.PLAN.write_text(plan_with(PRIOR_ROWS, without_prior_rows(stand_in_plan()).replace(good, bad)))
+        assert RT.main([]) == 2
+        err = capsys.readouterr().err
+        assert "stop rule 11" in err and message in err
+        assert not out.exists() and not (tmp_path / "here").exists()
+    S.PLAN.write_text(plan_with(PRIOR_ROWS))
+    assert RT.main([]) == 3
+    assert "the branch guard let the run start" in capsys.readouterr().err
+    assert summary(out)["start"]["branch"]["branch"] == "R"
+
+
 def test_stop_rule_12_refuses_a_target_set_the_limits_refuse(tmp_path, clean_git, monkeypatch, capsys):
     """Feasibility before data (stop rule 12, every s x q): with a tighter coin cap (the branch guard bypassed here,
     since it pins max_coin at 0.60), the 0.72 plateau extreme (0.36 a coin) breaks the limits and the run refuses."""
@@ -932,12 +977,18 @@ def test_a_dry_run_never_writes_into_the_study_folder_or_the_repo(
     shutil.copytree(train0["out"], default)
     set_look_earned(default, True)
     before = S.tree_hashes(default)
-    assert RT.main(train_args(default, cfg, "--amendment", "1", "--trigger", "b")) == 2
-    assert FZ.main(["--out-dir", str(default), "--config-dir", str(cfg)]) == 2
-    assert RV.main(validate_args(default, cfg)) == 2
-    for main in (A0.main, A1.main):
-        assert main(["--out-dir", str(repo / "scratch")]) == 2
-    assert "never writes into" in capsys.readouterr().err and S.tree_hashes(default) == before
+    # each call is refused by its own folder guard, read call by call: the look's would otherwise be hidden behind
+    # its later "run freeze.py first" refusal (#73)
+    for call in (
+        lambda: RT.main(train_args(default, cfg, "--amendment", "1", "--trigger", "b")),
+        lambda: FZ.main(["--out-dir", str(default), "--config-dir", str(cfg)]),
+        lambda: RV.main(validate_args(default, cfg)),
+        lambda: A0.main(["--out-dir", str(repo / "scratch")]),
+        lambda: A1.main(["--out-dir", str(repo / "scratch")]),
+    ):
+        assert call() == 2
+        assert "never writes into" in capsys.readouterr().err
+    assert S.tree_hashes(default) == before and not (default / "validate").exists()
 
 
 def test_the_runlog_keeps_a_deleted_run_or_look_from_running_again(tmp_path, clean_git, monkeypatch, capsys):
@@ -1762,6 +1813,7 @@ def test_s_r0_and_the_luck_controls_are_recomputed_from_their_inputs(rebuilt):
         items[label] = rec["items"]
         if label == "A":
             seed_a = x
+            _check_q_only_descriptions(r["descriptions"], x)
     # E5, E8 and the verdict
     e5a = T.e5a_holds(items["A"], items["B"], r["seeds"]["A"]["sharpe"], r["seeds"]["B"]["sharpe"])
     assert r["e5"]["a"] == S.jsonable(e5a)
@@ -1817,6 +1869,35 @@ def test_s_r0_and_the_luck_controls_are_recomputed_from_their_inputs(rebuilt):
         assert fold["share_changes"] == sum(
             1 for t in range(len(s_)) if p0 <= t <= pl - 1 and s_[t] != (s_[t - 1] if t else 0.0)
         )
+
+
+def _check_q_only_descriptions(d, x):
+    """M2: the q-only shift (written out in ``_span``, never taken from lab.runner.downvol) is also used for the
+    descriptions B3-lead, the lag rank, the leave-one-year-out E1, the bear-year E1 and the stitched shifts'
+    percentiles (seed A only). Each is recomputed here from the shifts u = 1..259; VP's whole-schedule shifts give
+    other numbers on seed 7 (#73)."""
+    kept, sh0, shifts = x["S"].index, _sh(x["R0"]), x["shifts"]
+    years = sorted(set(T.bar_years(kept).tolist()))
+    assert sorted(d["leave_one_year_out"]) == [str(y) for y in years]
+    for year in years:
+        e1 = T.e1_test(x["R0"], shifts, 260, keep=T.without_years(kept, [year]))
+        row = d["leave_one_year_out"][str(year)]
+        assert row["removed"] == [year] and (row["e1_rank_p"], row["E1"]) == (e1["rank_p"], e1["holds"])
+    bears = T.without_years(kept, list(S.BEAR_YEARS))
+    assert S.BEAR_YEARS == (2018, 2022)
+    assert d["bear_years_removed"]["e1_rank_p"] == T.e1_test(x["R0"], shifts, 260, keep=bears)["rank_p"]
+    st = d["stitched"]
+    guarded = [_sh(shifts[u]) for u in range(53, 260)]
+    assert st["shifts"] == S.jsonable(
+        {**mc.percentiles(guarded), "rank_p": T.e1_test(x["R0"], shifts, 260)["rank_p"]}
+    )
+    lead = [_sh(shifts[u]) for u in range(1, 53)]
+    assert st["b3_lead"] == S.jsonable(
+        {**mc.percentiles(lead), "rank_p": (1 + sum(v >= sh0 for v in lead)) / 53}
+    )
+    lag = [_sh(shifts[u]) for u in range(208, 260)]
+    assert st["r0_rank_among_lags"] == (1 + sum(v >= sh0 for v in lag)) / 53
+    assert st["lags"] == S.jsonable(mc.percentiles(lag))
 
 
 def test_the_range_s_points_are_recomputed_from_their_inputs(rebuilt):
