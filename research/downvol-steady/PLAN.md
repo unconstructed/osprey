@@ -135,6 +135,29 @@ holds if at most 18 of 200 pass E1 at each point.
 
 ## 15. Amendments
 
+- **M1 (2026-11-24, after vol-steady's audit, before any downvol-steady code, run or bar): the reason corrected, and
+  E1 judged with the share held fixed.**
+  - **The reason in "In plain words" was wrong.** It read vol-steady run 0 as stepping back because of wild up-moves.
+    vol-steady's audit (`research/vol-steady/AUDIT.md`, finding 2) showed that at the four 2020-21 step-downs, up days
+    carried only 21-46% of the window's variance, so a downside-only measure would likely have stepped back about as
+    often.
+    - The lead told the owner. The owner chose to run this study anyway, together with the buy-the-dip study ("Why
+      not both?", 2026-11-24, in chat).
+    - W1 is therefore no support for this angle. The study is a test of an angle written down in advance, nothing
+      more.
+  - **E1 shifts only the volatility steps (finding 1 of that audit).** vol-steady's seed-A E1 passed because each
+    fold's share s travelled with the shifted schedule. To stop that here:
+    - **E1's null series for shift u** keeps each check close's own fold share and moves only the step:
+      `share_u(c_k) = s_{fold(c_k)} × q(c_{(k+u) mod W})`. The rows before c_0 are unchanged. It uses the same guarded
+      offsets u = 53..W − 1, the same rank-p rule (at most 9 of 207 at or above) and the same execution from S's book.
+    - The same q-only shift is used for E1 inside E7, E8 (155 Binance shifts), the S(s_k) check (where s is constant
+      anyway) and E9's validate shifts.
+    - VP's whole-schedule shifts, where s moves with q, are still run and reported as **E1-whole**, a description that
+      decides nothing.
+    - The q-only shift is written in `lab/runner/downvol.py` and tested there:
+      - by hand on a two-fold path;
+      - with s held equal in every fold, it equals VP's whole-schedule shift bit for bit;
+      - no price is read.
 - **A1:** the throughput timing (before run 0).
 - **A0:** the procedure controls (before run 0).
 
