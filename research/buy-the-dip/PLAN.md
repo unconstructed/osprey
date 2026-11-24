@@ -129,8 +129,13 @@ It fixes, at t*:
   vector is the current weights plus (f, 1 − f) × piece / V_t;
 - a line exactly at I_t is crossed.
 
-**Caps.** If the target would put a coin above max_coin − h or cash below min_cash + h, the added amount is cut to the
-largest that keeps both. The cut part is lost, never carried over, and is recorded as "capped".
+**Caps [R1].** If the target would put a coin above max_coin − h or cash below min_cash + h, the added amount is cut
+to the largest amount a, with 0 ≤ a ≤ the crossed pieces' sum, that keeps both. The cut part is lost, never carried
+over, and is recorded as "capped".
+- If no a > 0 keeps both (the wallet is within h of a limit but not past it, so no limit fix is due), no order is sent
+  at that close and the whole amount is recorded as "capped". The ladder never sells; only a limit fix does.
+- Every order's targets (the first buy, a ladder buy and a limit fix, in the twins too) pass `portfolio.check_targets`
+  with the Steady limits as read and h = 0.02 (section 10).
 
 **End of a ladder.** The ladder **re-arms** at the first close after t* where `I_t >= H_t` (I is the highest of its past
 365 days). Lines not yet crossed are dropped. The next ladder takes its base B from the cash at its own trigger, so a
@@ -251,6 +256,8 @@ monthly in N% of two-year periods. After its last buy the price fell up to K% fu
 - **Twins:** each twin's ordered total equals its dip run's total (before caps), and a dip run with no order has twins
   equal to hold bit for bit.
 - **Accounting** matches an independent book of coin units and cash on every 9th run, at run time.
+- **[R1] Every order's targets** (the first buy, ladder buys and limit fixes, in dip runs and twins) pass
+  `portfolio.check_targets` with the Steady limits as read and h = 0.02, checked at every order.
 - **Counts** equal section 7's exactly (31,948 and 58,680), failures included.
 - **A config hash** covers `dipbuy.py`, `protect.py`, `portfolio.py`, `holdmix.py`, `reference.py`, `trend.py`,
   `lab/validation/*.py`, the data loaders, `config/*.yaml`, `pyproject.toml`, `uv.lock`, the study script and this
@@ -343,18 +350,70 @@ only come as a dated amendment with its own pre-registration (as protect-gains' 
 for this study.
 
 **Amendments:**
+- **R1 (2026-11-24, after `risk-officer`'s review, before any code, run or bar):** the caps never give a negative
+  amount (section 5); every order's targets are checked (section 10); section 13 confirmed with the exact values the
+  app offers and the wording notes.
 - **A1:** the throughput timing (before run 0).
 
-## 13. Allowed range (to be confirmed by `risk-officer` before run 0)
+## 13. Allowed range (`risk-officer`, 2026-11-24, config only) [R1]
 
-The proposed range customers can choose from is the grid:
-- Y from 10% to 30%;
-- Z from 5% to 20%;
-- X from 10% to 25%;
-- M from 25% to 100% of the cash per fall.
+**Confirmed.** The app offers these values only, in every combination (the 54 settings of section 7):
+- Y, the first fall from the past year's highest close: 10%, 20% or 30%;
+- Z, each further fall below the previous line: 5%, 10% or 20%;
+- X, each piece: 10% or 25% of the USDC held when the fall starts;
+- M, the most used per fall: 25%, 50% or 100% of that USDC;
+- f, BTC's share of each buy: 50% or 75%. Any other split is untested.
 
-Every combination stays inside the Steady limits by construction: the caps and the limit fix. The app must not present
-any setting as keeping a Steady wallet inside its 35% budget (D3).
+The start wallets (all USDC, or 30% crypto) are conditions, not settings. A customer's own mix gets the same rule, but
+its numbers are measured at these two only.
+
+**Inside the Steady limits.**
+- Every combination stays inside the Steady limits as read (cash ≥ 20%, each coin ≤ 60%, h = 0.02) at every close the
+  rule decides at.
+- Every order's targets pass `portfolio.check_targets` with h = 0.02: the caps (section 5) and the limit fix
+  (section 4).
+- Between closes, price moves can carry a wallet past a limit. The next close's limit fix brings it back to 22% cash
+  and 58% per coin, as `portfolio.rebalance` does.
+- The ladder never spends the reserve. M = 100% means spending down to 22% cash, or less if a coin reaches 58% first
+  (at f = 75%, near 77% crypto).
+- The app must not present any setting as keeping a Steady wallet inside its 35% budget (D3). The budget is shown, not
+  enforced, and a full ladder can hold up to 78% crypto.
+
+**App wording notes:**
+- **Y** is the fall of the customer's BTC/ETH split, measured from the highest daily close of the past 365 days. It is
+  not BTC alone.
+- **Show every line.** The deepest line ranges from 10% below the high (Y 10%, X 25%, M 25%: one line) to 91% below it
+  (Y 30%, Z 20%, X 10%, M 100%: 10 lines).
+- **M is per fall,** as a share of the USDC held when that fall starts, so a later fall gets M of what is left. At
+  M = 100% the first fall spends down to the 22% reserve.
+- **Re-arming** needs a new one-year high, which after a crash and a sideways year can be far below the crash's peak.
+  So a second ladder can start inside a long bear market.
+- **Buying into a crash.** With Y 10%, Z 5%, X 25% and M 100%, the wallet reaches about 78% crypto within a 23% fall,
+  and rides any deeper fall fully invested; a further 50% crypto fall then costs the wallet about 39%. Capped amounts
+  are lost, not saved for lower prices.
+- **It can sell.** When rises take cash below 20% or a coin above 60%, a limit fix sells back to 22% / 58%, and it
+  replaces that close's buy.
+- **An all-USDC start** buys nothing if crypto never falls Y from its yearly high.
+- **With "hold this mix" on the same wallet** (not simulated), the mix tool would sell dip buys back toward the mix.
+  The app allows one tool or the other on a wallet, or labels the combination untested. Ladder buys are not band or
+  reset trades, so they neither count against nor get around `hold_mix_max_rebalances_per_30d`.
+
+**Production must ship what was tested** (the app enforces these):
+- the check at the daily close (00:00 UTC), one order per close, filled at the next open; the index, the 365-day high
+  and the inclusive line crossings of section 5;
+- ladder targets pass `check_targets` with h = 0.02 at the fill (re-capped at the fill price if the router sends USD
+  amounts);
+- a ladder's total is at most M × B;
+- buys go only from USDC into BTC/ETH in the f split, and the only sales are limit fixes;
+- coins BTC, ETH and USDC only;
+- a protect-gains brake wins, and the ladder starts armed afresh after its buy-back;
+- B is fixed at the trigger: a deposit made during a ladder is not added to its pieces, or the case is labelled
+  untested.
+
+**No owner-approved limit is loosened.** h tightens 20% and 60% to 22% and 58%; `LIMIT_TOL` is `rebalance`'s round-off
+allowance; the coin list is the file's; the hold-mix limit is untouched. The 35% budget is shown, not enforced, as in
+protect-gains' confirmation. If the owner wants the budget to bind self-directed tools, the range would be narrowed
+from its riskiest end after D3's numbers, as AGENTS.md allows.
 
 ## 14. Outputs
 
@@ -377,6 +436,7 @@ any setting as keeping a Steady wallet inside its 35% budget (D3).
 - **One wallet size** (5,000 USD); no later deposits; one lookback for the high (365 days); daily checks only.
 - **The ladder never sells** (only the limit fix does), so its crypto share can only fall by price moves or a limit
   fix. That is the owner's rule as written.
+- **f is 50% or 75% only;** other BTC/ETH splits are untested (section 13).
 - **The scouting engine and placeholder costs.**
 
 ## 16. Looks at the data
@@ -385,5 +445,6 @@ any setting as keeping a Steady wallet inside its 35% budget (D3).
 |---|---|---|---|
 | P1-P5 | before this plan | section 2 | Prior looks, disclosed |
 | Plan | 2026-11-24 | the lead | No market data. Read: protect-gains' PLAN.md; dip-timing's RESULTS.md summary; `protect.py`'s function list, `Step` protocol, `run_overlay` and `index_signal`; `portfolio._simulate`'s signature; `docs/app/features.md`'s buy-the-dip and protect-gains rows |
+| Risk | 2026-11-24 | `risk-officer` | No market data. Read: this plan's sections 4, 5, 7 and 13; `config/risk_levels.yaml`; `portfolio.risk_limits`, `check_targets` and `LIMIT_TOL`; protect-gains' section 12. A scratch check on random weights (config only). It read no result file |
 
 **Validate-window looks used for buy-the-dip: 0.**
