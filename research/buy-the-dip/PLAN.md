@@ -382,7 +382,12 @@ for this study.
   protect-gains; the config hash's "data loaders" are `panel.py`, `catalog.py`, `external.py` and `loaders.py` with
   the files they import (`interface.py`, `steady.py`, `lab/config.py`); a failed dip run's twins are logged as
   failed; the `--fast` grid is 4 settings × 2 starts.
-- **A1:** the throughput timing (before run 0).
+- **A1 (2026-11-24, on commit `7d582ef`, after the tiers passed on `7d582ef`; synthetic bars only): 36.1
+  CPU-minutes, under the 240 limit.** `run.py --time` on synthetic bars (731 rows, 20 repetitions; the busy setting
+  (Y 0.10, Z 0.05, X 0.10, M 1.00) from the all-USDC start with f = 50%, which gave 4 ladders, 21 orders, 23 pieces
+  and 7 limit fixes) gives 28.7 ms a dip run, 22.9 ms a dca twin, 20.3 ms a lump twin and 19.2 ms a hold run, each
+  with every check. So the plan's 90,628 runs take about 36.1 CPU-minutes, about 18 minutes on 2 workers. Run 0
+  repeats this timing at its start, and stop rule 7 applies.
 
 ## 13. Allowed range (`risk-officer`, 2026-11-24, config only) [R1]
 
