@@ -1,0 +1,1 @@
+{"commit": "cc03c2a1e3a9804c315e71a29c4317e26004982a", "config_hash": "266c6d43fb1789d7b748965b0d9595e88461dea2dc14fa0be4ac96614a604315", "data": "real", "dirty": false, "out_dir": "/home/user/osprey/results/vol-steady", "run": 0, "script": "run_train.py", "snapshot_id": "1746a21b75683e76", "trigger": null, "utc": "2026-11-24T04:16:24.460908+00:00"}

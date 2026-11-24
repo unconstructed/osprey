@@ -331,4 +331,6 @@ None blocking.
 |---|---|---|---|
 | Plan | 2026-11-23 | the lead | No market data. Read: trend-steady's PLAN.md (sections 4-12), `lab/runner/trend.py`'s function list and docstrings, and the protect-gains run 0 results already known (V2) |
 
+| T1 | 2026-11-24 | the lead | Run 0 on the train window (Kraken and Binance, 2017-2022), commit `cc03c2a`: NO EDGE (`RESULTS.md`). No validate or test bar |
+
 **Validate-window looks used for vol-steady: 0.**
