@@ -158,6 +158,19 @@ holds if at most 18 of 200 pass E1 at each point.
       - by hand on a two-fold path;
       - with s held equal in every fold, it equals VP's whole-schedule shift bit for bit;
       - no price is read.
+- **M2 (2026-11-24, after the build, before any run or bar): readings the build pinned** where the plan is silent
+  (`study.INTERPRETATIONS`, recorded in the start record; no market data read):
+  - **Under the q-only shift, z moves with q;** s, the fold, the check closes and the head rows stay. No number moves
+    on any span the study runs, because activation (row ≤ 126) comes before every span's first check.
+  - **E1-whole's scope:** at S for both seeds on Kraken, the 207 guarded offsets, logged as `shift_whole` evaluation
+    rows that are never counted; its 2 × 207 runs are in the projection.
+  - **The q-only shift is also used for the descriptions** B3-lead, the lag rank, the leave-one-year-out E1 and the
+    bear-year E1, besides M1's list and A0 and the slow calibration. Where s is one value it equals VP's shift bit for
+    bit.
+  - **The seam:** `volsteady.py` calls its own σ̂ directly, so `downvol.py` holds copies of its four path functions with
+    the measure as an argument; a test pins that with VP's σ̂ passed in, each equals vol-steady's bit for bit.
+  - The 2,400 prior trials are a pinned value; the parameter parse is VP's (lookback ≥ 2); the correlations also use
+    vol-steady's S_A.
 - **A1:** the throughput timing (before run 0).
 - **A0:** the procedure controls (before run 0).
 

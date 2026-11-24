@@ -48,7 +48,7 @@ from lab.search.stability import stable_region
 from lab.validation import montecarlo as mc
 from lab.validation import stats
 
-HERE = Path(__file__).resolve().parents[1] / "research" / "downdownvol-steady"
+HERE = Path(__file__).resolve().parents[1] / "research" / "downvol-steady"
 
 
 def _load(name: str, file: str):
@@ -88,7 +88,9 @@ BRANCH_LINE = (
     "`config/risk_levels.yaml`\n  (SHA-256 `d3f58253dfc2dbbe0ca5e54a4fa12489ab0e08827ecbc309e8ab2b7cc028723e`), "
     "owner-approved in writing on\n  2026-11-21.\n"
 )
-PLACEHOLDERS = "- **A1:** the throughput timing (before run 0).\n- **A0:** the procedure controls (before run 0).\n"
+PLACEHOLDERS = (
+    "- **A1:** the throughput timing (before run 0).\n- **A0:** the procedure controls (before run 0).\n"
+)
 
 
 def stand_in_plan(rows: str = PLACEHOLDERS) -> str:
@@ -328,6 +330,18 @@ def test_amendment_row_must_name_the_run():
     assert S.amendment_row_present(plan_with(row, text), 1)
 
 
+def test_the_committed_plan_reads_as_a_real_run_will_read_it():
+    """The one test that reads the committed PLAN.md (TESTING.md #68), and only what the pre-registration fixes for
+    good: its header's branch line reads Branch R at 35% (stop rule 11: the branch never changes after run 0), and its
+    section 15 is found from '## 15.' to '## 17.' (not the '## 14-16.' heading before it). Amendments A1 and A0 are not
+    read here: their state changes when they are recorded, and the stand-in plans test both states."""
+    text = (S.HERE / "PLAN.md").read_text()
+    assert S.HERE.name == "downvol-steady" and S.plan_branch(text) == {"branch": "R", "budget_pct": 35}
+    section = S.amendments_section(text)
+    assert section.startswith("## 15. Amendments") and "\n## " not in section
+    assert "## 14-16." in text and "## 14-16." not in section
+
+
 def test_study_names_plain_params_and_jsonable():
     assert S.study_tag(0, 0) == "downvol-steady-s0" and S.study_tag(1, 2) == "downvol-steady-s1_a2"
     assert S.parse_study("downvol-steady-s1_a2_wf04") == {"seed": 1, "run": 2, "part": "wf04"}
@@ -363,7 +377,9 @@ def test_the_pinned_values_are_the_plan_s():
     assert S.BARS_SHA256 == "08f5ca2ca56dbba2526673bcf3515e25ca6d097da4c91b6c08e492ae21b3cd1e"
     assert (S.SEEDS, S.FOLD_SEED_STEP, S.FINAL_SEED_OFFSET, S.STABLE_K) == ({"A": 0, "B": 1}, 1000, 5000, 10)
     assert (S.STRICT_EXTRA, S.K4_AS_15, S.MAX_AMENDMENTS) == (49, 14, 2)
-    assert S.PRIOR_TRIALS == 2400 and S.PINNED["prior_trials"] == 2400  # section 14: vol-steady run 0's trials (W1)
+    assert (
+        S.PRIOR_TRIALS == 2400 and S.PINNED["prior_trials"] == 2400
+    )  # section 14: vol-steady run 0's trials (W1)
     assert S.PINNED["down_factor"] == 2.0 and "q-only" in S.PINNED["e1_null"]
     assert {"measure", "e1_q_only", "e1_whole", "strict_count"} <= set(S.INTERPRETATIONS)
     assert (
@@ -785,7 +801,7 @@ def test_an_amendment_run_needs_the_previous_start_a_fresh_name_and_a_trigger(tm
     (train / "downvol-steady-s1_a1_wf02").mkdir()
     assert RT.main(train_args(out, cfg, "--amendment", "1", "--trigger", "a")) == 2
     assert "studies of amendment run 1 exist" in capsys.readouterr().err
-    assert sorted(p.name for p in train.iterdir()) == ["run0", "downvol-steady-s1_a1_wf02"]
+    assert sorted(p.name for p in train.iterdir()) == ["downvol-steady-s1_a1_wf02", "run0"]
 
 
 def test_an_amendment_run_continues_the_same_kind_of_run(tmp_path, clean_git, capsys):
@@ -1149,7 +1165,12 @@ def _stressed_q_shift(original):
 def test_the_plain_bundle_s_comparators_match_s_and_its_checks_stop(walk, monkeypatch):
     b = bundle(walk)
     panel, windows, params = walk
-    assert b["W"] == 260 and len(b["S"]) == 1820 and set(b["shifts"]) == {53, 200} and set(b["whole_shifts"]) == {53}
+    assert (
+        b["W"] == 260
+        and len(b["S"]) == 1820
+        and set(b["shifts"]) == {53, 200}
+        and set(b["whole_shifts"]) == {53}
+    )
     assert np.array_equal(
         b["R0"].loc[b["runs"][0].index[366:]].to_numpy(), S.kept_of(b["runs"][0], windows[0].t0).to_numpy()
     )
@@ -1157,11 +1178,19 @@ def test_the_plain_bundle_s_comparators_match_s_and_its_checks_stop(walk, monkey
     assert np.array_equal(head, b["runs"][0].attrs["share"][: len(head)]) and len(set(head.tolist())) > 1
     # E1's shifts are the q-only shifts (M1): each check keeps its fold's s; E1-whole's move s with q (VP's)
     steps, c1 = b["steps"], Costs.from_yaml()
-    assert steps.schedule is b["schedule"] and steps.s.tolist() == [params[i]["crypto_share"] for i in b["schedule"].fold]
+    assert steps.schedule is b["schedule"] and steps.s.tolist() == [
+        params[i]["crypto_share"] for i in b["schedule"].fold
+    ]
     for u in (53, 200):
-        q_only = D.run_q_shift(b["span"], steps, limits=LIMITS, costs=c1, u=u)["ret"].loc[b["S"].index].to_numpy()
+        q_only = (
+            D.run_q_shift(b["span"], steps, limits=LIMITS, costs=c1, u=u)["ret"].loc[b["S"].index].to_numpy()
+        )
         assert np.array_equal(b["shifts"][u], q_only)
-    whole = T.run_span(b["span"], b["schedule"], limits=LIMITS, costs=c1, u=53)["ret"].loc[b["S"].index].to_numpy()
+    whole = (
+        T.run_span(b["span"], b["schedule"], limits=LIMITS, costs=c1, u=53)["ret"]
+        .loc[b["S"].index]
+        .to_numpy()
+    )
     assert np.array_equal(b["whole_shifts"][53], whole) and not np.array_equal(whole, b["shifts"][53])
     for target, name, wrap, message in (
         (T, "run_span", _stressed_run_span(T.run_span), "S's R_0 does not hold S's book"),
@@ -1374,7 +1403,9 @@ def test_run_0_names_its_studies_and_counts_every_trial_and_run(train0):
     ]
     assert S.study_dirs(out / "train") == names
     assert s["status"] == "complete" and r["trials"]["n_raw"] == 12 * n
-    assert r["trials"]["n_strict"] == 12 * n + 49 + 2400 and r["trials"]["n_strict_k4_15"] == 12 * n + 63 + 2400
+    assert (
+        r["trials"]["n_strict"] == 12 * n + 49 + 2400 and r["trials"]["n_strict_k4_15"] == 12 * n + 63 + 2400
+    )
     assert r["trials"]["prior_trials"] == 2400
     trials = pd.read_parquet(out / "train" / "run0" / "trials.parquet")
     assert len(trials) == 12 * n and set(trials["run"]) == {0} and set(trials["seed"]) == {0, 1}
@@ -1410,7 +1441,9 @@ def test_run_0_names_its_studies_and_counts_every_trial_and_run(train0):
     )
     assert (ev["kind"] == "lead").sum() == 2 * 52 and (ev["kind"] == "shift_sk").sum() == 4 * 207
     whole = ev[ev["kind"] == "shift_whole"]  # E1-whole: a description, never counted
-    assert len(whole) == 2 * 207 and not whole["counted"].any() and set(whole["offset"]) == set(range(53, 260))
+    assert (
+        len(whole) == 2 * 207 and not whole["counted"].any() and set(whole["offset"]) == set(range(53, 260))
+    )
     assert not ev["kind"].str.contains("phi|placebo|fresh").any()  # no stop-loss variant (section 11A)
     # the executor runs tallied equal the projection's table (stop rule 17); the bootstraps fit inside it
     units = S.run_counts()
@@ -1466,7 +1499,9 @@ def test_run_0_s_verdict_headline_and_gates_follow_the_rules(train0):
 
 def _h0(panel, windows, params, limits, costs, like=None, weekday=0):
     return [
-        D.downvol_backtest(dict(p), T.h0_slice(panel, w, like=like), limits=limits, costs=costs, weekday=weekday)
+        D.downvol_backtest(
+            dict(p), T.h0_slice(panel, w, like=like), limits=limits, costs=costs, weekday=weekday
+        )
         for p, w in zip(params, windows, strict=True)
     ]
 
@@ -1497,24 +1532,40 @@ def _n0(panel, runs, windows, params, limits, costs):
     )
 
 
-def _span(panel, runs, windows, limits, costs, offsets, kept):
-    """R_0 and its shifts rebuilt from the fold runs' share paths (volsteady.stitched_schedule, trend.run_span)."""
+def _span(panel, runs, windows, limits, costs, offsets, kept, shares, *, whole=False):
+    """R_0 and its shifts rebuilt from the fold runs' share and q paths (volsteady.stitched_schedule,
+    trend.run_span). The q-only shift of amendment M1 is written out here, not taken from lab.runner.downvol: at check
+    c_k the share is s_fold(c_k) x q(c_((k + u) mod W)), z moving with q. With ``whole=True`` the shifts are VP's
+    whole-schedule shifts (trend.shifted), E1-whole's."""
     span = panel.loc[: windows[-1].last]
     sched = V.stitched_schedule(
         span.index, windows, [r.attrs["z"] for r in runs], [r.attrs["share"] for r in runs]
     )
+    w = len(sched.checks)
+    q = np.array(
+        [runs[i].attrs["q"][c] for c, i in zip(sched.checks.tolist(), sched.fold.tolist(), strict=True)]
+    )
+    s = np.array([float(shares[i]) for i in sched.fold.tolist()])
+    assert np.array_equal(sched.share, s * q)
+
+    def shifted(u):
+        if whole:
+            return T.shifted(sched, u)
+        order = (np.arange(w) + u) % w
+        return sched._replace(z=sched.z[order], share=s * q[order])
+
     r0 = T.run_span(span, sched, limits=limits, costs=costs)["ret"].loc[kept].to_numpy()
     shifts = {
-        u: T.run_span(span, sched, limits=limits, costs=costs, u=u)["ret"].loc[kept].to_numpy()
+        u: T.run_span(span, shifted(u), limits=limits, costs=costs)["ret"].loc[kept].to_numpy()
         for u in offsets
     }
-    return r0, shifts, len(sched.checks)
+    return r0, shifts, w
 
 
 @pytest.fixture(scope="module")
 def rebuilt(train0, tmp_path_factory):
-    """The inputs of run 0, rebuilt from the synthetic bars and the logged choices with lab.runner.volsteady and
-    lab.runner.trend only."""
+    """The inputs of run 0, rebuilt from the synthetic bars and the logged choices with lab.runner.downvol,
+    lab.runner.volsteady and lab.runner.trend only."""
     out, cfg = train0["out"], train0["cfg"]
     s = summary(out)
     limits = sd.steady_limits(cfg)
@@ -1543,7 +1594,9 @@ def _seed(rb, label):
     params = r["seeds"][label]["params"]
     runs, runs2 = _h0(K, windows, params, limits, c1), _h0(K, windows, params, limits, c2)
     s, s2 = _stitch(runs, windows), _stitch(runs2, windows)
-    r0, shifts, w = _span(K, runs, windows, limits, c1, range(1, 260), s.index)
+    shares = [p["crypto_share"] for p in params]
+    r0, shifts, w = _span(K, runs, windows, limits, c1, range(1, 260), s.index, shares)
+    _, whole, _ = _span(K, runs, windows, limits, c1, range(53, 260), s.index, shares, whole=True)
     n0, n02 = _n0(K, runs, windows, params, limits, c1), _n0(K, runs2, windows, params, limits, c2)
     x = _stitch(
         [
@@ -1559,6 +1612,7 @@ def _seed(rb, label):
         "S2": s2,
         "R0": r0,
         "shifts": shifts,
+        "whole": whole,
         "W": w,
         "N0": n0,
         "N0_2": n02,
@@ -1581,6 +1635,20 @@ def test_s_r0_and_the_luck_controls_are_recomputed_from_their_inputs(rebuilt):
         np.testing.assert_array_equal(x["R0"][:364], x["S"].to_numpy()[:364])  # R_0 = S on fold 0's kept rows
         e1 = T.e1_test(x["R0"], x["shifts"], 260)
         assert rec["e1"] == S.jsonable({k: e1[k] for k in rec["e1"]}) and rec["e1"]["n_shifts"] == 207
+        # E1-whole (a description) from VP's whole-schedule shifts; the two nulls differ where the folds' s differ
+        e1w = T.e1_test(x["R0"], x["whole"], 260)
+        assert rec["e1_whole"] == S.jsonable({k: e1w[k] for k in rec["e1_whole"]})
+        assert (
+            len({p["crypto_share"] for p in x["params"]}) > 1 and rec["e1"]["p50"] != rec["e1_whole"]["p50"]
+        )
+        np.testing.assert_array_equal(  # oos.parquet's percentile columns of both nulls
+            np.percentile(np.vstack([x["shifts"][u] for u in range(53, 260)]), 50, axis=0),
+            oos[f"shifts_{label}_p50"].to_numpy(),
+        )
+        np.testing.assert_array_equal(
+            np.percentile(np.vstack([x["whole"][u] for u in range(53, 260)]), 50, axis=0),
+            oos[f"shifts_whole_{label}_p50"].to_numpy(),
+        )
         e2 = T.e2_test(x["S"], x["N0"], n_resamples=rb["resamples"])
         assert (rec["e2"]["d"], rec["e2"]["p"], rec["e2"]["holds"]) == (e2["d"], e2["p"], e2["holds"])
         e3 = [
@@ -1679,12 +1747,13 @@ def test_s_r0_and_the_luck_controls_are_recomputed_from_their_inputs(rebuilt):
             first_row=15,
             oos_returns=x["S"].to_numpy(),
             n_raw=n_raw,
-            n_strict=n_raw + 49,
+            n_strict=n_raw + 49 + 2400,  # section 14: VP's strict count plus vol-steady run 0's 2,400 trials
         )
         assert (
             rec["active_report"]["dsr_effective"] == act["dsr_effective"]
             and rec["active_report"]["pbo_mean"] == act["pbo_mean"]
         )
+        assert rec["active_report"]["dsr_strict"] == S.jsonable(act["dsr_strict"])
         assert rec["items"]["G3"] == T.g3_g4(rep, act)["G3"] and rec["items"]["G4"] == T.g3_g4(rep, act)["G4"]
         assert rec["items"]["G1"] == (rep["oos_sharpe_annual"] >= 1.0) and rec["items"]["G2"] == (
             _sh(x["S2"]) > 0.5
@@ -1707,17 +1776,10 @@ def test_s_r0_and_the_luck_controls_are_recomputed_from_their_inputs(rebuilt):
     bruns = _h0(rb["Bn"], bw, bp, rb["limits"], rb["c1"], like=K)
     bs = _stitch(bruns, bw)
     assert bs.index.equals(seed_a["S"].index[seed_a["S"].index > windows[1].t0])
-    span = rb["Bn"].loc[: bw[-1].last]
-    sched = V.stitched_schedule(
-        span.index, bw, [x.attrs["z"] for x in bruns], [x.attrs["share"] for x in bruns]
-    )
-    assert len(sched.checks) == 208
-    br0 = T.run_span(span, sched, limits=rb["limits"], costs=rb["c1"])["ret"].loc[bs.index].to_numpy()
-    bshift = {
-        u: T.run_span(span, sched, limits=rb["limits"], costs=rb["c1"], u=u)["ret"].loc[bs.index].to_numpy()
-        for u in range(53, 208)
-    }
-    be1 = T.e1_test(br0, bshift, 208)
+    shares_b = [p["crypto_share"] for p in bp]
+    br0, bshift, bw_n = _span(rb["Bn"], bruns, bw, rb["limits"], rb["c1"], range(53, 208), bs.index, shares_b)
+    assert bw_n == 208
+    be1 = T.e1_test(br0, bshift, 208)  # E8 on the 155 q-only shifts (M1)
     bn0 = _stitch(
         [
             T.always_in_n0(
@@ -1844,7 +1906,10 @@ def test_the_range_s_points_are_recomputed_from_their_inputs(rebuilt):
         pk = [{**q, "crypto_share": s_k} for q in params_a]
         runs, runs2 = _h0(K, windows, pk, limits, c1), _h0(K, windows, pk, limits, c2)
         sk_s = _stitch(runs, windows)
-        r0, shifts, _ = _span(K, runs, windows, limits, c1, range(53, 260), kept)
+        r0, shifts, _ = _span(K, runs, windows, limits, c1, range(53, 260), kept, [s_k] * 5)
+        _, whole_k, _ = _span(K, runs, windows, limits, c1, (53, 259), kept, [s_k] * 5, whole=True)
+        for u in (53, 259):  # one s: the q-only shifts are VP's whole-schedule shifts bit for bit (M1)
+            np.testing.assert_array_equal(shifts[u], whole_k[u])
         e1, e2 = (
             T.e1_test(r0, shifts, 260),
             T.e2_test(sk_s, _n0(K, runs, windows, pk, limits, c1), n_resamples=rb["resamples"]),
@@ -1947,13 +2012,13 @@ def test_the_dsr_counts_and_the_descriptions_are_recomputed(rebuilt):
     trial_sharpes = sd.report_trial_sharpes(studies, rb["train"])
     s = pd.read_parquet(rb["train"] / "run0" / "oos.parquet")["S_A"].to_numpy()
     d = r["descriptions"]["dsr"]
+    n_raw = r["trials"]["n_raw"]
+    # section 14: VP's strict count plus vol-steady run 0's 2,400 trials
+    assert d["n_strict"] == r["trials"]["n_strict"] == n_raw + 49 + 2400
+    assert d["strict"] == stats.deflated_sharpe_ratio(s, trial_sharpes, n_trials=n_raw + 2449)["dsr"]
+    assert d["strict_k4_15"] == stats.deflated_sharpe_ratio(s, trial_sharpes, n_trials=n_raw + 2463)["dsr"]
     assert (
-        d["strict"]
-        == stats.deflated_sharpe_ratio(s, trial_sharpes, n_trials=r["trials"]["n_raw"] + 49)["dsr"]
-    )
-    assert (
-        d["strict_k4_15"]
-        == stats.deflated_sharpe_ratio(s, trial_sharpes, n_trials=r["trials"]["n_raw"] + 63)["dsr"]
+        d["n_raw"] == n_raw and d["effective"] == r["seeds"]["A"]["overfitting_report"]["dsr_effective_count"]
     )
     assert r["trials"]["minus_10_trials"] == {
         st: int((S.trial_table(rb["train"], [st])["value"] == -10.0).sum()) for st in studies
@@ -2032,7 +2097,7 @@ def test_an_amendment_run_counts_every_run_and_reports_the_less_favourable_verdi
     studies = S.study_dirs(out / "train")
     assert len(studies) == 24 and sum("_a1_" in x for x in studies) == 12
     assert r["trials"]["n_raw"] == 24 * n and r["trials"]["this_run"] == 12 * n
-    assert r["trials"]["n_strict"] == 24 * n + 49
+    assert r["trials"]["n_strict"] == 24 * n + 49 + 2400
     assert (
         s1["start"]["trigger"] == "other, after the verdict"
         and s1["start"]["g6_budget"]["max_drawdown_budget"] == 0.35
@@ -2246,7 +2311,13 @@ def test_the_look_runs_once_and_its_numbers_are_recomputed_from_their_inputs(fro
         sched.checks[:-1], sched.z[:-1], sched.share[:-1], sched.fold[:-1], sched.head_z, sched.head_share
     )
     np.testing.assert_array_equal(sched.checks, checks)
-    shifts = [
+    q_at, order = run.attrs["q"][sched.checks], lambda u: (np.arange(78) + u) % 78
+    q_only = [  # E9's validate shifts are M1's q-only shifts: theta's one s, so VP's whole-schedule shifts too
+        sched._replace(z=sched.z[order(u)], share=theta["crypto_share"] * q_at[order(u)])
+        for u in range(53, 78)
+    ]
+    shifts = [_sh(T.run_span(K, sh, limits=limits, costs=c1)["ret"].loc[kept.index]) for sh in q_only]
+    assert shifts == [
         _sh(T.run_span(K, sched, limits=limits, costs=c1, u=u)["ret"].loc[kept.index]) for u in range(53, 78)
     ]
     e9 = T.e9_holds(_sh(kept), f["train_sharpe"]["A"], _sh(n0), shifts)
@@ -2444,7 +2515,10 @@ def test_a0_s_numbers_are_recomputed_from_its_panels(controls):
         windows = T.fold_windows(panel.index)
         runs = _h0(panel, windows, rec["params"], limits, c1)
         s = _stitch(runs, windows)
-        r0, shifts, w = _span(panel, runs, windows, limits, c1, range(53, 260), s.index)
+        shares = [p["crypto_share"] for p in rec["params"]]
+        r0, shifts, w = _span(
+            panel, runs, windows, limits, c1, range(53, 260), s.index, shares
+        )  # q-only (M1)
         assert w == rec["W"] == 260
         e1 = T.e1_test(r0, shifts, w)
         e2 = T.e2_test(s, _n0(panel, runs, windows, rec["params"], limits, c1), n_resamples=200)
@@ -2456,7 +2530,8 @@ def test_a0_s_numbers_are_recomputed_from_its_panels(controls):
         )
         power = V.power_count([x.attrs["share"] for x in runs], windows, panel.index)
         assert (rec["P"], rec["changes"]) == (power["holds"], power["total"])
-    # the volatility-clustering panels 0 and 1 by hand: the fixed rule (30, 0.60, 0.50), R_0 and 207 shifts
+    # the volatility-clustering panels 0 and 1 by hand: the fixed rule (30, 0.60, 0.50), R_0 and 207 shifts (one s,
+    # so the q-only shifts are VP's whole-schedule shifts bit for bit)
     for j, logged in enumerate(c["vol_check"]):
         g = T.garch_panel(j)
         path = D.downvol_path(g, 30, 0.60, 0.50)
@@ -3179,12 +3254,12 @@ def test_prior_amendments_by_hand(tmp_path):
 
 
 def test_stand_in_plans_hold_amendments_a1_and_a0_once(tmp_path, monkeypatch):
-    """#59: the real-data stand-in plan holds exactly one A1 and one A0 line, whether or not the real PLAN.md holds
-    its own (today its placeholders); `without_prior_rows` drops those lines (continuation lines included) and nothing
-    else."""
-    real_text = S.PLAN.read_text()
-    assert len([ln for ln in S.amendments_section(real_text).splitlines() if ln.startswith("- **A1")]) == 1
-    base = without_prior_rows(real_text)
+    """#59: the real-data stand-in plan holds exactly one A1 and one A0 line, whether the plan it is built from holds
+    placeholders or records; `without_prior_rows` drops those lines (continuation lines included) and nothing else."""
+    for source in (stand_in_plan(), stand_in_plan(PRIOR_ROWS)):  # placeholders, and A1 and A0 written
+        assert len([ln for ln in S.amendments_section(source).splitlines() if ln.startswith("- **A1")]) == 1
+        assert without_prior_rows(source) == without_prior_rows(stand_in_plan())
+    base = without_prior_rows(stand_in_plan())
     rows = (
         "- **A1:** (2026-12-01) N = 200 on the first line,\n  and a continuation line.\n"
         "- **A01.** not an A0 line\n"
@@ -3197,7 +3272,7 @@ def test_stand_in_plans_hold_amendments_a1_and_a0_once(tmp_path, monkeypatch):
     section = S.amendments_section(base)
     assert "\n- **A1" not in section and "\n- **A0" not in section
     real = tmp_path / "PLAN.md"
-    real.write_text(plan_with(PRIOR_ROWS, base))  # the real plan once A1 and A0 are written into it
+    real.write_text(plan_with(PRIOR_ROWS, base))  # a plan once A1 and A0 are written into it
     monkeypatch.setattr(S, "PLAN", real)
     real_folders(monkeypatch, tmp_path / "stand-in")
     got = S.prior_amendments(S.PLAN.read_text(), S.PLAN_SETTINGS.n_trials)
@@ -3206,16 +3281,13 @@ def test_stand_in_plans_hold_amendments_a1_and_a0_once(tmp_path, monkeypatch):
 
 def test_a_real_run_needs_amendments_a1_and_a0_first(train0, tmp_path, clean_git, monkeypatch, capsys):
     """Section 15, order of work step 4: a real run 0 refuses (exit 2, nothing written) until A1 (with this build's N)
-    and A0 (no alarm, or the owner's written decision) are in the committed PLAN.md. Dry runs are exempt."""
+    and A0 (no alarm, or the owner's written decision) are in PLAN.md. Dry runs are exempt. Every plan here is a
+    stand-in (#68: never today's committed plan)."""
     out, catalog_dir = real_folders(monkeypatch, tmp_path)
     plan = tmp_path / "PLAN2.md"
     monkeypatch.setattr(S, "PLAN", plan)
-    committed = (S.REPO / "research" / "downdownvol-steady" / "PLAN.md").read_text()
-    real = without_prior_rows(committed)
-    placeholders = plan_with(  # the plan as committed before A1 and A0 ran (#68: not today's committed plan)
-        "- **A1:** the throughput timing (before run 0).\n- **A0:** the procedure controls (before run 0).\n",
-        real,
-    )
+    real = without_prior_rows(stand_in_plan())
+    placeholders = stand_in_plan(PLACEHOLDERS)  # the plan as committed before A1 and A0 ran
     for text, match in (
         (placeholders, "does not say 'N = 200'"),
         (real, "exactly one '- **A1' line"),  # no A1 or A0 line at all (#59)
@@ -3338,6 +3410,12 @@ def test_correlations_read_the_other_steady_studies_last_complete_run(tmp_path, 
         pd.DataFrame({"S_A": values}).to_parquet(base / f"run{j}" / "oos.parquet")
     (base / "run3").mkdir()
     (base / "run3" / "summary.json").write_text("not json")
+    vol = tmp_path / "results" / "vol-steady" / "train" / "run0"  # the study this one was chosen after (W1)
+    vol.mkdir(parents=True)
+    (vol / "summary.json").write_text(json.dumps({"status": "complete"}))
+    pd.DataFrame({"S_A": other.iloc[1:]}).to_parquet(
+        vol / "oos.parquet"
+    )  # one close fewer: the common closes
     monkeypatch.setattr(S, "REPO", tmp_path)
     assert RT.stored_s_a("trend-steady", idx).tolist() == (other * -1.0).tolist()  # run 1, the last complete
     assert RT.stored_s_a("rebalance-steady", idx) is None
@@ -3348,4 +3426,5 @@ def test_correlations_read_the_other_steady_studies_last_complete_run(tmp_path, 
         got["trend_steady_S_A"] == float(np.corrcoef(s, -other)[0, 1]) and got["rebalance_steady_S_A"] is None
     )
     assert got["N0"] == pytest.approx(1.0) and got["B1"] == float(np.corrcoef(s, other)[0, 1])
+    assert got["vol_steady_S_A"] == float(np.corrcoef(s.iloc[1:], other.iloc[1:])[0, 1])
     assert RT.correlations({**ctx, "data": "synthetic"}, b)["trend_steady_S_A"] is None
