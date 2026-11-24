@@ -180,8 +180,8 @@ holds if at most 18 of 200 pass E1 at each point.
     recorded in RESULTS.md, README.md and the RUNLOG; section 20's row for it is added after the look, or once no look
     is earned.
   - The review's other test gaps (TESTING.md #73) were closed in the tests; no rule or number changed.
-- **A1:** the throughput timing (before run 0).
-- **A0:** the procedure controls (before run 0).
+- **A1 (2026-11-24, on commit `7d582ef`, after the tiers passed on `7d582ef`; synthetic only): N = 200.** `throughput.py` on `make_panel(synthetic_market(2190, seed=21))`: a 200-trial study of the built adapter takes 6.7 CPU-seconds, so 12 studies need about 1.3 CPU-minutes, far under 60. One backtest takes 17.5 ms, under twice trend-steady's stand-in (13.1 ms), so no re-timing is needed. Projections: run 0 3.2 CPU-minutes (budget 60), A0 35.6 (budget 120).
+- **A0 (2026-11-24, on commit `7d582ef`; synthetic only): stop rule 15: no alarm; the power alarm fired (power 1 of 20); owner decision: reports/director/2026-11-24-owner-answer-downvol-a0-power.md.** Negative controls: 0 false positives in 20 (E1 alone 0, E2 alone 0). Positive controls: E1, E2 and P together on 1 of 20 (E1 alone 5, E2 alone 1, P 19). Volatility clustering with no momentum: E1 on 17 of 200 (8.5%), a description. The owner answered "can we do the first and the third?": run 0 goes ahead as pre-registered, and a follow-up design for a more sensitive test is written first, on synthetic data only, and committed before run 0 reads any bar. A NO EDGE verdict here means the test could not tell.
 
 ## 17. Code to build, and its tests (VP 17, adapted)
 
