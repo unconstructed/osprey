@@ -3113,8 +3113,11 @@ def test_a_real_run_needs_amendments_a1_and_a0_first(train0, tmp_path, clean_git
     monkeypatch.setattr(S, "PLAN", plan)
     committed = (S.REPO / "research" / "vol-steady" / "PLAN.md").read_text()
     real = without_prior_rows(committed)
+    placeholders = plan_with(  # the plan as committed before A1 and A0 ran (#68: not today's committed plan)
+        "- **A1:** the throughput timing (before run 0).\n- **A0:** the procedure controls (before run 0).\n", real
+    )
     for text, match in (
-        (committed, "does not say 'N = 200'"),  # the committed plan, its A1 and A0 lines placeholders
+        (placeholders, "does not say 'N = 200'"),
         (real, "exactly one '- **A1' line"),  # no A1 or A0 line at all (#59)
         (plan_with(PRIOR_ROWS.replace("N = 200", "N = 150"), real), "does not say 'N = 200'"),
         (plan_with(PRIOR_ROWS.replace("power: no alarm", "power 2 of 20"), real), "says neither"),
