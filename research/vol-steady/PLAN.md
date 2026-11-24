@@ -280,8 +280,8 @@ look runs first. Both are disclosed again at the look.
   - **The slow calibration on the synthetic build** (null: iid walks, at most 18 of 200 allowed): 3 of 200 at
     (10, 0.80, 0.50) and 13 of 200 at (120, 0.80, 0.50). Both pass. The second is above the nominal 4.8%; about 17%
     of null runs would score that high, and it is reported as is.
-- **A1:** the throughput timing (before run 0).
-- **A0:** the procedure controls (before run 0).
+- **A1 (2026-11-24, on commit `5b5df1e`, after the tiers passed on `d8855c9`; synthetic only): N = 200.** `throughput.py` on `make_panel(synthetic_market(2190, seed=21))`: a 200-trial study of the built adapter takes 4.4 CPU-seconds, so 12 studies need about 0.9 CPU-minutes, far under 60. One backtest takes 15.1 ms, under twice trend-steady's stand-in (13.1 ms), so no re-timing is needed. Projections: run 0 2.6 CPU-minutes (budget 60), A0 29.0 (budget 120).
+- **A0 (2026-11-24, on commit `5b5df1e`; synthetic only): stop rule 15: no alarm; the power alarm fired (power 3 of 20); owner decision: reports/director/2026-11-24-owner-answer-vol-a0-power.md.** Negative controls: 1 false positive in 20 (E1 alone 2, E2 alone 1). Positive controls: E1, E2 and P together on 3 of 20 (E1 alone 6, E2 alone 4). Volatility clustering with no momentum: E1 on 26 of 200 (13%), a description. The owner answered "Run it" and asked the lead to think of a different angle. The candidate angles are written in that record before run 0.
 
 ## 17. Code to build, and its tests (TP 17, adapted)
 
