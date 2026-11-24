@@ -15,11 +15,16 @@ days later" (A10/30d). It was picked after seeing the results, so it was tested 
 **It does not hold up.** In that mostly rising market:
 
 - **It made falls deeper.** The bad-case fall (90th percentile over 42 one-year runs) was 23.4%, against 16.4% for
-  the tool alone. The worst was 26.4% against 17.8%. Each sale locked in a 10% fall, and the wallet sat in cash while
-  the market recovered. Thirty days later it bought back higher, and the next dip started from there.
-- **It cost money in every run where it fired.** A typical year ended 9.1% below the tool alone (median; mean 11.3%),
-  and it never ended ahead in any of the 42 runs.
-- **It did not whipsaw much** (8 of 63 buy-backs, 12.7%, were sold again within a month). That part passed.
+  the tool alone. The worst was 26.4% against 17.8%. The fall was deeper in 25 of the 28 runs where the brake fired.
+  Each sale locked in a 10% fall, and the wallet sat in cash while the market recovered. In 46 of 63 buy-backs, 30
+  days later it bought back higher (median +10.8%), and the next dip started from there. In every one of the 25
+  runs, the worst fall began before a sale and bottomed after a buy-back, never while in cash (the audit).
+- **It cost money in every run where it fired.** Over all 42 runs a typical year ended 9.1% below the tool alone
+  (median; mean 11.3%), and it never ended ahead. Fourteen of those runs are the 30% mixes, where it never fired;
+  over the 28 runs where it fired, the median cost was 18.3%.
+- **It did not whipsaw much** (8 of 63 buy-backs, 12.7%, were sold again within a month). That part passed. All 8
+  are one market event, the 2024-02-22 buy-back sold again on 2024-03-20, repeated across overlapping windows of the
+  two 70% mixes; the 63 buy-backs are 24 distinct events.
 - **The 30% crypto mixes never fired.** Their wallet never fell 10% in this window, so they are identical to the
   tool alone.
 
@@ -50,17 +55,23 @@ says the post-hoc pick should not be suggested either.
 
 ## Descriptions (decide nothing)
 
-- **"Separate" reading:** the same numbers as "counts". No 30-day buy-back was held back by the tool's wait.
+- **"Separate" reading:** the same numbers as "counts", by construction: the tool does not trade while the wallet
+  is stopped, so a buy-back 30 days after the sale always comes after the tool's 15-day wait.
 - **A10 with the trend buy-back** (run 0's strongest protection):
   - it cut the bad-case fall (Q 11.6% against 16.4%; worst 15.5% against 17.8%);
   - it cost a median 11.5% and never ended ahead (V-a FAIL);
   - it held crypto only part of the time (median 36% of days in USDC).
-- **The full 18-month span** (6 runs a mix) is in `validate_look.json` (`full_span`).
+- **The full 18-month span** (96 runs: 2 sources × 2 cost levels × 6 mixes × 4 settings) is in
+  `validate_look.json` (`full_span`).
+- On Binance 2x, A10/trend's worst fall (17.83%) is slightly above the tool alone's (17.67%).
 
 ## Record
 
 - Commit `d8855c9`, config hash `b945f1d303d9b99c…`, snapshot `1746a21b75683e76`, VALIDATE_PLAN.md SHA-256
   `dc9041f0…`.
-- 768 runs, none failed, in 13 s.
+- 768 runs, none failed; the grid took 11.2 s (11.9 s from STARTED to the completion line).
 - Train-part panel hashes equal run 0's; 547 validate rows per source, none missing.
+- **Audit:** `backtest-auditor`, 2026-11-24, PASS ([VALIDATE_AUDIT.md](VALIDATE_AUDIT.md)). Its own recompute of
+  V-a, V-b, V-c, the verdict and the robustness labels matches; an independent engine reran all 84 runs of each pool
+  to 3.2e-15; the protocol held. Its wording corrections were applied the same day; no number changed.
 - **Deviations:** none.
