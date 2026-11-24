@@ -63,14 +63,16 @@ quarters when crypto's falling days have been wilder than a target level τ. Ove
 - **Part of it may be the comparator, but how much is not measured.** N0 is not a fresh "hold the share" each year.
   It starts from the rule's own wallet at the year's start, buys the year's share s only if the rule had stepped back,
   and after that never trades except to fix the limits.
-  - **In 2018 and 2020 it bought the year's share,** because the rule then held only a quarter and a half of its
-    share. In 2020 it bought 41% crypto, and its crypto then grew to about 78% by year-end.
+  - **In 2018 and 2020 it bought the year's share,** because the rule then held only a quarter of its share (2018)
+    and half of it (2020). In 2020 it bought 41% crypto, and its crypto then grew to about 78% by year-end: 57% on
+    average over the year, against the rule's 20%.
   - **In 2019, 2021 and 2022 the rule held its full share at the year's start,** so N0 kept the rule's wallet as it
     had drifted. At the year's first close that was about 61% crypto in 2019 (share 52%), 78% in 2021 (share 42%; a
     limit fix at the 4 January close trimmed it) and 33% in 2022 (share 34%; N0 made no trade all year).
   - **So in 2021 "holding" carried about 59% crypto on average, against the rule's 46%,** in a year when crypto rose.
-    Part of the rule's 2021 shortfall (+67% against +96%, by bar-year) is that holding had more crypto, not the rule's
-    timing. In 2019 the two held about the same on average (holding 53%, the rule 56%), and the gap was small (+40%
+    Part of the rule's 2021 shortfall (+67% against +96%, by bar-year) is that holding let its crypto drift up while
+    each of the rule's steps cut it back to its share or below: a difference in how much crypto, rather than steps at
+    bad moments. In 2019 the two held about the same on average (holding 53%, the rule 56%), and the gap was small (+40%
     against +43%, by bar-year).
   - **The rule drifts between its steps too** (from 21% to 39% crypto after its September 2020 step).
   - **Even a holding bought once at the start of 2018 and never re-cut,** apart from limit fixes (N0-span), beat the
@@ -274,8 +276,8 @@ share (0.414):
 - **Over all five years at this run's own settings,** plain volatility gives a Sharpe of 0.41 against 0.31. The steps
   differ at 61 of the 260 checks, mostly in the 10-day windows of 2018 and 2022.
 - **The N0 column is each run's own holding, as the plan defines it.** In the two 15-day runs the rule already held its
-  full share when 2020 began, so N0 kept the drifted book (35% and 30% crypto) instead of buying 41%. Compare the
-  returns first.
+  full share when 2020 began, so N0 kept the drifted book (35% and 30% crypto at the 3 January close, when N0 decided)
+  instead of buying 41%. Compare the returns first.
 - **What one run cannot tell:** whether the downside measure made the search pick (85 days, 0.35) for 2020. The
   walk-forward's picks are noisy (PBO 0.78).
 

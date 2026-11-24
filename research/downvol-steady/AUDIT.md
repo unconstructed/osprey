@@ -54,8 +54,9 @@ so it is still unused for downvol-steady.
   or keep, then hold": it starts from the rule's own wallet at each year's start, buys the year's share only if the
   rule was then stepped back, and after that trades only to fix the limits (finding 6). A resampling test must give
   p < 0.05.
-- **E3 (smaller falls):** are the rule's worst fall and its Monte Carlo worst fall both shallower than X's? X buys the
-  rule's average crypto of each year at the year's start and then holds it, trading only to fix the limits.
+- **E3 (smaller falls):** are the rule's worst fall and its Monte Carlo worst fall both shallower than X's? X moves the
+  rule's wallet to the rule's average crypto of the year at the year's start (buying or selling), then holds it,
+  trading only to fix the limits.
 - **E4:** does E2's lead survive doubled costs?
 - **E6 (not one year):** does the lead over N0 survive dropping any one year?
 - **P (enough information):** at least 20 share changes, spread over at least 4 years.
@@ -145,7 +146,7 @@ descriptions; they decide nothing:
 The last column compares each run with its own N0, as the plan defines it (finding 6). In the two 85-day runs the
 rule was at half its share when 2020 began, so N0 bought the year's share, 41%, and made +165% in 2020. In the two
 15-day runs the rule already held its full share, so N0 kept that run's wallet as it was, 35% crypto (downside) and
-30% (plain), and made +138% and +118%. So compare the returns first.
+30% (plain) at the 3 January close, when N0 decided, and made +138% and +118%. So compare the returns first.
 
 - **At the same settings, the two measures behave almost alike.** With an 85-day window and a 0.35 target, plain
   volatility would also have sat out about 11 weeks and never held the full share in 2020.
@@ -170,7 +171,7 @@ reader can take this as evidence that downside timing harms, which the run does 
 - **The timing itself was ordinary.** E1's rank p is 0.83, inside what chance gives about 1 time in 5 or 6.
 - **The shortfall is one year.** Without 2020, D is −0.17, and the rule is ahead in about 12% of the resamples.
 - **And that year is one settings pick** (finding 1). At vol-steady's 2020 settings, the same downside rule ends
-  2020 level with its own N0 (+0.01 log). That N0 kept the rule's wallet (35% crypto) instead of buying 41%. Against
+  2020 level with its own N0 (+0.01 log). That N0 kept the rule's wallet (35% crypto at the 3 January close) instead of buying 41%. Against
   this run's N0, which did buy 41%, it trails by 0.09 log, where the run itself trails by 0.69.
 
 **Fix:**
@@ -331,3 +332,9 @@ Trial count: 2,400 (12 studies × 200, none failed); about 18 effective; strict 
 Final test window: **not run**. Items 1-17 do not all pass, and the verdict is NO EDGE. **Verdict: RETURN TO
 RESEARCHER.** The plan ends here for downvol-steady; the follow-up, if the owner wants it, is a new pre-registered
 study.
+
+> **Lead's corrections after the second final check (2026-11-24).** Wording only, no number or result changed: the E3
+> line now says X moves the wallet to the year's average crypto by buying or selling (at t0 the rule held more than
+> its yearly average in 2019, 2021 and 2022, so X sold); the 35% and 30% figures of the 15-day reruns now name their
+> point, the 3 January 2020 close. RESULTS.md now gives 2020's averages (holding 57%, the rule 20%), as finding 6's
+> fix asks.
