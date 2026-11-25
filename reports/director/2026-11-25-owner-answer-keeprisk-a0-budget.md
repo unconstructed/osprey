@@ -13,8 +13,10 @@ passed), A1 (`run.py --time`, synthetic bars only) was run three times on that c
 | 3 | 31.5 | 404.9 | 324.0 |
 
 Both A0 sizes were above 300, so A0 would refuse to start. The plan's estimate (about 20 CPU-seconds a panel) was low:
-A1 measures about 50-58 CPU-seconds a panel (4 x (3 + 2 x 258) full-span runs at about 19-22 ms each, with 588 window
-runs at about 13-19 ms). No market bar has been read for this study.
+A1's three projections give about 49-58 CPU-seconds a panel (per w: 2 x 258 copy and mix runs at about 19-22 ms, 3
+rule runs at about 28-38 ms, 147 window runs at about 13-19 ms and one RISK-X at about 0.3 s). The timings are noisy:
+A0's DD-only copy and mix, which do less work than the full pair, timed slower in all three, and they set about 80% of
+the projected cost; A0 re-times at its start. No market bar has been read for this study.
 
 **Question (as put to the owner, 2026-11-25, as a multiple-choice prompt) and answer.**
 

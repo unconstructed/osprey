@@ -707,7 +707,7 @@ look and that validate is known to be a rising market. Otherwise there is no loo
   7's A0 limit is 600 CPU-minutes, not 300.** The owner raised it on 2026-11-25
   ([the decision](../../reports/director/2026-11-25-owner-answer-keeprisk-a0-budget.md)) after A1 (below) projected
   A0 at 405-481 CPU-minutes with 100 panels a set and 324-385 with 80, both above 300, so A0 could not start at
-  either size. The A0 cost estimate above (about 20 CPU-seconds a panel) was low: A1 measures about 50-58. The
+  either size. The A0 cost estimate above (about 20 CPU-seconds a panel) was low: A1's three projections give about 49-58. The
   fallback rule keeps its form at the new limit: 100 panels a set when the projection at 100 is at most 600, else 80
   when the projection at 80 is, else A0 refuses. Nothing else changes: the five sets, their seeds and sizes, the
   alarms and their limits, the resampling, the measures, run 0's limit of 240 CPU-minutes, the gates, the grid and
@@ -719,7 +719,8 @@ look and that validate is known to be a rising market. Otherwise there is no loo
   with its checks and measures 37.6 ms, a guarded copy and its mix with their measures 36.2 ms, A0's copy and mix by
   DD only 43.6 ms, a window run 18.7 ms, one index set of 10,000 0.72 s and one RISK-X 0.33 s; its counts are
   section 7's (768 full-span runs, 40,192 copy pairs, 36,608 window runs, 10 index sets, 448 resamplings). Run 0 and
-  A0 each re-time at their start.
+  A0 each re-time at their start. The timings are noisy: A0's DD-only pair, which does less work than the full pair,
+  timed slower in all three, and it sets about 80% of A0's projected cost.
 - **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner's decision).
 
 ## 14. Allowed range (`risk-officer` confirmed 2026-11-25, before run 0, config only)

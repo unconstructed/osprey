@@ -108,6 +108,11 @@ OWNER_DECISION_RE = re.compile(r"owner decision: `?(?P<path>reports/director/[\w
 OWNER_DECISION_NEGATED_RE = re.compile(
     r"\b(?:no|not|without|pending|awaiting)\W+(?:(?:an?|the|any)\W+)?$", re.IGNORECASE
 )
+# owner decisions on file that answer no A0 alarm (the study's set-up, A0's compute budget): never an A0 record's
+NOT_ALARM_DECISIONS = (
+    "reports/director/2026-11-25-owner-answer-ride-test.md",
+    "reports/director/2026-11-25-owner-answer-keeprisk-a0-budget.md",
+)
 A0_NO_ALARM = "A0 alarms: none"  # stop rule 8: the pinned phrase of an A0 record with no alarm
 A0_NO_ALARM_RE = re.compile(rf"(?<!\w){re.escape(A0_NO_ALARM)}(?!\w)")
 A0_FIRED_RE = re.compile(r"fired", re.IGNORECASE)  # stop rule 9: an A0 record that reports an alarm ...
@@ -197,7 +202,8 @@ INTERPRETATIONS = {
     "whole words, on one line; 'no alarm' alone is not it) or name an owner decision, 'owner decision: "
     "reports/director/<file>.md'; every decision it names must exist, and a mention that says there is none ('no', "
     "'not', 'without', 'pending' or 'awaiting', optionally with 'a', 'an', 'the' or 'any', just before it) names no "
-    "decision. Stop rule 9: an A0 item that reports an alarm is refused unless it names an owner decision on file, "
+    "decision; a decision that answers no A0 alarm (NOT_ALARM_DECISIONS: the owner's ride-test answer and A0's "
+    "compute budget, amendment M2) is refused wherever the A0 item names it. Stop rule 9: an A0 item that reports an alarm is refused unless it names an owner decision on file, "
     "whatever else it says. It reports one when it holds the word 'fired' anywhere (any case, inside a longer word "
     "too), or, outside the pinned phrase and in any case, 'alarm' or 'alarms' followed by an alarm's name (A0-<n>, A0 "
     "<n> or A0<n>) with at most 4 characters other than letters, digits and '_' between them, or with 'on', 'for', "
@@ -527,6 +533,10 @@ def prior_amendments(plan_text: str, repo: Path = REPO) -> dict:
     a0 = rows["A0"][0]
     decisions = owner_decisions(a0)
     for path in decisions:
+        if path in NOT_ALARM_DECISIONS:
+            raise Refusal(
+                f"amendment A0 names {path}, an owner decision that answers no A0 alarm (stop rules 8 and 9)"
+            )
         if not (Path(repo) / path).is_file():
             raise Refusal(f"amendment A0 names an owner decision {path} that does not exist")
     decision = decisions[0] if decisions else None

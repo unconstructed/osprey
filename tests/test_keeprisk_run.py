@@ -426,6 +426,24 @@ def test_an_a0_record_needs_the_pinned_phrase_and_an_alarm_needs_an_owner_decisi
             "- **A0** (2026-11-26): A0 alarms: none; A0-3 at 14 of 100, over its limit.\n",
             "('A0-3 at 14 of 100, over its limit')",
         ),
+        # a decision on file that answers no A0 alarm never stands for one or for the phrase (amendment M2's review)
+        (
+            "- **A0** (2026-11-26; 100 panels a set, owner decision: "
+            "reports/director/2026-11-25-owner-answer-keeprisk-a0-budget.md): alarm A0-3 fired (E1 holds on 14 of 100 "
+            "NC panels).\n",
+            "names reports/director/2026-11-25-owner-answer-keeprisk-a0-budget.md, an owner decision that answers no "
+            "A0 alarm",
+        ),
+        (
+            "- **A0** (2026-11-26; owner decision: `reports/director/2026-11-25-owner-answer-keeprisk-a0-budget.md`). "
+            "E1 held on 14 of 100 NC panels, more than the limit of 10.\n",
+            "an owner decision that answers no A0 alarm",
+        ),
+        (
+            "- **A0** (2026-11-26): A0 alarms: none; owner decision: "
+            "reports/director/2026-11-25-owner-answer-ride-test.md\n",
+            "an owner decision that answers no A0 alarm",
+        ),
         # every decision named must be on file; a mention that says there is none names no decision
         (
             "- **A0** (2026-11-26): A0-3 fired; owner decision: reports/director/a0-answer.md; owner decision: "
