@@ -18,10 +18,11 @@ into results/keep-risk-steady or anywhere in the repo; ``--fast`` is for dry run
 folder and ``--amendment k`` refuses unless 1 <= k <= 2, ``run<k-1>/start.json`` exists, ``run<k>/`` does not, every
 earlier run is the same kind of run and (real data) PLAN.md section 13's amendments list holds ``- **Amendment run k``;
 the RUNLOG must not hold this run number; a real run refuses a dirty git tree, a plan without exactly one A1 and one A0
-record (stop rule 8; the A0 record saying "no alarm" or naming an owner decision on file) and a catalog whose bars
-hash is not the pinned one; ``risk_limits("steady")`` must give exactly min_cash 0.20 and max_coin 0.60 (section 4)
-and every target of the grid must pass ``check_targets`` with them and h = 0.02; a real run whose projection (the A1
-timing, made again at start) is above 240 CPU-minutes does not start (stop rule 7).
+record (stop rule 8; the A0 record holding the pinned phrase "A0 alarms: none" or naming an owner decision on file,
+and an A0 record that reports an alarm refused unless it names an owner decision on file: stop rule 9) and a catalog
+whose bars hash is not the pinned one; ``risk_limits("steady")`` must give exactly min_cash 0.20 and max_coin 0.60
+(section 4) and every target of the grid must pass ``check_targets`` with them and h = 0.02; a real run whose
+projection (the A1 timing, made again at start) is above 240 CPU-minutes does not start (stop rule 7).
 
 Then, before any bar is read: ``run<k>/start.json`` and one RUNLOG line. Then the panels (row counts, panel hashes on
 real data, every calendar window present: stop rule 2; a close after 2023-01-01: stop rule 3), BTC's calendar-year
@@ -103,6 +104,10 @@ BOOK_CHECK_EVERY = 9  # section 11
 SIGMA_RTOL = 1e-12  # section 11: the numpy recompute of sigma
 LABEL = K.LABEL
 OWNER_DECISION_RE = re.compile(r"owner decision: `?(?P<path>reports/director/[\w.-]+\.md)")
+A0_NO_ALARM = "A0 alarms: none"  # stop rule 8: the pinned phrase of an A0 record with no alarm
+A0_NO_ALARM_RE = re.compile(rf"(?<!\w){re.escape(A0_NO_ALARM)}(?!\w)")
+A0_FIRED_RE = re.compile(r"fired", re.IGNORECASE)  # stop rule 9: an A0 record that reports an alarm ...
+A0_ALARM_RE = re.compile(r"\balarms?[\s:]+A0-\d", re.IGNORECASE)  # ... or names one outside the pinned phrase
 
 
 @dataclass(frozen=True)
@@ -176,8 +181,11 @@ INTERPRETATIONS = {
     "line, an event line is appended when a run completes, stops or crashes",
     "prior_amendments": "Stop rule 8: section 13's amendments list (from '**Amendments:**' to '## 14.') must hold "
     "exactly one line starting '- **A1' or '- **Amendment A1' and one for A0, neither holding 'to be written' (the "
-    "committed placeholders), and the A0 line must say 'no alarm' or 'owner decision: reports/director/<file>.md' "
-    "naming a file that exists. Real runs only",
+    "committed placeholders). The A0 line must hold the pinned phrase 'A0 alarms: none' (exactly, as whole words; "
+    "'no alarm' alone is not it) or 'owner decision: reports/director/<file>.md' naming a file that exists. Stop rule "
+    "9: an A0 line that reports an alarm (the word 'fired' anywhere in the line, any case, or 'alarm A0-<n>' / "
+    "'alarms A0-<n>' / 'alarms: A0-<n>' outside the pinned phrase) is refused unless it names an owner decision on "
+    "file, whatever else the line says. Real runs only",
     "snapshot": "Section 3's snapshot id is recorded with the catalog's; the bars hash and the panel hashes decide",
     "limits": "risk_limits('steady') must give min_cash exactly 0.20 and max_coin exactly 0.60 (section 4), and "
     "every target of the grid (s q f, s q (1 - f)) must pass check_targets with them and h = 0.02",
@@ -487,11 +495,33 @@ def prior_amendments(plan_text: str, repo: Path = REPO) -> dict:
     decision = OWNER_DECISION_RE.search(a0)
     if decision is not None and not (Path(repo) / decision["path"]).is_file():
         raise Refusal(f"amendment A0 names an owner decision {decision['path']} that does not exist")
-    if decision is None and "no alarm" not in a0:
+    alarm = a0_alarm(a0)
+    if decision is None and alarm is not None:
         raise Refusal(
-            "stop rule 9: amendment A0 says neither 'no alarm' nor 'owner decision: reports/director/<file>.md'"
+            f"stop rule 9: amendment A0 reports an alarm ({alarm!r}) and names no owner decision on file "
+            "('owner decision: reports/director/<file>.md'): run 0 does not start"
         )
-    return {"A1": rows["A1"][0], "A0": a0, "owner_decision": None if decision is None else decision["path"]}
+    if decision is None and A0_NO_ALARM_RE.search(a0) is None:
+        raise Refusal(
+            f"stop rule 8: amendment A0 says neither '{A0_NO_ALARM}' nor 'owner decision: "
+            "reports/director/<file>.md'"
+        )
+    return {
+        "A1": rows["A1"][0],
+        "A0": a0,
+        "alarm": alarm,
+        "owner_decision": None if decision is None else decision["path"],
+    }
+
+
+def a0_alarm(line: str) -> str | None:
+    """The text by which an A0 record reports an alarm (INTERPRETATIONS["prior_amendments"]), or None: the word
+    'fired' anywhere, or 'alarm A0-<n>' outside the pinned phrase."""
+    fired = A0_FIRED_RE.search(line)
+    if fired is not None:
+        return fired.group(0)
+    named = A0_ALARM_RE.search(A0_NO_ALARM_RE.sub(" ", line))
+    return None if named is None else named.group(0)
 
 
 # ------------------------------------------------------------------------------------------- start guards

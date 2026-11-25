@@ -109,7 +109,8 @@ READINGS = {
     "and run on the price panel's window",
     "copies": "The guarded copies' and their mixes' runs are measured by DD only (no fee check): A0 is a check of "
     "the statistics, not of the accounting, which run 0 checks on every run",
-    "exit": "An alarm prints ALARM and exits 3 after writing a0.json; no alarm exits 0",
+    "exit": "An alarm prints ALARM and exits 3 after writing a0.json; no alarm exits 0. The last line names the "
+    "alarms ('A0 alarms: A0-<n>, ...') or prints run.py's pinned phrase 'A0 alarms: none' (stop rule 8's record)",
 }
 
 
@@ -435,9 +436,8 @@ def run(args) -> int:
     R.write_parquet(pd.DataFrame(rows), out / "panels.parquet")
     failures = [{k: r[k] for k in ("set", "j", "error", "tb")} for r in results if r["status"] != K.OK]
     R.write_json(out / "a0.json", {"summary": summary, "failures": failures, "runtime_s": time.time() - t0})
-    print(
-        f"A0 ({sizes.panels} panels a set) done in {time.time() - t0:.1f}s; alarms: {summary['alarms'] or 'none'}"
-    )
+    alarms = f"A0 alarms: {', '.join(summary['alarms'])}" if summary["alarms"] else R.A0_NO_ALARM
+    print(f"A0 ({sizes.panels} panels a set) done in {time.time() - t0:.1f}s. {alarms}")
     if summary["alarms"]:
         print(f"ALARM: {', '.join(summary['alarms'])} (stop rule 9: run 0 does not start)", file=sys.stderr)
         return 3

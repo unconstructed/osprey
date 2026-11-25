@@ -24,11 +24,13 @@ import numpy as np
 import pandas as pd
 import pytest
 from test_keeprisk import hand_resampler
+from test_portfolio import set_steady_budget
 
 from lab.data import catalog
 from lab.data.panel import load_panel
 from lab.runner import holdmix as H
 from lab.runner import keeprisk as K
+from lab.runner import portfolio as pf
 from lab.runner import protect as P
 from lab.runner import trend as T
 
@@ -73,7 +75,12 @@ PLACEHOLDERS = (
     "- **A1** (to be written after the tiers pass on the build's commit; synthetic bars only).\n"
     '- **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner\'s decision).\n'
 )
-RECORDS = "- **A1** (2026-11-26): run 0 projects 28 CPU-minutes.\n- **A0** (2026-11-26): no alarm.\n"
+RECORDS = "- **A1** (2026-11-26): run 0 projects 28 CPU-minutes.\n- **A0** (2026-11-26): A0 alarms: none.\n"
+# the code review's A0 line (#77): it reports alarm A0-3 and says "no alarm" about the others
+REVIEW_A0 = (
+    "- **A0** (2026-11-26): alarm A0-3 fired (E1 holds on 14 of 100 NC panels at w 8%); no alarm on A0-1, A0-2 and "
+    "A0-4. The lead tells the owner.\n"
+)
 
 
 def _refuse_real_bars(*args, **kwargs):
@@ -332,7 +339,7 @@ def test_prior_amendments_stop_rule_8(tmp_path, capsys, monkeypatch, clean_git, 
             (RECORDS + "- **A1** a second record.\n", "found 2 line(s)"),
             (
                 "- **A1** (2026-11-26): timed.\n- **A0** (2026-11-26): alarms A0-1.\n",
-                "says neither 'no alarm'",
+                "stop rule 9: amendment A0 reports an alarm ('alarms A0-1')",
             ),
             (
                 "- **A1** timed.\n- **A0** owner decision: reports/director/no-such-file.md\n",
@@ -348,7 +355,7 @@ def test_prior_amendments_stop_rule_8(tmp_path, capsys, monkeypatch, clean_git, 
     with pytest.raises(R.Refusal, match="no amendments list"):
         R.prior_amendments("# a plan without section 13\n")
     got = R.prior_amendments(PLAN_TEXT.format(rows=RECORDS))
-    assert got["owner_decision"] is None and got["A0"].endswith("no alarm.")
+    assert got["owner_decision"] is None and got["alarm"] is None and got["A0"].endswith("A0 alarms: none.")
     decision = "- **A1** timed.\n- **Amendment A0** owner decision: reports/director/answer.md\n"
     (tmp_path / "reports" / "director").mkdir(parents=True)
     (tmp_path / "reports" / "director" / "answer.md").write_text("the owner's answer")
@@ -358,6 +365,79 @@ def test_prior_amendments_stop_rule_8(tmp_path, capsys, monkeypatch, clean_git, 
     )
     assert R.amendment_row_present(PLAN_TEXT.format(rows="- **Amendment run 1** (2026-12-01): a fix.\n"), 1)
     assert not R.amendment_row_present("- **Amendment run 1** outside the list\n## 14.\n", 1)
+
+
+def test_an_a0_record_needs_the_pinned_phrase_and_an_alarm_needs_an_owner_decision(
+    tmp_path, capsys, monkeypatch, clean_git, tiny
+):
+    """Stop rules 8 and 9 (INTERPRETATIONS["prior_amendments"], #77): the A0 record must hold exactly 'A0 alarms:
+    none' or name an owner decision on file; a record that reports an alarm ('fired', or 'alarm A0-<n>' outside the
+    pinned phrase) needs an owner decision on file, whatever else it says."""
+    assert R.A0_NO_ALARM == "A0 alarms: none"
+    a1 = "- **A1** (2026-11-26): run 0 projects 28 CPU-minutes.\n"
+    (tmp_path / "reports" / "director").mkdir(parents=True)
+    (tmp_path / "reports" / "director" / "a0-answer.md").write_text("the owner's answer to A0")
+
+    def check(a0: str, repo: Path = tmp_path) -> dict:
+        return R.prior_amendments(PLAN_TEXT.format(rows=a1 + a0), repo)
+
+    no_alarm = "stop rule 8: amendment A0 says neither 'A0 alarms: none' nor 'owner decision:"
+    for a0, text in (
+        (REVIEW_A0, "stop rule 9: amendment A0 reports an alarm ('fired')"),  # the review's line
+        ("- **A0** (2026-11-26): no alarm.\n", no_alarm),  # a bare "no alarm" is not the pinned phrase
+        ("- **A0** (2026-11-26): no alarms.\n", no_alarm),
+        ("- **A0** (2026-11-26): a0 alarms: none.\n", no_alarm),  # the phrase exactly, case included
+        ("- **A0** (2026-11-26): A0 alarms: nonexistent.\n", no_alarm),  # as whole words
+        ("- **A0** (2026-11-26): A0 alarms:none.\n", no_alarm),
+        ("- **A0** (2026-11-26): A0 alarms: none; A0-3 fired.\n", "reports an alarm ('fired')"),
+        (
+            "- **A0** (2026-11-26): A0 alarms: none. Alarm A0-4 at 31 of 400.\n",
+            "reports an alarm ('Alarm A0-4')",
+        ),
+        ("- **A0** (2026-11-26): A0 alarms: A0-3.\n", "reports an alarm ('alarms: A0-3')"),
+        ("- **A0** (2026-11-26): A0 alarms: none (A0-3 FIRED on the rerun).\n", "reports an alarm ('FIRED')"),
+        (
+            '- **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner\'s decision).\n',
+            "needs exactly one '- **A0' record (not the placeholder)",
+        ),  # the committed placeholder
+        (
+            REVIEW_A0.replace(
+                "tells the owner.", "tells the owner; owner decision: reports/director/gone.md"
+            ),
+            "names an owner decision reports/director/gone.md that does not exist",
+        ),
+    ):
+        with pytest.raises(R.Refusal) as refused:
+            check(a0)
+        assert text in str(refused.value), (a0, str(refused.value))
+    for a0, alarm in (
+        ("- **A0** (2026-11-26): A0 alarms: none.\n", None),
+        ("- **A0** (2026-11-26): 100 panels a set, 152 CPU-minutes. A0 alarms: none\n", None),
+        ("- **A0** (2026-11-26): **A0 alarms: none** (A0-3 at 9 of 100, under its limit).\n", None),
+        (REVIEW_A0.replace("tells the owner.", "owner decision: reports/director/a0-answer.md"), "fired"),
+        ("- **Amendment A0** alarms A0-1; owner decision: reports/director/a0-answer.md\n", "alarms A0-1"),
+    ):
+        got = check(a0)
+        assert got["A0"] == a0.rstrip("\n") and got["alarm"] == alarm
+        assert got["owner_decision"] == (None if alarm is None else "reports/director/a0-answer.md")
+    # through a real run's start: the review's line and a bare "no alarm" are refused with nothing written; with the
+    # owner's decision on file the run gets past stop rule 8 to the next guard (the stand-in has no SNAPSHOT.json).
+    # The decision file lives in a stand-in repo (tmp_path), never in the real one.
+    original = R.prior_amendments
+    monkeypatch.setattr(R, "prior_amendments", lambda text, repo=tmp_path: original(text, repo))
+    for i, (a0, text) in enumerate(
+        (
+            (REVIEW_A0, "stop rule 9: amendment A0 reports an alarm"),
+            ("- **A0** (2026-11-26): no alarm.\n", no_alarm),
+            (
+                REVIEW_A0.replace("tells the owner.", "owner decision: reports/director/a0-answer.md"),
+                "cannot read",
+            ),
+        )
+    ):
+        out, cat, here = real_folders(monkeypatch, tmp_path / f"run{i}", rows=a1 + a0)
+        _refused(capsys, R.main(real_args(out, cat)), text)
+        assert not out.exists() and sorted(p.name for p in here.iterdir()) == ["PLAN.md"]
 
 
 def test_the_steady_limits_and_the_grid_s_targets(tmp_path, capsys):
@@ -950,6 +1030,298 @@ def test_the_steps_do_not_depend_on_costs_the_wallet_or_s(dry_runs):
     assert k1.equals(k2)
 
 
+# ------------------------------------------------------------------------------------------ D2's boom checks and D3
+
+# a --fast seed whose boom checks read their own rowset: read with rowset 'all', both would move to 0.15
+BOOM_SEED = 9
+
+
+@pytest.fixture(scope="module")
+def boom_run(tmp_path_factory):
+    """A --fast dry run (seed 9) with D2's boom minimum lowered to 1 window, so the boom checks run D1 (the fast grid
+    keeps at most 3 Kraken windows, under the plan's 12, so the shared dry run's checks are MISSING), on a copy of
+    config/ whose steady budget is written as 35 by key (#55: set up here, whatever the real file holds). Every call
+    of keeprisk.d1 is recorded with its inputs (a spy; the result is d1's own)."""
+    base = tmp_path_factory.mktemp("boom")
+    cfg = base / "cfg"
+    cfg.mkdir()
+    for name in ("costs.yaml", "splits.yaml", "risk_levels.yaml"):
+        (cfg / name).write_bytes((R.REPO / "config" / name).read_bytes())
+    set_steady_budget(cfg, "35")
+    calls: list[dict] = []
+    real_d1 = K.d1
+
+    def spy(windows, labels, **kwargs):
+        out = real_d1(windows, labels, **kwargs)
+        calls.append({"windows": windows.copy(), "labels": labels.copy(), "kwargs": kwargs, "out": out})
+        return out
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(catalog, "load_bars", _refuse_real_bars)
+        mp.setattr(R, "git_state", lambda repo=R.REPO: dict(CLEAN))
+        mp.setattr(R, "TIMING_REPS_FAST", 1)
+        mp.setattr(K, "BOOM_MIN_WINDOWS", 1)
+        mp.setattr(K, "d1", spy)
+        assert R.main(dry(base / "out", "--config-dir", str(cfg), seed=BOOM_SEED)) == 0
+    run = base / "out" / "run0"
+    return {
+        "runs": pd.read_parquet(run / "runs.parquet"),
+        "spans": pd.read_parquet(run / "spans.parquet"),
+        "decision": read_json(run / "decision.json"),
+        "start": read_json(run / "start.json"),
+        "calls": calls,
+        "cfg": cfg,
+    }
+
+
+def _my_overlaps(k: int, year: int) -> bool:
+    """Window k holds months M_k .. M_(k+23), M_k = January 2017 + k months; year Y holds months 12 (Y - 2017) ..
+    12 (Y - 2017) + 11."""
+    first = 12 * (year - 2017)
+    return k <= first + 11 and k + 23 >= first
+
+
+def _my_d1_full(runs, spans, family, rowset="all", windows=None):
+    """Section 10's D1 on one pool written out here, with every number it reports per setting and mix."""
+    win = runs[(runs["family"] == family) & (runs["scope"] == "window") & (runs["kind"] == "rule")]
+    if windows is not None:
+        win = win[win["window"].isin(list(windows))]
+    lab = spans[(spans["family"] == family) & (spans["rowset"] == rowset)]
+    n = len(set(win["window"].tolist()))
+    settings = []
+    for w in R.FAST.settings:
+        mixes, first = [], None
+        for s, f in R.FAST.mixes:
+            mine = win[(win["w"] == w) & (win["s"] == s) & (win["f"] == f)]
+            label = lab[(lab["w"] == w) & (lab["s"] == s) & (lab["f"] == f)]["label"].tolist()
+            assert len(mine) == n and len(label) == 1
+            vx = mine["V_X"].tolist()
+            assert all(math.isfinite(v) for v in vx + mine["c_X"].tolist())
+            calmer = sum(1 for v in vx if v < 0.0)
+            c_med = float(np.median(np.asarray(mine["c_X"], dtype=float)))
+            rules = [2 * calmer >= n, label[0] in (K.CALMER, K.CANT_TELL), c_med <= 2.0]
+            for i, r in enumerate(rules, start=1):
+                if not r and first is None:
+                    first = {"mix": (s, f), "rule": i}
+            mixes.append(
+                {
+                    "s": s,
+                    "f": f,
+                    "calmer_windows": calmer,
+                    "label": label[0],
+                    "c_X_median": c_med,
+                    "rules": rules,
+                }
+            )
+        settings.append(
+            {
+                "w": w,
+                "usable": all(r for m in mixes for r in m["rules"]),
+                "calmer_all": all(m["label"] == K.CALMER for m in mixes),
+                "first_failure": first,
+                "mixes": mixes,
+            }
+        )
+    usable = [st for st in settings if st["usable"]]
+    if usable:
+        default = max(usable, key=lambda st: (st["calmer_all"], st["w"]))["w"]
+        reason = "usable: " + ", ".join(str(st["w"]) for st in usable)
+    else:
+        default, reason = K.NO_DEFAULT, "no usable setting"
+    return {"default": default, "reason": reason, "windows": n, "settings": settings}
+
+
+def test_d2_s_boom_checks_run_d1_on_the_kept_windows_with_their_own_rowset(boom_run, monkeypatch):
+    """D2's boom checks (INTERPRETATIONS["boom"], #77): D1 on the Kraken 1x windows overlapping none of the removed
+    years, with the labels of the removal's own rowset; every D1 of decide (the headline, both boom checks, Binance
+    and 2x) recomputed number by number from the runs and the spans; D2's label; and the minimum at its boundary."""
+    runs, spans, d, calls = boom_run["runs"], boom_run["spans"], boom_run["decision"], boom_run["calls"]
+    assert d["thresholds"]["BOOM_MIN_WINDOWS"] == 1  # lowered on purpose (the plan's 12 is pinned elsewhere)
+    returns = {int(y): v for y, v in boom_run["start"]["year_returns"].items()}
+    assert sorted(returns) == list(range(2017, 2023))
+    ranked = sorted(returns, key=lambda y: (-returns[y], y))  # ties to the earlier year
+    kraken = sorted(
+        set(runs[(runs["family"] == "KRAKEN 1x") & (runs["scope"] == "window")]["window"].tolist())
+    )
+    assert kraken == list(R.FAST.windows["KRAKEN"])
+
+    def same(call, family, rowset, windows) -> dict:
+        mine = _my_d1_full(runs, spans, family, rowset, windows)
+        pool = call["windows"]
+        assert set(pool["family"]) == {family} and set(pool["scope"]) == {"window"}
+        want = R.FAST.windows[R.FAMILY[family].source] if windows is None else windows
+        assert sorted(set(pool["window"].tolist())) == list(want)
+        assert set(call["labels"]["family"]) == {family} and set(call["labels"]["rowset"]) == {rowset}
+        assert call["kwargs"] == {"settings": R.FAST.settings, "mixes": R.FAST.mixes}
+        out = call["out"]
+        assert (out["default"], out["reason"], out["windows"]) == (
+            mine["default"],
+            mine["reason"],
+            mine["windows"],
+        )
+        for st, my in zip(out["settings"], mine["settings"], strict=True):
+            assert {k: st[k] for k in ("w", "usable", "calmer_all", "first_failure")} == {
+                k: my[k] for k in ("w", "usable", "calmer_all", "first_failure")
+            }
+            for m, mm in zip(st["mixes"], my["mixes"], strict=True):
+                assert m == mm, (family, rowset, st["w"], m, mm)
+        return mine
+
+    assert len(calls) == 5  # decide's D1 calls, in order: the headline, the two boom checks, Binance, 2x
+    head = same(calls[0], "KRAKEN 1x", "all", None)
+    assert d["D1"]["KRAKEN 1x"]["default"] == head["default"] == d["headline"]["default"]
+    checks = d["D2"]["checks"]
+    for n, (name, call) in enumerate(zip(R.BOOM, calls[1:3], strict=True), start=1):
+        years = ranked[:n]
+        kept = [k for k in kraken if not any(_my_overlaps(k, y) for y in years)]
+        assert d["boom"][name] == {"years": years, "windows": kept} and 1 <= len(kept) < len(kraken)
+        mine = same(call, "KRAKEN 1x", name, kept)
+        assert call["out"]["windows"] == len(kept) == mine["windows"]
+        assert checks[f"boom: {name}"] == mine["default"]
+        # the removal's rowset is not rowset 'all' here: read with 'all' the check would name another default
+        assert _my_d1_full(runs, spans, "KRAKEN 1x", "all", kept)["default"] != mine["default"]
+    for call, (check, family) in zip(calls[3:], R.CHECK_FAMILIES.items(), strict=True):
+        assert checks[check] == same(call, family, "all", None)["default"] == d["D1"][family]["default"]
+    order = ("boom: without the best 1", "boom: without the best 2", "Binance", "2x costs")
+    moved = [c for c in order if checks[c] not in (head["default"], K.MISSING)]
+    missing = [c for c in order if checks[c] == K.MISSING]
+    assert not missing and moved  # every check decided, at least one moved
+    assert d["D2"]["label"] == "NOT ROBUST (" + ", ".join(moved) + ")" == d["headline"]["label"]
+    # the minimum at its boundary: decide again on the same tables (len(kept) windows decide, one fewer is MISSING)
+    ctx = {"grid": R.FAST, "year_returns": returns, "budget": d["budget"]}
+    for name in R.BOOM:
+        kept = d["boom"][name]["windows"]
+        for minimum, want in ((len(kept), checks[f"boom: {name}"]), (len(kept) + 1, K.MISSING)):
+            monkeypatch.setattr(K, "BOOM_MIN_WINDOWS", minimum)
+            assert R.decide(runs, spans, ctx)["D2"]["checks"][f"boom: {name}"] == want
+
+
+def _plain(x):
+    """JSON's view of a value: NaN and None as None, numpy scalars as Python ones, tuples as lists."""
+    if isinstance(x, dict):
+        return {str(k): _plain(v) for k, v in x.items()}
+    if isinstance(x, list | tuple | np.ndarray):
+        return [_plain(v) for v in list(x)]
+    if isinstance(x, np.bool_ | bool):
+        return bool(x)
+    if isinstance(x, np.integer):
+        return int(x)
+    if isinstance(x, float | np.floating):
+        return float(x) if math.isfinite(float(x)) else None
+    if x is None or (not isinstance(x, str) and pd.isna(x)):
+        return None
+    return x
+
+
+def _my_describe(values) -> dict:
+    x = [float(v) for v in values if v is not None and math.isfinite(float(v))]
+    if not x:
+        return {"n": 0, "p10": None, "median": None, "p90": None, "share_above_0": None}
+    p10, med, p90 = (float(v) for v in np.percentile(np.asarray(x), [10.0, 50.0, 90.0]))
+    return {
+        "n": len(x),
+        "p10": p10,
+        "median": med,
+        "p90": p90,
+        "share_above_0": sum(v > 0.0 for v in x) / len(x),
+    }
+
+
+def _my_d3_cell(cell: pd.DataFrame, budget) -> dict:
+    """D3 over one cell's window runs (section 10) written out here."""
+    by = {k: cell[cell["kind"] == k].sort_values("window") for k in ("rule", "N", "X")}
+    rule = by["rule"]
+    out = {key: _my_describe(rule[key].tolist()) for key in ("V_X", "V_N", "c_N", "c_X", "c_eq", "x", "x_eq")}
+    for key, col in (("cut_X", "V_X"), ("cut_N", "V_N")):
+        out[key] = _my_describe([100.0 * (1.0 - math.exp(v)) for v in rule[col].tolist() if math.isfinite(v)])
+    out["fees_pct_per_year"] = _my_describe(rule["fees_pct_per_year"].tolist())
+    out["F"] = {}
+    for k, part in by.items():
+        falls = part["F"].tolist()
+        out["F"][k] = {
+            "median": float(np.median(falls)),
+            "Q": float(np.percentile(falls, 90.0)),
+            "worst": max(falls),
+            "past_budget": None if budget is None else sum(v > budget for v in falls) / len(falls),
+        }
+    out["worst_week"] = {k: min(part["worst_week"].tolist()) for k, part in by.items()}
+    out["over_cap"] = {k: _my_describe(part["over_cap"].tolist()) for k, part in by.items()}
+    out["stepped_back"] = _my_describe(rule["q_lt1"].tolist())
+    out["longest_back_days"] = _my_describe(rule["longest_back_days"].tolist())
+    out["rebound_gap"] = {
+        "median": float(np.median(rule["rebound_gap"].tolist())),
+        "worst": max(rule["rebound_gap"].tolist()),
+    }
+    out["orders_per_year"] = _my_describe(rule["orders_per_year"].tolist())
+    out["busiest_30d"] = max(int(v) for v in rule["busiest_30d"].tolist())
+    out["windows"] = len(rule)
+    out["calmer_windows"] = sum(1 for v in rule["V_X"].tolist() if v < 0.0)
+    years = sorted(set(rule["year"].tolist()))
+    out["by_year"] = {
+        y: {key: float(np.median(rule[rule["year"] == y][key].tolist())) for key in ("V_X", "c_N", "F")}
+        for y in years
+    }
+    return out
+
+
+def _my_d3(runs, spans, family, default, budget) -> dict:
+    """D3 for every cell of one family (section 10): its own window runs, its own rowset 'all' span row and the
+    headline's default."""
+    win = runs[(runs["family"] == family) & (runs["scope"] == "window")]
+    lab = spans[(spans["family"] == family) & (spans["rowset"] == "all")]
+    cells = []
+    for w, s, f in sorted(set(zip(win["w"], win["s"], win["f"], strict=True))):
+        cell = win[(win["w"] == w) & (win["s"] == s) & (win["f"] == f)]
+        span = lab[(lab["w"] == w) & (lab["s"] == s) & (lab["f"] == f)]
+        assert len(span) == 1 and len(cell) == 4 * len(R.FAST.windows[R.FAMILY[family].source])
+        cells.append(
+            {
+                "w": w,
+                "s": s,
+                "f": f,
+                "default": w == default,
+                "windows": _my_d3_cell(cell, budget),
+                "span": span.iloc[0].to_dict(),
+            }
+        )
+    return _plain({"default": default, "budget": budget, "cells": cells})
+
+
+def test_d3_is_recomputed_for_every_family_from_its_own_runs_and_the_budget_as_read(
+    boom_run, dry_runs, monkeypatch
+):
+    """D3 in decision.json (section 10, #77): for every family, every cell's numbers from that family's own window
+    runs and span row (window count, V_X, V_N and their cuts, c_N, c_X, c_eq, x, x_eq, fees, the falls F of the
+    rule, N and X with their median, Q, worst and share past the budget as read, the worst week, the over-cap weeks,
+    the stepping back, the missed rebound, the orders, the busiest 30 days, the calmer windows, by year), the
+    headline's default marked; on the boom run's config copy at a budget of 35% and on the shared dry run at the
+    real file's budget as read."""
+    shared = tables(dry_runs)
+    for t, cfg in ((boom_run, boom_run["cfg"]), (shared, None)):
+        runs, spans, d = t["runs"], t["spans"], t["decision"]
+        budget = pf.risk_limits("steady", cfg)["max_drawdown_budget"]
+        assert d["budget"] == budget == t["start"]["risk_limits"]["max_drawdown_budget"]
+        assert set(d["D3"]) == set(R.FAST.families)
+        head = d["D1"]["KRAKEN 1x"]["default"]
+        for family in R.FAST.families:
+            assert d["D3"][family] == _my_d3(runs, spans, family, head, budget), family
+    d = boom_run["decision"]
+    assert d["budget"] == 0.35 and isinstance(d["headline"]["default"], float)  # a default to mark
+    assert any(c["default"] for c in d["D3"]["KRAKEN 1x"]["cells"])
+    # past the budget at its boundary: a budget exactly one window's fall counts only the falls strictly above it
+    runs, spans = boom_run["runs"], boom_run["spans"]
+    falls = sorted(runs[(runs["scope"] == "window") & (runs["family"] == "KRAKEN 1x")]["F"].tolist())
+    edge = falls[len(falls) // 2]
+    returns = {int(y): v for y, v in boom_run["start"]["year_returns"].items()}
+    got = R.decide(runs, spans, {"grid": R.FAST, "year_returns": returns, "budget": edge})
+    shares = []
+    for family in R.FAST.families:
+        mine = _my_d3(runs, spans, family, got["D1"]["KRAKEN 1x"]["default"], edge)
+        assert _plain(got["D3"][family]) == mine, family
+        shares += [c["windows"]["F"][k]["past_budget"] for c in mine["cells"] for k in ("rule", "N", "X")]
+    assert 0.0 < max(shares) and min(shares) < 1.0
+
+
 # ------------------------------------------------------------------------------------------------ stops and failures
 
 
@@ -1227,6 +1599,28 @@ def test_a0_runs_end_to_end_on_tiny_sizes(tmp_path, monkeypatch, capsys):
     code = C.main(["--out-dir", str(out), "--fast"])
     a0 = read_json(out / "a0.json")
     assert code == (3 if a0["summary"]["alarms"] else 0)
+    # the last line names the alarms or prints run.py's pinned phrase, which stop rule 8 reads in the A0 record;
+    # both ways (the other way with the alarms the summary gives replaced)
+
+    def check_record(said: list[str]) -> None:
+        last = capsys.readouterr().out.strip().splitlines()[-1]
+        record = f"- **A1** timed.\n- **A0** (2026-11-26): {last}\n"
+        if said:
+            assert last.endswith(". A0 alarms: " + ", ".join(said))
+            with pytest.raises(R.Refusal, match="stop rule 9: amendment A0 reports an alarm"):
+                R.prior_amendments(PLAN_TEXT.format(rows=record), tmp_path)
+        else:
+            assert last.endswith(". A0 alarms: none") and R.A0_NO_ALARM == "A0 alarms: none"
+            assert R.prior_amendments(PLAN_TEXT.format(rows=record), tmp_path)["alarm"] is None
+
+    check_record(a0["summary"]["alarms"])
+    forced = [] if a0["summary"]["alarms"] else ["A0-1", "A0-3"]
+    real_summarize = C.summarize
+    monkeypatch.setattr(C, "summarize", lambda *a: {**real_summarize(*a), "alarms": list(forced)})
+    assert C.main(["--out-dir", str(tmp_path / "a0-forced"), "--fast"]) == (3 if forced else 0)
+    assert read_json(tmp_path / "a0-forced" / "a0.json")["summary"]["alarms"] == forced
+    check_record(forced)
+    monkeypatch.setattr(C, "summarize", real_summarize)
     assert a0["summary"]["panels"] == 1 and a0["failures"] == []
     rows = pd.read_parquet(out / "panels.parquet")
     assert len(rows) == 5 * 4 and set(rows["set"]) == set(C.SETS)
@@ -1252,3 +1646,101 @@ def test_a0_runs_end_to_end_on_tiny_sizes(tmp_path, monkeypatch, capsys):
     assert C.main(["--out-dir", str(R.REPO / "a0")]) == 2 and "never writes into" in capsys.readouterr().err
     assert C.main(["--out-dir", str(tmp_path / "w"), "--fast", "--workers", "0"]) == 2
     assert not (R.REPO / "a0").exists()
+
+
+def test_a0_s_nc_panel_is_recomputed_by_hand():
+    """A0's NC set, E1's own null (section 13; it feeds alarm A0-3; #77): one panel recomputed here. The q schedule
+    comes from the schedule panel trend.garch_panel(260000 + j) (numpy's sigma, the switch-on decision and the Monday
+    checks: ``my_q_path``) and runs on the price panel trend.garch_panel(250000 + j): the rule against X on the full
+    span and on each window, every guarded copy's V (the schedule's check q's rotated by u weeks, against its own
+    same-average mix) and E1, RISK-X's p-values from a hand resampler, Holm, the labels and D1 at the one mix."""
+    j, (s, f), lookback, resamples = 0, C.MIX, 14, 60
+    sizes = C.Sizes(panels=1, resamples=resamples, copy_stride=128, windows=(0, 48))
+    costs = R.cost_models(None)[("1x", K.DEPOSIT)]
+    C._init(
+        {
+            "sizes": sizes,
+            "limits": LIM,
+            "costs": costs,
+            "idx": K.index_set(2189, resamples=resamples),
+            "second": False,
+        }
+    )
+    got = C.panel_result("NC", j)
+    prices, schedule = T.garch_panel(250_000 + j), T.garch_panel(260_000 + j)
+    assert prices.index.equals(schedule.index) and len(prices) == 2190
+    n = len(prices)
+    checks = [t for t in range(1, n) if t >= lookback and schedule.index[t].day_of_week == 0]
+    idx = hand_resampler(n - 1, resamples)
+    month0 = pd.Timestamp("2017-01-01", tz="UTC")
+
+    def dd(res) -> float:
+        r = res["ret"].to_numpy()[1:].tolist()
+        return math.sqrt(math.fsum(min(v, 0.0) ** 2 for v in r) / len(r))
+
+    def run(bars, share):  # the executor fed one crypto share per close, split f and 1 - f
+        share = np.asarray(share, dtype=float)
+        return K.ride_run(bars, np.column_stack([share * f, share * (1.0 - f)]), limits=LIM, costs=costs)
+
+    def cagr(res) -> float:
+        days = (res.index[-1] - res.index[0]) / pd.Timedelta(days=1)
+        return float(np.prod(1.0 + res["ret"].to_numpy()[1:])) ** (365.0 / days) - 1.0
+
+    cells, per_w = [], {}
+    for w in K.W_VALUES:
+        mine = got["by_w"][w]
+        q = my_q_path(schedule, w, f, 0, n, lookback)
+        assert not np.array_equal(q, my_q_path(prices, w, f, 0, n, lookback))  # the prices' q is another
+        rule = run(prices, s * q)
+        xr = run(prices, np.full(n, _exact_mean((s * q)[:-1])))
+        v = math.log(dd(rule)) - math.log(dd(xr))
+        assert mine["V"] == v, w
+        qk = q[checks]
+        vu = []
+        for u in range(53, len(checks), sizes.copy_stride):  # the guarded copies u = 53 .. W - 1, every 128th
+            share = np.empty(n)
+            k = -1
+            for t in range(n):
+                if k + 1 < len(checks) and checks[k + 1] == t:
+                    k += 1
+                share[t] = s * q[0] if k < 0 else s * qk[(k + u) % len(checks)]
+            mix = run(prices, np.full(n, _exact_mean(share[:-1])))
+            vu.append(math.log(dd(run(prices, share))) - math.log(dd(mix)))
+        rank = (1 + sum(x <= v for x in vu)) / (1 + len(vu))
+        assert len(vu) == 3 and mine["e1_rank_p"] == rank and mine["e1_holds"] == (rank < 0.05)
+        a, b = rule["ret"].to_numpy()[1:], xr["ret"].to_numpy()[1:]
+        da, db = np.minimum(a, 0.0) ** 2, np.minimum(b, 0.0) ** 2
+        vs = np.array([0.5 * (np.log(np.mean(da[i])) - np.log(np.mean(db[i]))) for i in idx])
+        p = {
+            "p_calm": (1 + int((vs >= 0).sum())) / (resamples + 1),
+            "p_rough": (1 + int((vs <= 0).sum())) / (resamples + 1),
+            "p_eq": (1 + int((vs <= math.log(0.9)).sum())) / (resamples + 1),
+        }
+        assert {key: mine[key] for key in p} == p
+        vx, cx = [], []
+        for kw in sizes.windows:  # window k: closes from the 2nd of M_k to the 1st of M_(k+24)
+            first = month0 + pd.DateOffset(months=kw) + pd.Timedelta(days=1)
+            last = month0 + pd.DateOffset(months=kw + 24)
+            keep = (prices.index >= first) & (prices.index <= last)
+            r0 = int(np.flatnonzero(keep)[0])
+            piece = prices[keep]
+            qw = my_q_path(schedule, w, f, r0, r0 + len(piece), lookback)
+            rw, xw = run(piece, s * qw), run(piece, np.full(len(piece), _exact_mean((s * qw)[:-1])))
+            vx.append(math.log(dd(rw)) - math.log(dd(xw)))
+            cx.append(100.0 * (cagr(xw) - cagr(rw)))
+        calmer = sum(1 for x in vx if x < 0.0)
+        assert mine["calmer_windows"] == calmer and mine["c_X_median"] == float(np.median(cx))
+        cells.append({"w": w, "steps": bool((q < 1.0).any()), "V": v, "e1": rank, **p})
+        per_w[w] = (calmer, float(np.median(cx)))
+    holm, labels = _my_labels(cells)
+    for w in K.W_VALUES:
+        assert got["by_w"][w]["holm"] == holm[w] and got["by_w"][w]["label"] == labels[w], w
+    usable = [
+        w
+        for w in K.W_VALUES
+        if 2 * per_w[w][0] >= len(sizes.windows)
+        and labels[w] in (K.CALMER, K.CANT_TELL)
+        and per_w[w][1] <= 2.0
+    ]
+    want = max(usable, key=lambda w: (labels[w] == K.CALMER, w)) if usable else K.NO_DEFAULT
+    assert got["default"] == want and got["set"] == "NC" and got["status"] == K.OK
