@@ -3,7 +3,8 @@
 > **SCOUTING ONLY:** the reference engine (`lab/runner/keeprisk.py` on `lab/runner/trend.py`'s executor), the
 > placeholder costs of `config/costs.yaml`, and Kraken and Binance daily candles in place of Base prices. Not
 > NautilusTrader. Written 2026-11-25 by the lead from the committed record (`decision.json`, `spans.csv`, `runs.csv`)
-> and `results/keep-risk-steady/run0/`.
+> and `results/keep-risk-steady/run0/`, and corrected the same day after the audit ([AUDIT.md](AUDIT.md): the run
+> PASS; numbers PASS; two plain-words sentences reworded (R1, R2) and five recommended changes made (C1-C5)).
 > - Run 0 ran on commit `2a43cc4` with a clean tree, config hash `de32565d…`, data snapshot `1746a21b75683e76`. On that
 >   commit the full tier passed (2750 tests, 18 slow, 100% branch coverage of `lab/`), the deep profile passed (2732),
 >   ruff was clean and the dashboard passed (86).
@@ -29,12 +30,14 @@ windows 12 and 48 are left, fewer than 12, so that check is MISSING, as section 
   (more so at the lower settings), because the tool holds less crypto on average. That calm was bought by giving up a
   median 0.4-29 points of return a year, mostly in the boom periods.
 - **Against simply holding the same average amount of crypto, it made no difference worth showing.** The down days
-  were a median 0-4% smaller, and the full-span reading rules out a cut as large as 10% at 31 of the 32 cells
-  (NO NOTICEABLE DIFFERENCE). The worst falls were about the same or *deeper* than the plain lower mix's (up to 5 points
-  at w = 8%). Its return was a median -1.2 to +6.3 points a year lower (lower at 28 of 32 cells).
-- **Its timing is not random.** At w = 8% and 10% the tool ranked in the top 4% of the guarded time-shifted copies of
-  its own stepping back (E1 at all 8 mixes; rank p 0.004-0.035): it does step back at better moments than chance. The gain is just too
-  small to beat a plain lower crypto share.
+  were a median 0-4% smaller. The full-span test labels 31 of the 32 cells NO NOTICEABLE DIFFERENCE (a cut of 10%
+  or more rejected at the 5% level), but A0 found that this reading can be overconfident in exactly this direction
+  (the caveat below), so it is a computed label, not a finding shown to users. The worst falls were about the same or *deeper* than the plain lower mix's (up to 5 points
+  at w = 8%). At every cell the tool fell further than X in most windows: 28-49 of 49 (median 44). Its return was a median -1.2 to +6.3 points a year lower (lower at 28 of 32 cells).
+- **At w = 8% and 10% its steps were better timed than chance.** The tool ranked in the top 4% of the guarded
+  time-shifted copies of its own stepping back (E1 at all 8 mixes; rank p 0.004-0.035); at 12% and 15% E1 held at
+  1 and 0 of 8 mixes. This mostly re-confirms what P8 had already shown on these bars (volatility clusters), so it
+  is weak new evidence (PLAN.md section 16). The gain is too small to beat a plain lower crypto share.
 - **A plain lower crypto share with the same calm** (the yardstick X_eq) returned 1-9 points a year more than the tool
   over 2017-2022, at every cell.
 - **So no setting is suggested.** For a calmer ride the honest suggestion is a lower crypto share. Users can still
@@ -174,14 +177,16 @@ Medians over the 8 mixes of each cell's window median.
 | KRAKEN 1x 500 USD | 15% | 1.0% | 1.17 | +0.1 | 43% |
 
 Binance, 2x costs, the 500 USD wallet and the 7- and 28-return look-backs tell the same story: a median cut of about -1 to
-5% against holding the same crypto steadily, falls about the same or deeper, and some return given up. The cost flag (section 9.5)
+5% against holding the same crypto steadily, falls about the same or deeper, and some return given up at 23 of the 24 rows (at Binance w 10% the tool earned a
+median 1.5 points a year more than X). The cost flag (section 9.5)
 fired at no cell of the headline pool.
 
 **A post-hoc reading (decides nothing, added by the lead).** At w = 10%, D1's rules 1 and 3 hold at all 8 mixes; only
 rule 2 fails. A0 says NO NOTICEABLE DIFFERENCE can be wrong when the tool helps. Read as CAN'T TELL, w = 10% would
 have passed D1. But its cut against X is still a median 2-4%, its falls 0-3 points deeper than X's, and the steady
 share with the same calm returned 1-8 points a year more. This is not a default: the rules were fixed before the run,
-and M3 keeps them unchanged.
+and M3 keeps them unchanged. It cannot be the reason for an amendment run or a change to D1: a rule changed after
+seeing this result would be chosen by the result.
 
 ## The 32 cards (Kraken 1x; shown with the CAN'T TELL sentence, amendment M3)
 
@@ -566,7 +571,7 @@ A0's power: CALMER at any setting on 10 of 100 made-up markets with a real effec
 > **Keep my risk steady, at w = 15% a week**, with your mix (60% crypto, 75% of it BTC). In two-year periods of 2017-2022:
 > - It held a median 58% crypto and stepped back 9% of the time.
 > - **Against keeping your full mix:** down days 3% smaller; worst fall 47% against 48% (median; the worst period 63% against 64%); it gave up a median 4.0 points a year (from -1.6 to 12.0).
-> - **Against simply holding 58% crypto steadily:** Its down days were smaller than holding 58% crypto steadily in 22 of 49 two-year periods (a median -0.1%), but we can't rule out that this was luck.
+> - **Against simply holding 58% crypto steadily:** Its down days were smaller than holding 58% crypto steadily in 22 of 49 two-year periods (in the median period they were 0.1% larger), but we can't rule out that this was luck.
 > - About 0.7 trades a month (up to 4 in a busy month); fees about 0.22% a year.
 > - After the worst low of a period it trailed your full mix by a median 0.2 points over the next three months.
 > - Holding crypto steadily at the share with the same calm returned 2.0 points a year more than this setting over 2017-2022.

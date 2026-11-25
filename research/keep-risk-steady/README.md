@@ -24,7 +24,7 @@ that costs, and it picks a suggested default by rules fixed in advance.
   DIFFERENCE, SMALLER BUT BELOW NOTICE or ROUGHER is shown to users with the CAN'T TELL sentence. The tiers passed
   on `2a43cc4` (after a lint fix in A0's diagnostic). **Run 0** (train window, 117,760 runs, 0 failed): **NO DEFAULT**,
   label MISSING (boom: without the best 2). Against holding the same average crypto steadily the tool's down days were
-  a median 0-4% smaller, a 10% cut ruled out at 31 of 32 cells (NO NOTICEABLE DIFFERENCE), its falls about the same or
+  a median 0-4% smaller, 31 of 32 cells labelled NO NOTICEABLE DIFFERENCE, a reading A0 found overconfident in that direction (M3), its falls about the same or
   deeper; a plain lower crypto share with the same calm returned 1-9 points a year more ([RESULTS.md](RESULTS.md)).
-  Next: one audit. Validate-window looks used: 0 (none planned). The test window is never read.
+  The audit ([AUDIT.md](AUDIT.md)): the run PASS, the numbers PASS, the wording corrected (R1, R2, C1-C5). The study is done. Validate-window looks used: 0 (none planned). The test window is never read.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.

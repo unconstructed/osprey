@@ -879,6 +879,7 @@ month" should cap this tool is the owner's call (section 17 Q2; the pinned answe
 | Range check | 2026-11-25 | `risk-officer` | **No market data**: no catalog loader called, nothing under `data/` or `results/` read. Read: this plan, the owner record of 2026-11-25, `config/risk_levels.yaml` through `portfolio.risk_limits`, the code of `portfolio.risk_limits`, `_breach_test`, `check_targets` and `trend.in_force`. A config-only scratch check of section 14 (under a second). Confirmed section 14 |
 | A0 | 2026-11-25 | the lead | **No market data.** A0 on synthetic panels (first seed range, 100 a set; section 13), then a recount of its boundary check on the same panels with mean blocks 60, 120, 250 and 500 (about 6 CPU-minutes, `a0_first_range/block_check.py`). Read its outputs and told the owner (amendment M3) |
 | Run 0 | 2026-11-25 | the lead | **Train window only** (Kraken and Binance, closes through 2023-01-01; no validate or test bar). `run.py` on commit `2a43cc4` (117,760 runs, 0 failed). Read its outputs and wrote RESULTS.md |
+| Audit | 2026-11-25 | `backtest-auditor` | **Train window only** (no bar after 2023-01-01 00:00 UTC). Read run 0's outputs and RESULTS.md; rebuilt the rule, four E1 copies, N and X from train bars with its own code; wrote AUDIT.md |
 
 **Validate-window looks used for keep-risk-steady: 0.**
 
