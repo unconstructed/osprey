@@ -235,3 +235,12 @@ renders it outside the looks table. Remove the blank line.
 | 17 | Data quality and snapshot | PASS | Snapshot and panel hashes reproduced; the one known missing close |
 
 Final test window: **not run**. Items 1-17 do not all pass, and the verdict is NO EDGE.
+
+> **Lead's correction, 2026-11-25 (after downvol-steady's audit found the same wording there).** Finding 8 says "N0
+> orders (s/2, s/2) at t0 and then only fixes limits". As `trend.always_in_n0` is written (TP section 9), N0 orders
+> the year's share at t0 only when the rule does not already hold those targets, that is, only when the rule was
+> stepped back at the year's start. Here that was 2018 and 2019 (q 0.25 and 0.75 at t0). In 2020, 2021 and 2022 the
+> rule held its full share, so N0 kept the rule's wallet as it had drifted (26%, 59% and 48% crypto at the year's first
+> close, against shares of 35%, 55% and 37%). Rebuilt with `trend.always_in_n0` on the train panel, N0 equals
+> `oos.parquet`'s N0_A bit for bit. No number, finding outcome or result of this audit changes; RESULTS.md now
+> describes N0 this way.

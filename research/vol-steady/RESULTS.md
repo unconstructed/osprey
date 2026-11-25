@@ -13,7 +13,7 @@
 **In plain words.** The rule holds BTC and ETH up to a crypto share, and steps back in quarters when crypto has been
 wilder than a target level. Over 2018-2022, out of sample:
 
-- **It made money:** +210%, with a worst fall of 47%. Holding the same mix without the scaling made +170%, with a
+- **It made money:** +210%, with a worst fall of 47%. The plan's holding comparison (N0, below) made +170%, with a
   worst fall of 44%.
 - **The edge over holding was small, and could be luck.** Its risk-adjusted return (Sharpe 0.80 against 0.72) beat
   holding by 0.08, but a test that resamples the history says a gap that size happens by chance about 1 time in 4.
@@ -48,7 +48,7 @@ volatility trend, a forecast, and volatility as a crash warning.
 |---|---|---|---|---|
 | S, the rule (walk-forward) | 0.80 | +210% | −47.3% | −14.7% |
 | R_0, S's schedule run as one book | 0.86 | +247% | −41.5% | −17.0% |
-| N0, always hold the fold's share s | 0.72 | +170% | −44.4% | −12.6% |
+| N0, holding: the rule's wallet at each year's start, set to the year's share s only if the rule had stepped back, then only limit fixes | 0.72 | +170% | −44.4% | −12.6% |
 | X, hold S's average mix of each fold | 0.98 | +391% | −45.0% | −22.6% |
 | B1, buy and hold BTC | 0.43 | +18% | −81.4% | −38.9% |
 | B2, 50/50 BTC/USDC monthly | 0.43 | +56% | −53.6% | −17.3% |
@@ -60,7 +60,7 @@ volatility trend, a forecast, and volatility as a crash warning.
 | ID | Question | Seed A | Seed B | Holds |
 |---|---|---|---|---|
 | E1 | Timing beats the same schedule shifted in time | rank p 0.019 (3 of 207 shifts at or above) | rank p 0.279 | A only |
-| E2 | Beats holding the same mix | D = +0.083, p 0.245 | D = +0.078, p 0.305 | No |
+| E2 | Beats holding (N0, as in the Numbers table) | D = +0.083, p 0.245 | D = +0.078, p 0.305 | No |
 | E3 | Cuts falls beyond holding less crypto | S −47.3% / MC p5 −69.4% against X −45.0% / −67.7% | S −45.4% / −66.9% against X −39.3% / −67.4% | No |
 | E4 | Survives doubled costs | S 0.79 > N0 0.72 | 0.66 > 0.59 | Yes |
 | E5 | Not fragile (seeds and check day) | (a) E1 and G5(a) differ between seeds; (b) every weekday keeps ≥ 0.7 × Sharpe | | No |
@@ -116,6 +116,15 @@ volatility trend, a forecast, and volatility as a crash warning.
   - the Sharpe with gas charged is 0.88 at 500 USD.
 - **Fills per parameter:** 45 kept fills for 3 parameters is 15 each, under the checklist's 30 (flagged in
   `summary.json`); 27 of the 45 are in 2018.
+- **What N0 is** (corrected 2026-11-25; wording only, no number changed). N0 is not a fresh "hold the share" each
+  year. It starts from the rule's own wallet at the year's start, buys the year's share s only if the rule was then
+  stepped back, and after that trades only to fix the limits. Rebuilt with `trend.always_in_n0` on the train panel, it
+  equals `oos.parquet`'s N0_A bit for bit:
+  - **2018 and 2019:** the rule was stepped back at the year's start (a quarter and three quarters of its share), so N0
+    bought the year's share (31% and 56% crypto);
+  - **2020, 2021 and 2022:** the rule held its full share, so N0 kept the rule's wallet as it had drifted: 26% crypto
+    at the first close of 2020 (share 35%), 59% in 2021 (share 55%; one limit fix, decided at the 4 May close) and 48%
+    in 2022 (share 37%; no trade all year).
 - **N0 never rebalances,** so part of E2's lead D is a rebalancing effect. This is the reviewed design, and E2 fails
   anyway.
 
