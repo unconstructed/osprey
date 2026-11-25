@@ -1244,6 +1244,7 @@ def boom_run(tmp_path_factory):
     run = base / "out" / "run0"
     return {
         "runs": pd.read_parquet(run / "runs.parquet"),
+        "series": pd.read_parquet(run / "series.parquet"),
         "spans": pd.read_parquet(run / "spans.parquet"),
         "decision": read_json(run / "decision.json"),
         "start": read_json(run / "start.json"),
@@ -1341,6 +1342,33 @@ def test_d2_s_boom_checks_run_d1_on_the_kept_windows_with_their_own_rowset(boom_
     assert returns == _my_year_returns(bars["KRAKEN"])
     ranked = _ranked(returns)
     assert ranked[:2] == [2018, 2017] and _ranked(_my_year_returns(bars["BINANCE"]))[:2] == [2018, 2020]
+    # the boom rowsets' span rows are cut by Kraken's ranking too (#77): each removal's kept return rows written out
+    # here (a row's bar day is its close minus 1 day), and V, the row count and p_calm recomputed from the series.
+    # Ranked on Binance's closes this seed would drop 2020 in place of 2017, which moves every row's V and count
+    series = boom_run["series"]
+    ret = {
+        (r.w, r.s, r.f, r.kind): np.asarray(r.ret)[1:]
+        for r in series[series["family"] == "KRAKEN 1x"].itertuples()
+    }
+    bar_year = np.array([(ts - pd.Timedelta(days=1)).year for ts in bars["KRAKEN"].index[1:]])
+    dd = lambda r: math.sqrt(math.fsum(min(v, 0.0) ** 2 for v in r.tolist()) / len(r))  # noqa: E731
+    for n, name in enumerate(R.BOOM, start=1):
+        keep = ~np.isin(bar_year, ranked[:n])
+        rows = int(keep.sum())
+        idx = hand_resampler(rows, R.FAST.resamples)
+        part = spans[(spans["family"] == "KRAKEN 1x") & (spans["rowset"] == name)]
+        assert len(part) == len(R.FAST.settings) * len(R.FAST.mixes)
+        for row in part.itertuples():
+            a, b = ret[(row.w, row.s, row.f, "rule")][keep], ret[(row.w, row.s, row.f, "X")][keep]
+            da, db = np.minimum(a, 0.0) ** 2, np.minimum(b, 0.0) ** 2
+            vs = np.array([0.5 * (np.log(np.mean(da[i])) - np.log(np.mean(db[i]))) for i in idx])
+            assert row.rows == rows and row.V == math.log(dd(a)) - math.log(dd(b)), (
+                name,
+                row.w,
+                row.s,
+                row.f,
+            )
+            assert row.p_calm == (1 + (vs >= 0).sum()) / (len(idx) + 1)
     kraken = sorted(
         set(runs[(runs["family"] == "KRAKEN 1x") & (runs["scope"] == "window")]["window"].tolist())
     )
