@@ -17,7 +17,10 @@ that costs, and it picks a suggested default by rules fixed in advance.
   amendment M2). The tiers passed on `71697da` (2750 passed, 100% branch coverage; the deep profile 2732 passed).
   **A0 ran on `71697da` (synthetic only, 100 panels a set, 4,056 s) and raised alarm A0-4**: on PG (volatility
   clusters with a real effect) the resampling was too confident in its lower tail, 96 of 400 boundary tests against
-  a limit of 30 (NC 20, NW 16; the upper tail 0, 17 and 13). A0-1, A0-2 and A0-3 did not fire. Stop rule 9: run 0
-  does not start; the owner decides the fix ([A0's outputs](a0_first_range/)). No market bar read for this study
-  yet. Validate-window looks used: 0 (none planned). The test window is never read.
+  a limit of 30 (NC 20, NW 16; the upper tail 0, 17 and 13). A0-1, A0-2 and A0-3 did not fire
+  ([A0's outputs](a0_first_range/)). Longer resampling blocks did not fix it (a recount at 120-500: 94-109). The
+  owner decided ([the decision](../../reports/director/2026-11-25-owner-answer-keeprisk-a0-alarm.md), amendment M3):
+  every decision rule stays as pinned (the error only makes D1 more cautious), and a setting labelled NO NOTICEABLE
+  DIFFERENCE, SMALLER BUT BELOW NOTICE or ROUGHER is shown to users with the CAN'T TELL sentence. Next: the tiers on
+  M3's commit, then run 0. No market bar read for this study yet. Validate-window looks used: 0 (none planned). The test window is never read.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.

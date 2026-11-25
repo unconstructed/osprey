@@ -721,7 +721,26 @@ look and that validate is known to be a rising market. Otherwise there is no loo
   section 7's (768 full-span runs, 40,192 copy pairs, 36,608 window runs, 10 index sets, 448 resamplings). Run 0 and
   A0 each re-time at their start. The timings are noisy: A0's DD-only pair, which does less work than the full pair,
   timed slower in all three, and it sets about 80% of A0's projected cost.
-- **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner's decision).
+- **Amendment M3** (2026-11-25, written after A0 and the owner's decision on its alarm, before run 0; no market bar
+  read for this study). A0 (below) raised alarm A0-4: on PG the paired resampling's lower tail was wrong on 96 of
+  400 boundary tests. It can label a setting NO NOTICEABLE DIFFERENCE, SMALLER BUT BELOW NOTICE or ROUGHER THAN
+  HOLDING LESS when the rule really cuts more; it did not over-claim CALMER (its upper tail: 0, 13 and 17 of 400 on
+  PG, NW and NC). A recount on A0's first-range panels with mean blocks 120, 250 and 500 left the lower tail at 94-109
+  (`a0_first_range/block_check.json`), so a longer block is no fix. The owner decided
+  ([the decision](../../reports/director/2026-11-25-owner-answer-keeprisk-a0-alarm.md)):
+  1. **Every decision rule is unchanged.** Section 9.4's labels are computed as pinned, and D1's rule 2 still excludes
+     a setting so labelled at a mix. The error makes D1 more cautious (toward NO DEFAULT), not less.
+  2. **What users see:** a setting labelled NO NOTICEABLE DIFFERENCE, SMALLER BUT BELOW NOTICE or ROUGHER THAN HOLDING
+     LESS is shown with the CAN'T TELL sentence of section 10, never its own. RESULTS.md reports the computed label
+     with this note.
+  3. **A0 is not rerun** on the second seed range: no statistic changed, and the owner's decision answers the alarm.
+  4. A0's first range and the block recount are prior looks (section 18). Nothing else changes.
+- **A0** (2026-11-25, on commit `71697da` after the three tiers passed on it with a clean tree; synthetic only, 100
+  panels a set, 4,056 s; outputs in `a0_first_range/`). Alarm A0-4 fired: the lower-tail boundary rate on PG was 96 of
+  400 (NW 16, NC 20; the upper tail 0, 13 and 17). A0-1: false CALMER on 0, 0 and 0 of 100 (NW, NS, NC). A0-2: a false
+  default on 0, 1 and 1. A0-3: E1 on NC at w 8, 10, 12 and 15% on 6, 1, 4 and 6. Power: CALMER at any w on 10 of 100
+  PG panels and 21 of 100 PR panels; E1 on 87-100 and 71-100. Amendment M3 holds the answer:
+  owner decision: reports/director/2026-11-25-owner-answer-keeprisk-a0-alarm.md
 
 ## 14. Allowed range (`risk-officer` confirmed 2026-11-25, before run 0, config only)
 
@@ -858,6 +877,7 @@ month" should cap this tool is the owner's call (section 17 Q2; the pinned answe
 | Plan | 2026-11-25 | this plan's author | **No market data**: no catalog loader called, nothing under `data/` or `results/` read. Read: P12's list. Accidental: P13. Synthetic experiments: appendix A (about 16 CPU-minutes) |
 | Other proposals | 2026-11-25 | two more proposal authors | **No market data.** The statistics-first and reuse-first proposals (not adopted; the reuse-first one was stopped unfinished). The statistics-first author ran about 18 CPU-minutes of synthetic experiments (scratch only) |
 | Range check | 2026-11-25 | `risk-officer` | **No market data**: no catalog loader called, nothing under `data/` or `results/` read. Read: this plan, the owner record of 2026-11-25, `config/risk_levels.yaml` through `portfolio.risk_limits`, the code of `portfolio.risk_limits`, `_breach_test`, `check_targets` and `trend.in_force`. A config-only scratch check of section 14 (under a second). Confirmed section 14 |
+| A0 | 2026-11-25 | the lead | **No market data.** A0 on synthetic panels (first seed range, 100 a set; section 13), then a recount of its boundary check on the same panels with mean blocks 60, 120, 250 and 500 (about 6 CPU-minutes, `a0_first_range/block_check.py`). Read its outputs and told the owner (amendment M3) |
 
 **Validate-window looks used for keep-risk-steady: 0.**
 
