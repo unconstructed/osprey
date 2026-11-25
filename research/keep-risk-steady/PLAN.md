@@ -671,6 +671,38 @@ Kraken validate (as protect-gains' V1), before any validate bar is read for this
 look and that validate is known to be a rising market. Otherwise there is no look.
 
 **Amendments:**
+- **Amendment M1** (2026-11-25, written after the build, its code review and the fixes, TESTING.md #75-#77; before
+  A1, A0 and run 0; no market bar read for this study). It changes no threshold, gate, grid, count or decision rule.
+  It pins where the plan's words leave room:
+  1. **x, the matched share (section 6),** is the correctly rounded mean of the in-force share over rows 0 .. n-2
+     (the exact sum, one rounding), not `math.fsum(share[0 .. n-2]) / (n - 1)`, which rounds twice. The two differ
+     only in the last bit, but for s = 0.40 on a 729-row window the formula gives 0.4 plus one ulp. A setting that
+     never steps would then have X differ from N, and a V_X of about 1e-16 of either sign that D1's rule 1 would
+     count as calmer about half the time. Section 12's identity (rule = X = N) and section 9.4's "X is N and V = 0"
+     need the exact mean (TESTING.md #75).
+  2. **Stop rule 8's A0 record:** "says no alarm" reads as the exact phrase `A0 alarms: none`, which `controls.py`
+     prints as its last line when no alarm fires (it prints `A0 alarms: A0-<n>, ...` when one does). A bare
+     "no alarm" is not a record. A line holding "to be written" (the placeholders below) is never a record. Only the
+     A0 item is read, with its wrapped lines, never the plan's other text.
+     - **Stop rule 9:** an A0 item that reports an alarm is refused unless it names an owner decision on file under
+       `reports/director/`, whatever else it says. It reports one if it holds "fired" or names an alarm (A0-1 ..
+       A0-4) as raised.
+     - The full reading is `run.py`'s `INTERPRETATIONS["prior_amendments"]` (TESTING.md #77).
+  3. **A0 measures the guarded copies and their mixes by DD only,** without the fee check. A0 checks the
+     statistics, which read DD alone. Run 0 checks the accounting on every run (section 11). With run 0's full
+     measures, A0's projection on this machine was 308 CPU-minutes, above stop rule 7's 300 (TESTING.md #76).
+  4. **A0's resampling** is run 0's: one index set from `default_rng(0)` over the train grid's 2189 return rows,
+     shared by every panel. Section 13's disjoint streams are the panels' market streams.
+  5. **A0's tests** are in `tests/test_keeprisk_run.py`, not a third file `tests/test_keeprisk_controls.py`
+     (section 12).
+  6. **The other readings** are in `lab/runner/keeprisk.py`'s `READINGS_PINNED`, `run.py`'s `INTERPRETATIONS` and
+     `controls.py`'s `READINGS`. They are recorded in each start record and covered by the config hash. Among them:
+     - **Section 7's pools as six families:** Kraken 1x, Binance 1x and Kraken 2x at 14 returns and 5,000 USD;
+       Kraken 1x at 7 and 28 returns, with copies and labels; and Kraken 1x at 500 USD, whose full span gets V and
+       RISK-X's p-values only, with no copies and no label.
+     - **The executor's Monday checks** include every Monday of the run, the rows before panel row 14 among them.
+     - **An X_eq whose V is MISSING** is logged as not run and counted.
+     - **Copy 0** is run in every full span as an uncounted check.
 - **A1** (to be written after the tiers pass on the build's commit; synthetic bars only).
 - **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner's decision).
 
