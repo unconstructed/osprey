@@ -71,7 +71,7 @@ An **iOS and Android** crypto app where users own their wallet and our strategie
     - a mix that fell more than 35% in the past is shown as Balanced or Bold, not Steady.
   - **Still open about the label** ([Features](features.md#the-risk-label-of-a-mix)): which number decides it; where Balanced ends and Bold begins (both budgets TBD); Balanced's required stop-loss; Bold's empty coin list; and whether the tool works the same way under those labels.
   - **Still open otherwise:** whether a sell-only limit fix may go through during a pause; what happens to a wallet's default when the wallet crosses 5,000 USD (proposal: set when the tool is set up, never changed by the app afterwards, and the customer can change it); and the recheck of both defaults with measured Base costs before customers see them.
-- [ ] Strategy settings: accept a per-customer decision check outside Nautilus, or keep Nautilus as the only decision-maker (fixed settings at launch, or one Nautilus node per approved combination)? See [Technical: Strategy settings](technical.md#strategy-settings)
+- [x] Strategy settings: a per-customer decision check outside Nautilus, running the same decision library as the Nautilus strategy and pinned by a parity test (owner, 2026-11-25, option B). See [Technical: Strategy settings](technical.md#strategy-settings)
 - [ ] Subscription price, given gas sponsorship, Privy and RPC costs
 - [ ] Subscriptions: in-app purchase only, or also US web checkout?
 - [ ] Fee model: subscription only, or also a small swap fee later
