@@ -317,6 +317,21 @@ Owned by `ml-researcher`. Full approach in [research-methods.md: Prediction mode
 - Every model is compared against naive baselines (last value, rolling average) and judged by **strategy profit after costs in Nautilus**, not by forecast error alone.
 - Models are trained offline, versioned in MLflow, and loaded read-only by a Nautilus strategy. No retraining inside a backtest window; walk-forward retraining copies the production schedule.
 
+## Reporting back to the owner (all agents)
+
+Owner's instruction, 2026-11-25. Every agent and session ends a task with this report, in plain English, short
+enough to read on a phone. Details stay in the files; the report links to them.
+
+```
+**Tasks run:** one line per task.
+**What was done:** results, with the key numbers. Say plainly what failed or was skipped.
+**Why:** one or two lines: the reason for the work, or the rule or decision it follows.
+**Questions for you:** numbered, each answerable in a line; put a recommendation first. "None" if none.
+**What's next:** the next one to three steps, and whether each waits on an answer above.
+```
+
+No jargon without a plain explanation, no long tables, nothing the owner has to scroll back to understand.
+
 ## Hard rules (all agents)
 
 1. **No secrets in code or chat.** Keys load from env vars or a git-ignored `.env`. Never print or log a key.
