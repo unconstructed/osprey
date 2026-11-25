@@ -210,7 +210,7 @@ def test_the_plan_s_counts_and_grids_are_pinned():
     assert R.FAST.settings == K.W_VALUES and R.FAST.resamples == 500 and R.FAST.copy_stride == 64
     assert (R.CPU_MINUTES_MAX, R.A0_CPU_MINUTES_MAX, R.MAX_AMENDMENTS, R.STRESS, R.BOOK_CHECK_EVERY) == (
         240.0,
-        300.0,
+        600.0,
         2,
         2.0,
         9,
@@ -1826,10 +1826,12 @@ def test_a0_alarm_limits_and_the_panel_count():
         "count": 8,
         "boundary": 24,
     }
-    assert C.choose_panels({"100": 300.0, "80": 1.0}, False) == 100
-    assert C.choose_panels({"100": 300.0001, "80": 300.0}, False) == 80
+    assert C.choose_panels({"100": 600.0, "80": 1.0}, False) == 100
+    assert C.choose_panels({"100": 600.0001, "80": 600.0}, False) == 80
     with pytest.raises(R.Refusal, match="stop rule 7"):
-        C.choose_panels({"100": 400.0, "80": 300.5}, False)
+        C.choose_panels({"100": 800.0, "80": 600.5}, False)
+    # amendment M2: A1's projections on 6f91f46 (above the old 300 at both sizes) start with 100 panels
+    assert C.choose_panels({"100": 480.8, "80": 384.7}, False) == 100
     assert C.choose_panels({"100": 1e9, "80": 1e9}, True) == 1
 
 

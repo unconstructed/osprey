@@ -703,7 +703,23 @@ look and that validate is known to be a rising market. Otherwise there is no loo
      - **The executor's Monday checks** include every Monday of the run, the rows before panel row 14 among them.
      - **An X_eq whose V is MISSING** is logged as not run and counted.
      - **Copy 0** is run in every full span as an uncounted check.
-- **A1** (to be written after the tiers pass on the build's commit; synthetic bars only).
+- **Amendment M2** (2026-11-25, written after A1, before A0 and run 0; no market bar read for this study). **Stop rule
+  7's A0 limit is 600 CPU-minutes, not 300.** The owner raised it on 2026-11-25
+  ([the decision](../../reports/director/2026-11-25-owner-answer-keeprisk-a0-budget.md)) after A1 (below) projected
+  A0 at 405-481 CPU-minutes with 100 panels a set and 324-385 with 80, both above 300, so A0 could not start at
+  either size. The A0 cost estimate above (about 20 CPU-seconds a panel) was low: A1 measures about 50-58. The
+  fallback rule keeps its form at the new limit: 100 panels a set when the projection at 100 is at most 600, else 80
+  when the projection at 80 is, else A0 refuses. Nothing else changes: the five sets, their seeds and sizes, the
+  alarms and their limits, the resampling, the measures, run 0's limit of 240 CPU-minutes, the gates, the grid and
+  every decision rule. `run.py`'s `A0_CPU_MINUTES_MAX` is 600.
+- **A1** (2026-11-25, on commit `6f91f46` after the three tiers passed on it with a clean tree; synthetic bars only,
+  `run.py --time`, three timings on an idle 4-core machine). Run 0: 38.7, 27.3 and 31.5 CPU-minutes, under its limit
+  of 240. A0: 480.8, 448.2 and 404.9 CPU-minutes at 100 panels a set, and 384.7, 358.6 and 324.0 at 80, above the
+  then limit of 300 (amendment M2 raises it to 600). The first timing's medians (3 repetitions): a full-span rule run
+  with its checks and measures 37.6 ms, a guarded copy and its mix with their measures 36.2 ms, A0's copy and mix by
+  DD only 43.6 ms, a window run 18.7 ms, one index set of 10,000 0.72 s and one RISK-X 0.33 s; its counts are
+  section 7's (768 full-span runs, 40,192 copy pairs, 36,608 window runs, 10 index sets, 448 resamplings). Run 0 and
+  A0 each re-time at their start.
 - **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner's decision).
 
 ## 14. Allowed range (`risk-officer` confirmed 2026-11-25, before run 0, config only)

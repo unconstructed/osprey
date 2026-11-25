@@ -6,8 +6,8 @@ Never reads the catalog. Writes only into a scratch folder (never results/keep-r
     uv run python research/keep-risk-steady/controls.py --out-dir <scratch> --second-range   # after a first alarm
     uv run python research/keep-risk-steady/controls.py --out-dir <scratch> --fast           # tests only: tiny sizes
 
-Before any panel is built it re-times the built code (``run.measure_throughput``) and projects A0's cost: at most 300
-CPU-minutes with 100 panels a set starts with 100; else at most 300 with 80 panels a set starts with 80 (the plan's
+Before any panel is built it re-times the built code (``run.measure_throughput``) and projects A0's cost: at most 600
+CPU-minutes with 100 panels a set starts with 100; else at most 600 with 80 panels a set starts with 80 (the plan's
 pinned fallback); else it refuses (exit 2, nothing written). A ``--fast`` run records the projection and never refuses.
 
 Then, on each panel of the five sets (100 each; section 13's seeds, all streams from 200000 on, or + 100000 with
@@ -99,8 +99,8 @@ READINGS = {
     "resampling_seed": "Each panel's RISK-X uses run 0's procedure, one index set from default_rng(0) (section 9.2) "
     "over the 2189 return rows of the train grid, shared by every panel; the disjointness of section 13 is the "
     "panels' market streams'",
-    "fallback": "100 panels a set when the projection at 100 is at most 300 CPU-minutes; else 80 when the projection "
-    "at 80 is; else refused (stop rule 7)",
+    "fallback": "100 panels a set when the projection at 100 is at most 600 CPU-minutes (the owner's limit, raised "
+    "from 300 by amendment M2); else 80 when the projection at 80 is; else refused (stop rule 7)",
     "alarm_limits": "'more than 10 of 100' and 'more than 30 of 400' as more than n // 10 and more than 3 n // 10 "
     "(80 panels: 8 and 24)",
     "boundary": "V-bar is the mean (math.fsum) of the other panels' finite V at that w; a panel with a MISSING V is "
