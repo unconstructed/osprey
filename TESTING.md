@@ -426,10 +426,11 @@ by open time (osprey: close time); `rel_ret_20` and the `benchmark` argument of 
   show those areas have survivors.
 - 5.5: the full demo rerun, the committed report and the AGENTS.md figures. The numbers will change: the
   generator, the fill timing and the cost model all differ from the starter's.
-- AGENTS.md (the owner's file, not edited in the merge) is out of date in two places: the `on_bar` example
+- ~~AGENTS.md (the owner's file, not edited in the merge) is out of date in two places: the `on_bar` example
   computes `vol_target / forecast_vol`, but forecasts are per bar now, so a strategy must annualise them first
   (× √365 for daily bars, × √8760 for hourly); and the starter-module table still describes the contract as
-  `ret, position, turnover` with close fills (4a.5).
+  `ret, position, turnover` with close fills (4a.5).~~ Both fixed by the director's milestone-2 review
+  (`reports/director/2026-11-25-milestone2.md`).
 - `volume_z_20` saturation: a decision for `ml-researcher` (section 4, findings that are not bugs).
 - `artifact.save_model` doesn't check that `features` match the columns the model was fit on, or that `kind`
   matches the model type (osprey's untested draft did both). Worth a check and a test (models owner).
@@ -437,7 +438,9 @@ by open time (osprey: close time); `rel_ret_20` and the `benchmark` argument of 
   `test_train_props.py` version now pins the purge, so it can be tightened the same way or dropped.
 - Live/backtest parity with Nautilus: `float(Price)` differs in the last bit from parsing the same decimal
   string for 4223 of 20000 random 2-decimal prices, so the batch path (catalog loader) must convert prices the
-  same way as the live path (milestone 2).
+  same way as the live path (milestone 2). Both now call `float()` on the `Price`: `lab.data.catalog.load_bars`
+  and `FeatureBuffer.update`. No test yet feeds catalog bars to a `FeatureBuffer` and compares the result with
+  `compute_features` on `load_bars`'s output; add one with the first model-using strategy.
 
 ---
 
@@ -699,6 +702,9 @@ Use these when you add a strategy, feature, model or runner.
 | **Calibration under the null** | Simulate many skill-less cases; the false-positive rate must match the advertised rate within a binomial band | `test_psr_false_positive_rate_is_about_5pct` |
 | **Oracle** | A forecaster that equals the truth must score perfectly | `test_cpcv_rows_and_identical_test_sets` |
 | **Crash recovery** | Simulate the leftovers of a killed process | `test_leftovers_from_a_crashed_run_are_ignored` |
+| **Real prices are discrete** | Draw prices with the few decimals real quotes have, with flat bars and exact returns to an earlier price. Continuous synthetic prices never repeat, and an exact repeat is where round-off decisions live | #61: on the Kraken hourly bar closing 2020-04-09 19:00 UTC a 50/50 rebalance filled at an open of 7299.4, exactly the previous fill's open 30 bars earlier, so the reference traded a 3.3e-16 leg and paid gas for it; no synthetic draw reaches that. About 1 hourly close in 3,500 equals the close 30 hours earlier |
+| **Real-data parity** | Run a new or changed engine against the reference on real catalog bars, train window only (Kraken and Binance, BTC and ETH, daily and hourly, costs at 1x and 2x); every disagreement becomes a hand-built regression test | `scripts/nautilus_parity_real.py` |
+| **Stand-ins for recorded state** | A test that copies `config/`, a PLAN.md or a RUNLOG sets every value it depends on by key, inside the named entry, and never depends on what the repo has recorded so far (budgets, amendments, runs) | `edit_steady_entry` and `set_steady_budget` (#55), `real_folders` (#48), `without_prior_rows` (#59) |
 
 Optuna objectives in tests must be module-level functions, and searches in tests use
 `n_workers=1`.

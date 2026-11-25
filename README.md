@@ -2,14 +2,14 @@
 
 This is where our trading strategies are built, simulated at scale, validated against overfitting and luck, and approved. Approved strategies are exported as pinned configs. They run in production as NautilusTrader strategy nodes on paper "model accounts". Nothing in this repo ever places a real order.
 
-[AGENTS.md](AGENTS.md) calls this repo the Strategy Lab (`strategy-lab`). This checkout is named `osprey`. The readers are the owner and the agent team: `data-engineer`, `quant-researcher`, `ml-researcher`, `backtest-auditor` and `risk-officer`.
+[AGENTS.md](AGENTS.md) calls this repo the Strategy Lab (`strategy-lab`). This checkout is named `osprey`. The readers are the owner and the agent team (the role files in `.claude/agents/`).
 
 ## Status
 
 > [!IMPORTANT]
-> This repo holds only the docs, the `.gitignore` and the results dashboard.
-> **The starter code is not in this repo yet.** That means `lab/`, its tests, `scripts/demo.py` and its `pyproject.toml`. The owner has it. Copy it in first: see [HOWTO: Set up the project](HOWTO.md#set-up-the-project).
-> Milestones 0 to 5 are all not started.
+> The starter code was merged into this repo on 2026-11-19 ([TESTING.md section 4a](TESTING.md#4a-merge-with-the-starter-code-2026-11-19)).
+> Milestone 1 (data) is done. Milestone 2 (costs and the Nautilus runner) was finished on 2026-11-25 ([report](reports/milestone2/2026-11-25.md)). Milestone 0 is open for TESTING.md 5.4 (mutation testing beyond `lab/validation/`) and 5.5 (the full demo rerun). Milestones 3 to 5 are not started.
+> Four scouting studies have run on the reference engine, in `research/`: dip-timing, rebalance-steady and trend-steady (each NO EDGE) and hold-mix-cap (defaults for the hold-this-mix tool). None is a NautilusTrader result, and no strategy is approved.
 > Live status: [dashboard/index.html](dashboard/index.html). Open it in a browser from your clone. GitHub shows the HTML source, not the page.
 
 What is in this repo today:
@@ -20,6 +20,13 @@ What is in this repo today:
 | [HOWTO.md](HOWTO.md) | Task-by-task guide, with the status of each task |
 | [AGENTS.md](AGENTS.md) | The owner's instructions to the agent team |
 | [TESTING.md](TESTING.md) | Testing standard, bug log and the first work order |
+| [research-methods.md](research-methods.md) | Why the pipeline looks the way it does |
+| `.claude/agents/` | The role files |
+| `config/` | Splits, costs (placeholders until measured) and risk levels |
+| `lab/`, `tests/`, `scripts/`, `pyproject.toml`, `uv.lock` | The lab's code, its tests and helper scripts |
+| `research/` | Pre-registered studies: plans, scripts, results and audits (all SCOUTING) |
+| `reports/` | Data, demo, milestone, risk-officer and director reports |
+| [docs/app/](docs/app/README.md) | The Osprey app plan |
 | `.gitignore` | The list from AGENTS.md setup step 3, with `/data/`, `/results/` and `/mlruns/` anchored to the repo root so `lab/data/` is not ignored |
 | `dashboard/` | Results dashboard: template, hand-edited status file, generated page ([dashboard/README.md](dashboard/README.md)) |
 | [scripts/build_dashboard.py](scripts/build_dashboard.py) | Builds `dashboard/index.html` from files in this repo |
@@ -50,10 +57,9 @@ flowchart TD
 
 ## Quick start
 
-This needs the starter code. Machine setup (uv, Python 3.13, the NautilusTrader reference clone) is in [HOWTO: Set up your machine](HOWTO.md#set-up-your-machine).
+Machine setup (uv, Python 3.13, the NautilusTrader reference clone) is in [HOWTO: Set up your machine](HOWTO.md#set-up-your-machine).
 
 ```bash
-# First copy the starter code into this checkout (HOWTO: Set up the project).
 uv sync                                                    # install everything in pyproject.toml
 uv run python -c "import nautilus_trader as nt; print(nt.__version__)"   # must start with "2."
 uv run pytest -m "not slow" -n auto                        # quick tier (every change)
@@ -66,7 +72,7 @@ Then **start with [TESTING.md section 5](TESTING.md#5-open-work-in-order). It is
 
 ## What's built and what's left
 
-"Built" means it exists in the starter code, which is not in this repo yet.
+"Built" means it is in `lab/` today.
 
 | Part | What it does | Status |
 |---|---|---|
@@ -76,9 +82,9 @@ Then **start with [TESTING.md section 5](TESTING.md#5-open-work-in-order). It is
 | `lab/models/` | Features, labels, baselines, training, artifacts, live parity | Built (starter code) |
 | `lab/data/loaders.py`, `lab/data/synthetic.py` | Kraken and Binance loaders; synthetic bars for tests and demos | Built (starter code) |
 | `scripts/demo.py` | End-to-end demo on synthetic data | Built (starter code) |
-| `lab/data/build.py` | Downloaders, quality checks, catalog writer, `SNAPSHOT.json` | To build (milestone 1) |
+| `lab/data/build.py` | Downloaders, quality checks, catalog writer, `SNAPSHOT.json` | Built (milestone 1) |
 | `lab/costs/` | Nautilus fee model for Base DEX trading (`fees.py`: pool + aggregator + size-based slippage + gas, from `config/costs.yaml`; slippage charged as a fee, so no fill model is needed) | Built (milestone 2, 2026-11-25) |
-| `lab/runner/nautilus.py` | `BacktestFn` on a NautilusTrader v2 `BacktestEngine` (one engine per run, disposed after use), running the reference rules' own decision code; passes the contract suite and the parity test; throughput in `scripts/nautilus_throughput.py` | Built (milestone 2, 2026-11-25); bars come from `lab.data.catalog.load_bars` |
+| `lab/runner/nautilus.py` | `BacktestFn` on a NautilusTrader v2 `BacktestEngine` (one engine per run, disposed after use), running the reference rules' own decision code; passes the contract suite and the parity test; throughput in `scripts/nautilus_throughput.py` | Built (milestone 2, 2026-11-25); bars come from `lab.data.catalog.load_bars`. Single asset only: the multi-asset runner is milestone 3 |
 | MLflow logging | Each trial (milestone 2) and each model version (AGENTS.md states no milestone) | Trials built (milestone 2, 2026-11-25: `lab/tracking/mlflow_log.py`, a SQLite store at `mlruns/mlflow.db`); model versions still to do |
 | `strategies/` | The three launch strategies as Nautilus strategies | To build (milestone 3) |
 | Audits on real data | Search and validation with the Nautilus runner; first audit reports | To build (milestone 4) |
@@ -101,7 +107,7 @@ From [AGENTS.md](AGENTS.md#milestones). Live status per milestone is on the dash
 
 ## Repo layout
 
-From [AGENTS.md](AGENTS.md#repo-layout), plus this repo's own files. `(here)` marks what exists in this repo today. `(built)` is in the starter code, which is not here yet. `(to build)` is not written yet.
+From [AGENTS.md](AGENTS.md#repo-layout), plus this repo's own files. `(here)` and `(built)` mark what exists today; `(to build)` is not written yet.
 
 ```
 osprey/                          # AGENTS.md calls it strategy-lab/
@@ -117,9 +123,10 @@ osprey/                          # AGENTS.md calls it strategy-lab/
 │   └── risk_levels.yaml         # drawdown budgets and coin lists per risk level
 ├── dashboard/                   # (here) template.html, status.json, README.md, index.html (generated)
 ├── lab/
-│   ├── data/                    # loaders (built), synthetic test data (built); downloaders + catalog writer (to build)
-│   ├── costs/                   # Nautilus fee and fill model subclasses for Base DEX trading (to build)
-│   ├── runner/                  # BacktestFn interface + reference backtester (built); Nautilus runner (to build)
+│   ├── data/                    # loaders, downloaders, quality checks, catalog writer, panels, synthetic test data (built)
+│   ├── costs/                   # Nautilus fee model for Base DEX trading (built, milestone 2)
+│   ├── runner/                  # BacktestFn interface, reference engines, single-asset Nautilus runner (built)
+│   ├── tracking/                # MLflow logging of search trials (built, milestone 2)
 │   ├── search/                  # Optuna studies, walk-forward optimization, stable regions, reports (built)
 │   ├── validation/              # purged splits, CPCV, DSR, PBO, Monte Carlo (built)
 │   ├── models/                  # features, labels, baselines, training, artifacts, live parity (built)
@@ -159,11 +166,8 @@ From [AGENTS.md: Hard rules](AGENTS.md#hard-rules-all-agents). Read the full lis
 | [AGENTS.md](AGENTS.md) | The owner's instructions: pipeline, data, costs, splits, risk levels, gates, roles, milestones, commands |
 | [TESTING.md](TESTING.md) | Testing standard, bug log, open test work (the first work order), definition of done |
 | [dashboard/README.md](dashboard/README.md) | What the dashboard shows and how to rebuild it |
-
-Not in this repo:
-
-- `research-methods.md`. AGENTS.md links to it several times and says to read it first, but it isn't here yet. Those links are broken until it is added. Ask the owner for it.
-- The app docs (`../caas-app/README.md`). They live in the app's repo, outside this one.
+| [research-methods.md](research-methods.md) | Why the pipeline looks the way it does: mass simulation, validation, prediction models |
+| [docs/app/README.md](docs/app/README.md) | The Osprey app plan: features, product, technical, business, repositories |
 
 ## Dashboard
 

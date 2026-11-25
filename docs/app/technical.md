@@ -128,7 +128,7 @@ Its worst fall is a Nautilus backtest on past prices with swap fees, slippage an
 
 These backtests need a Nautilus rebalancing backtest with the lab's cost model. Both wait on the lab's milestone 2 (the Nautilus runner and the fee and fill models), and the costs are placeholders until measured. Rule backtests on our servers only arrive in Phase 2, so for a Phase 1 launch the table is computed ahead of time; who computes it is not decided yet. As with rules, the live check and the backtests should use the same rebalancing logic, so a mix behaves the same in both.
 
-*Decided (owner, 2026-11-25):* the per-customer check (option B above). *Open:* does it run in the rules service or in the trade router? Before production, AGENTS.md now requires at least 4 weeks on paper model accounts at the default and at the riskiest combination in the approved range. It doesn't say whether the second account keeps running afterwards for the live record. The owner can still drop that second account (director report, decision 2).
+*Decided (owner, 2026-11-25):* the per-customer check (option B above), written in Python in the rules service, importing the lab's decision functions from its published package (owner, 2026-11-25). *Open:* does it run in the rules service or in the trade router? Before production, AGENTS.md now requires at least 4 weeks on paper model accounts at the default and at the riskiest combination in the approved range. It doesn't say whether the second account keeps running afterwards for the live record. The owner can still drop that second account (director report, decision 2).
 
 ### Customer rules and advanced mode
 

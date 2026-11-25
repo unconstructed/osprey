@@ -55,7 +55,7 @@ Component descriptions are in [Technical: Components](technical.md#components).
 
 **Why one repo for the app and the backend:** the signal, the API and the rule-record format are defined once in `packages/shared`; a change that touches the API and a screen ships as one reviewed commit; one agent team keeps one CI and one set of rules.
 
-**Languages:** TypeScript for the app and the services (one language end to end, with the Privy, 0x and viem SDKs for Base). Python only in `services/engine`, because Nautilus strategies are Python.
+**Languages:** TypeScript for the app and most services (with the Privy, 0x and viem SDKs for Base). Python in `services/engine`, because Nautilus strategies are Python, and in `services/rules` (owner, 2026-11-25): the per-customer decisions import the lab's own decision functions from its published package, so the app and the backtests decide with the same code rather than a port that could drift.
 
 **Money-path protection:** `CODEOWNERS` requires the owner's approval on `services/trade-router`, `services/risk-engine`, `services/permissions` and the signal schema. A different agent reviews those folders than the one that wrote them, and every money path carries the tests listed in [Technical: Agent team rules](technical.md#agent-team-rules).
 

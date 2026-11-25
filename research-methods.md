@@ -34,17 +34,17 @@ With a settings range ([AGENTS.md: Validation gates](AGENTS.md#validation-gates)
 
 | Job | Tool | Why | Notes |
 |---|---|---|---|
-| Engine for every result that counts | **NautilusTrader v2** | Same strategy code in backtest, paper and live; v2 supports custom fee and fill models in Python, which we need for Base swap costs | In v2, a `BacktestNode` runs one configuration; run many in parallel processes |
+| Engine for every result that counts | **NautilusTrader v2** | Same strategy code in backtest, paper and live; v2 supports custom fee and fill models in Python, which we need for Base swap costs | The lab builds one `BacktestEngine` per run (a `BacktestNode` builds the same engine from one configuration); run many in parallel processes. Measured on one core (2026-11-25): about 60,000 daily (12,000 with a fill on every bar) or 6,000-8,000 hourly full-history runs per hour, 10-25x slower than the reference engine |
 | Parameter search | **Optuna** | Bayesian search (TPE) finds good regions far faster than exhaustive grids; parallel across processes and machines | Journal file storage on one machine; Postgres storage across machines |
 | Scale-out | **Ray** (Ray Tune) | Turns the same sweep into a multi-machine job; supports AWS spot instances | Only once one machine is too slow |
-| Experiment tracking | **MLflow** | Every trial's parameters, data snapshot, code commit and metrics in one place; integrates with Ray Tune | The trial count feeds the Deflated Sharpe Ratio |
+| Experiment tracking | **MLflow** | Every trial's parameters, data snapshot, code commit and metrics in one place; integrates with Ray Tune | The trial count feeds the Deflated Sharpe Ratio. The local store is SQLite, `mlruns/mlflow.db` (MLflow 3.18 refuses plain-folder stores); browse it with `uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db` |
 | Results analysis | **Parquet + DuckDB / Polars** | Query hundreds of thousands of trial rows in seconds | One row per trial |
 | Overfitting statistics | **ml4t-diagnostic** or **purgedcv**, cross-checked by our own tested code | Deflated Sharpe Ratio, Probability of Backtest Overfitting, combinatorial purged cross-validation | Libraries are young; verify against known examples |
 | Prediction models | **LightGBM**, scikit-learn; **statsforecast** baselines; pretrained time-series models (Chronos-2, TimesFM 2.5, Moirai 2) as zero-shot baselines | Gradient boosting is the workhorse for tabular market features; pretrained models are cheap to test | Judge everything by trading profit after costs |
 | Optional fast scout | **vectorbt** (open-source edition) | Vectorized engine: thousands of simple signal combinations in seconds | Ideas only, in `research/`. Anything promising is rebuilt in Nautilus. Add it only if Nautilus sweeps become the bottleneck |
 | Data | Kraken OHLCVT, Binance public data, Coinbase REST (free); Tardis, CoinAPI (paid, both have Nautilus integrations) | Free sources cover daily and hourly bars for years | Paid tick data only if a strategy needs it |
 
-**Why not a second engine?** We chose one engine to keep things simple. The cost is speed: an event-driven engine is slower than a vectorized one. Smart search (Optuna) and parallel processes recover most of that. If sweeps still take too long, vectorbt can scout ideas, but its numbers never go into a report.
+**Why not a second engine?** We chose one engine to keep things simple. The cost is speed: an event-driven engine is slower than a vectorized one. Smart search (Optuna) and parallel processes recover most of that. If sweeps still take too long, vectorbt can scout ideas, but its numbers never go into a report. The lab's small pure-Python reference engines serve tests, demos and scouting (`lab/runner/reference.py` is pinned to Nautilus by a parity test; the multi-asset `portfolio.py` is not yet); a result and the luck controls it is judged against run on one engine ([AGENTS.md: Running many simulations](AGENTS.md#running-many-simulations), rule 6).
 
 ## Validation methods
 
@@ -90,7 +90,7 @@ With a settings range ([AGENTS.md: Validation gates](AGENTS.md#validation-gates)
 | B | One large cloud machine (many cores, spot pricing) running the same code | A study takes more than a day on one machine |
 | C | Ray cluster on AWS spot instances, Optuna on Postgres storage, MLflow tracking server | Only when step B isn't enough |
 
-- **Measure before scaling:** time one full-history backtest per strategy and record trials per hour per core. That number decides whether a sweep is a laptop job or a cloud job.
+- **Measure before scaling:** time one full-history backtest per strategy and record trials per hour per core. That number decides whether a sweep is a laptop job or a cloud job. The first numbers, for the single-asset Nautilus runner, are in [reports/milestone2/2026-11-25.md](reports/milestone2/2026-11-25.md).
 - **Spot instances are fine:** every trial is independent and logged, so an interrupted machine only loses its current trial.
 - **Budget guard:** set a monthly cloud spending cap before step B; the owner approves anything above it.
 
