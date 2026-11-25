@@ -7,4 +7,6 @@ Read these before doing anything:
 
 Start with TESTING.md section 5 unless the owner says otherwise. The role agents are in `.claude/agents/`; use the one whose job matches the task, and run `director` after each milestone.
 
-Every report back to the owner uses the five-part format in AGENTS.md "Reporting back to the owner": tasks run, what was done, why, questions, what's next.
+Every report back to the owner uses the format in AGENTS.md "Reporting back to the owner": tasks run, what was done, why, token cost, questions, what's next.
+
+Tokens cost the owner money: before any agent, workflow or long task, give a rough token estimate and wait for an OK (AGENTS.md "Token cost: warn first").

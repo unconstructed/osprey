@@ -369,11 +369,27 @@ enough to read on a phone. Details stay in the files; the report links to them.
 **Tasks run:** one line per task.
 **What was done:** results, with the key numbers. Say plainly what failed or was skipped.
 **Why:** one or two lines: the reason for the work, or the rule or decision it follows.
+**Token cost:** tokens written and re-read from cache for this task, and the estimate given before it.
 **Questions for you:** numbered, each answerable in a line; put a recommendation first. "None" if none.
 **What's next:** the next one to three steps, and whether each waits on an answer above.
 ```
 
 No jargon without a plain explanation, no long tables, nothing the owner has to scroll back to understand.
+
+### Token cost: warn first (owner, 2026-11-25)
+
+Tokens cost the owner money. Keep every task lean, and warn before spending:
+
+1. **Estimate before you start.** Before launching an agent, a workflow, a background job or any task likely to
+   write more than about 50,000 tokens or run longer than about 15 minutes, tell the owner the rough token cost (tokens
+   written, and tokens re-read from cache as the context grows) and wait for an OK. The same goes for adding scope to
+   a running job (more rounds, more analysis).
+2. **Pick the cheapest way that does the job.** Do small things directly instead of through an agent; use a lower
+   effort setting unless the work needs more; brief agents to wait with one long wait instead of frequent checks, to
+   skip analysis the task does not need, and to read only the parts of files they need. Long agent runs cost most in
+   re-reading their own growing context on every step.
+3. **Report what it cost** in the "Token cost" line above, next to the estimate. If a task is going well past its
+   estimate, stop and tell the owner before going on.
 
 ## Hard rules (all agents)
 
@@ -386,7 +402,7 @@ No jargon without a plain explanation, no long tables, nothing the owner has to 
 7. **Deterministic and traceable.** Seed all randomness; every trial records data snapshot ID, git commit and seed.
 8. **Every trial is logged**, including failures and abandoned variants. Hiding trials inflates results.
 9. **Spot only.** No leverage, shorting, market making or arbitrage; only coins on the risk level's list.
-10. **Ask the owner before** adding a dependency, changing `config/splits.yaml`, `config/costs.yaml` or `config/risk_levels.yaml`, or running anything that will cost money (cloud machines, paid data).
+10. **Ask the owner before** adding a dependency, changing `config/splits.yaml`, `config/costs.yaml` or `config/risk_levels.yaml`, or running anything that will cost money (cloud machines, paid data, or a large token spend: see "Token cost: warn first").
 11. **No result from failing code.** A backtest, search or audit only counts if the full test tier passed on that commit. New features, models, strategies and runners ship with the tests [TESTING.md](TESTING.md) section 7 describes, including a tamper-the-future test.
 
 ## Desk roles
