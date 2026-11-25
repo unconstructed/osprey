@@ -10,6 +10,7 @@ that costs, and it picks a suggested default by rules fixed in advance.
 
 - Plan: [PLAN.md](PLAN.md), the pre-registration (2026-11-25), modelled on buy-the-dip's plan, with the ride statistic
   of the 2026-11-24 design note adapted to fixed settings.
-- Status 2026-11-25: plan committed; `risk-officer` confirmed the allowed range (section 14). No code, no run, and no
-  market bar read for this study yet. Validate-window looks used: 0 (none planned). The test window is never read.
+- Status 2026-11-25: plan committed; `risk-officer` confirmed the allowed range (section 14). Code and tests built
+  (`lab/runner/keeprisk.py`, `run.py`, `controls.py`; TESTING.md #75, #76), synthetic data only. No run, and no market
+  bar read for this study yet. Validate-window looks used: 0 (none planned). The test window is never read.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.
