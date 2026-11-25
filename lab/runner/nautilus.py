@@ -197,13 +197,15 @@ class _RuleStrategy(Strategy):
                 f"{v_open:.4g} USD: it cannot pay them (raise capital_usd or check the cost model)"
             )
         want = self.target * (v_open - fee) / o  # coin units that hold exactly the target after the fee
+        # Sells are capped at the exact coin balance: a float balance can round up by one 1e-12 step (#62).
+        held = Decimal(str(self.portfolio.account(VENUE).balance_total(COINX).as_decimal()))
         if self.target == 0.0:
-            side, qty = OrderSide.SELL, Quantity(coin, PRECISION)
+            side, qty = OrderSide.SELL, _units(held)
         elif want > coin:
             side = OrderSide.BUY
             qty = _units(min(Decimal(repr(want - coin)), _affordable(self.cash_money(), fee, o)))
         else:
-            side, qty = OrderSide.SELL, _units(coin - want)
+            side, qty = OrderSide.SELL, _units(min(Decimal(repr(coin - want)), held))
         if float(qty) == 0.0:  # a round-off leg below 1e-12 units: nothing Nautilus can trade
             return
         order = self.order_factory.market(INSTRUMENT_ID, side, qty, tags=[intended_tag(intended)])

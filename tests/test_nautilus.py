@@ -16,7 +16,7 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from nautilus_trader.model import Currency, CurrencyType, Price, Quantity
 
@@ -68,6 +68,8 @@ COST_MODELS = (
     gap=st.sampled_from([0.0, 0.005, 0.03]),
     costs=st.sampled_from(COST_MODELS),
 )
+# #62: a full sell sized from the float balance asked for 1e-12 units more than the account held (denied).
+@example(n=262, seed=37975, vol=0.1, gap=0.03, costs=Costs())
 def test_nautilus_equals_the_reference_on_every_contract_rule(entry, n, seed, vol, gap, costs):
     bars = random_bars(n, seed, vol, gap)
     ref = entry.fn(entry.params, bars, costs=costs)
