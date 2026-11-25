@@ -8,3 +8,4 @@ slippage_bps:              # by trade size in USD
   "10000": 30
 gas_usd_per_trade: 0.10    # sponsored by us; replace with measured Base gas
 stress_multiplier: 2.0     # every finalist is re-run with all costs doubled
+small_coin_cost_multiplier: 2.0  # owner-approved 2026-11-25: pool fee and slippage x2 for coins other than BTC and ETH (gas unchanged), before the stress multiplier

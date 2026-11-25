@@ -665,11 +665,12 @@ def set_steady_budget(cfg, value: str) -> None:
     path.write_text("".join(lines))
 
 
-def test_the_real_file_sets_steady_s_budget_at_35_and_leaves_balanced_and_bold_missing():
+def test_the_real_file_sets_steady_s_budget_at_35_bold_s_at_60_and_leaves_balanced_missing():
     """``config/risk_levels.yaml`` as committed: Steady's Monte Carlo 95th-percentile max drawdown budget is 35%
     (owner-approved 2026-11-21, ``reports/director/2026-11-21-owner-answers-trend-steady.md`` item 1), read as the
-    fraction 0.35; balanced and bold are still TBD, so a gate that needs their budget is MISSING (None). The hash
-    is of the file's bytes."""
+    fraction 0.35; Bold's is 60% (owner-approved 2026-11-25,
+    ``reports/director/2026-11-25-owner-answer-momentum-bold.md``); balanced is still TBD, so a gate that needs its
+    budget is MISSING (None). The hash is of the file's bytes."""
     data = (CONFIG_DIR / "risk_levels.yaml").read_bytes()
     steady = pf.risk_limits("steady")
     assert steady["max_drawdown_budget"] == 0.35 and steady["max_drawdown_budget_pct"] == 35
@@ -681,8 +682,8 @@ def test_the_real_file_sets_steady_s_budget_at_35_and_leaves_balanced_and_bold_m
     assert sorted(raw) == ["balanced", "bold", "steady"]
     # bold's coin list is still empty, which risk_limits refuses (this runner holds BTC and ETH only), so its
     # budget is read with risk_limits' own rule
-    assert raw["bold"]["max_drawdown_budget_pct"] == "TBD"
-    assert pf._budget(raw["bold"]["max_drawdown_budget_pct"]) is None
+    assert raw["bold"]["max_drawdown_budget_pct"] == 60
+    assert pf._budget(raw["bold"]["max_drawdown_budget_pct"]) == 0.60
 
 
 HOLD_MIX_CAP_KEY = "hold_mix_max_rebalances_per_30d"
@@ -721,7 +722,7 @@ def test_the_hold_this_mix_cap_leaves_steady_s_risk_limits_unchanged(tmp_path):
     cap) and the file's own values. Only ``sha256`` moves: the file without the key's line gives the same dict but
     for its hash and path. The values are read from the file, not typed here, so an owner-approved change to
     Steady's other limits does not fail this test (#55); the real file's budget is pinned by
-    ``test_the_real_file_sets_steady_s_budget_at_35_and_leaves_balanced_and_bold_missing``."""
+    ``test_the_real_file_sets_steady_s_budget_at_35_bold_s_at_60_and_leaves_balanced_missing``."""
     raw = load_yaml("risk_levels")["steady"]
     lim = pf.risk_limits("steady")
     assert lim == {
