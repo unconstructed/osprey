@@ -27,6 +27,7 @@ fill. The contract tolerance for this runner (``TOL``) is written down from that
 
 from __future__ import annotations
 
+import functools
 import math
 import threading
 from collections.abc import Callable, Mapping
@@ -358,10 +359,10 @@ def _result(bars: pd.DataFrame, s: _RuleStrategy, costs: Costs) -> pd.DataFrame:
 
 
 def wrap(rule: Callable) -> Callable[..., pd.DataFrame]:
-    """A ``BacktestFn`` ``fn(params, bars, costs=None)`` that runs ``rule`` on Nautilus."""
+    """A ``BacktestFn`` ``fn(params, bars, costs=None)`` that runs ``rule`` on Nautilus.
 
-    def fn(params: Mapping, bars: pd.DataFrame, costs: Costs | None = None) -> pd.DataFrame:
-        return run(rule, params, bars, costs)
-
+    It is a ``functools.partial`` of :func:`run`, so it pickles (for a module-level rule) and a parallel search
+    (``lab.search.study``, spawned worker processes) can use it."""
+    fn = functools.partial(run, rule)
     fn.__name__ = f"nautilus_{getattr(rule, '__name__', 'rule')}"
     return fn

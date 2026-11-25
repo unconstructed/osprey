@@ -319,3 +319,23 @@ def test_bars_from_the_catalog_run_on_nautilus_like_the_reference(tmp_path, btc)
     nt = nautilus.run(reference.dip_buy, params, loaded)
     assert ref.attrs["n_trades"] > 0
     assert_parity(ref, nt, len(loaded))
+
+
+def test_the_nautilus_backtest_fn_runs_in_a_parallel_search(tmp_path, btc):
+    """``wrap`` gives a picklable BacktestFn, so ``lab.search.study`` can hand it to spawned worker processes; the
+    search's logged Sharpe of a trial equals a direct Nautilus run of the same params."""
+    import pickle
+
+    from lab.search.space import Param
+    from lab.search.study import SearchConfig, run_study
+
+    fn = nautilus.wrap(reference.dip_buy)
+    assert pickle.loads(pickle.dumps(fn)).__name__ == "nautilus_dip_buy"
+    specs = [Param("drop", "float", 0.03, 0.2), Param("lookback", "int", 3, 15)]
+    bars = btc.iloc[:500]
+    table = run_study("nt", fn, specs, bars, tmp_path, SearchConfig(n_trials=4, n_workers=2, seed=1))
+    assert len(table) == 4 and (table["state"] == "COMPLETE").all()
+    row = table.iloc[0]
+    params = {"drop": row["params_drop"], "lookback": int(row["params_lookback"])}
+    direct = fn(params, bars)
+    assert row["n_trades"] == len(direct.attrs["trade_returns"])
