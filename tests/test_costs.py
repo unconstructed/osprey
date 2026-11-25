@@ -139,18 +139,21 @@ def test_stressed_rejects_bad_multipliers(bad):
 # --------------------------------------------------------------------------------------------- loading
 
 
-def test_yaml_loading_equals_the_placeholders():
+def test_yaml_loading_equals_the_measured_costs():
     raw = yaml.safe_load((CONFIG_DIR / "costs.yaml").read_text())
     costs = Costs.from_yaml()
-    assert costs.pool_fee_bps == raw["pool_fee_bps"] == 5
-    assert costs.aggregator_fee_bps == raw["aggregator_fee_bps"] == 0
+    assert costs.pool_fee_bps == raw["pool_fee_bps"] == 0
+    assert costs.aggregator_fee_bps == raw["aggregator_fee_bps"] == 15
     assert costs.slippage_bps == tuple(sorted((float(k), float(v)) for k, v in raw["slippage_bps"].items()))
-    assert costs.slippage_bps == ((100.0, 10.0), (1000.0, 15.0), (10000.0, 30.0))
-    assert costs.gas_usd_per_trade == raw["gas_usd_per_trade"] == 0.10
+    assert costs.slippage_bps == ((100.0, 30.0), (1000.0, 54.0), (10000.0, 26.0), (50000.0, 5.0))
+    assert costs.gas_usd_per_trade == raw["gas_usd_per_trade"] == 0.15
     assert costs.stress_multiplier == raw["stress_multiplier"] == 2.0
     assert costs.capital_usd == 10_000.0
-    # the dataclass defaults mirror the placeholders: when measured values replace them, update both
-    assert costs == Costs()
+    # Measured values replaced the placeholders on 2026-11-25 (reports/costs/2026-11-25.md). The dataclass
+    # defaults keep the old placeholders as a fixed cost model for tests (TESTING.md #63): no code outside
+    # tests/ calls Costs(); every runner reads the file through Costs.from_yaml().
+    assert costs != Costs()
+    assert Costs() == Costs(5.0, 0.0, ((100.0, 10.0), (1000.0, 15.0), (10000.0, 30.0)), 0.10)
     assert Costs.from_yaml(capital_usd=1e6).capital_usd == 1e6
 
 

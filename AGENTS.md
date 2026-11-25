@@ -153,18 +153,19 @@ Every backtest runs with the cost model on. A zero-cost backtest is not a result
 
 Production trades are swaps on Base through the 0x aggregator. Costs per trade = pool fee + aggregator fee (if any) + slippage (grows with trade size) + gas (we sponsor it, so it's our cost). Implement these as Nautilus v2 fee and fill model subclasses in `lab/costs/`.
 
-Start with pessimistic placeholders, then replace them with measured values (`data-engineer` samples 0x price quotes on Base at several trade sizes):
+Measured values (owner-approved 2026-11-25; [reports/costs/2026-11-25.md](reports/costs/2026-11-25.md), one evening of read-only 0x quotes on Base). Re-measure before launch; the routing (0x, direct pools, or 0x without the bad "LunarBase" source) is still open, and the report gives the costs for each:
 
 ```yaml
-# config/costs.yaml — PLACEHOLDERS until measured. Pessimistic on purpose.
+# config/costs.yaml — MEASURED 2026-11-25. 90th percentiles, rounded up.
 venue: base_via_0x
-pool_fee_bps: 5            # major-pair pool fee tiers seen at 1–5 bps
-aggregator_fee_bps: 0      # confirm with 0x
+pool_fee_bps: 0            # inside 0x's price; counted in slippage_bps
+aggregator_fee_bps: 15     # 0x volume fee, measured on every sample
 slippage_bps:              # by trade size in USD
-  "100": 10
-  "1000": 15
-  "10000": 30
-gas_usd_per_trade: 0.10    # sponsored by us; replace with measured Base gas
+  "100": 30
+  "1000": 54
+  "10000": 26
+  "50000": 5
+gas_usd_per_trade: 0.15    # sponsored by us; worst measured $0.12, plus margin
 stress_multiplier: 2.0     # every finalist is re-run with all costs doubled
 ```
 

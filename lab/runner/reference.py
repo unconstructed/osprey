@@ -141,6 +141,8 @@ class Costs:
     ``ValueError``.
     """
 
+    # Defaults: the 2026-11 placeholders, kept as a fixed cost model for tests. Runs read config/costs.yaml
+    # through from_yaml() (measured values since 2026-11-25; TESTING.md #63).
     pool_fee_bps: float = 5.0
     aggregator_fee_bps: float = 0.0
     slippage_bps: tuple[tuple[float, float], ...] = ((100.0, 10.0), (1000.0, 15.0), (10000.0, 30.0))

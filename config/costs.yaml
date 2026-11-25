@@ -1,10 +1,12 @@
-# config/costs.yaml — PLACEHOLDERS until measured. Pessimistic on purpose.
+# config/costs.yaml — MEASURED 2026-11-25 (reports/costs/2026-11-25.md: one evening, 176 read-only 0x quotes on
+# Base). 90th percentiles, rounded up. Owner-approved 2026-11-25. Re-measure before launch.
 venue: base_via_0x
-pool_fee_bps: 5            # major-pair pool fee tiers seen at 1–5 bps
-aggregator_fee_bps: 0      # confirm with 0x
-slippage_bps:              # by trade size in USD
-  "100": 10
-  "1000": 15
-  "10000": 30
-gas_usd_per_trade: 0.10    # sponsored by us; replace with measured Base gas
+pool_fee_bps: 0            # inside 0x's price; counted in slippage_bps
+aggregator_fee_bps: 15     # 0x volume fee, measured on every sample
+slippage_bps:              # 90th percentile of cost beyond 0x's fee, by trade size in USD
+  "100": 30
+  "1000": 54
+  "10000": 26
+  "50000": 5
+gas_usd_per_trade: 0.15    # sponsored by us; worst measured $0.12, plus margin
 stress_multiplier: 2.0     # every finalist is re-run with all costs doubled
