@@ -1105,6 +1105,17 @@ def test_d3_by_hand():
         2017: {"V_X": 0.0, "c_N": 2.0, "F": 0.30000000000000004},
         2018: {"V_X": -0.2, "c_N": 2.0, "F": 0.3},
     }
+    # by year, the median and not the mean: a year holding three windows with lopsided numbers (#77, the fix
+    # checkers: with one or two windows a year the two agree)
+    lopsided = []
+    for k, (vx, cn, f_) in enumerate(((-0.3, 1.0, 0.1), (-0.1, 2.0, 0.2), (0.5, 6.0, 0.6), (0.2, 4.0, 0.4))):
+        rule = next(r for r in rows if r["kind"] == "rule")
+        base = {**rule, "window": k, "year": 2019 if k < 3 else 2020, "V_X": vx, "c_N": cn, "F": f_}
+        lopsided += [base, {**base, "kind": "N"}, {**base, "kind": "X"}]
+    assert K.d3_cell(pd.DataFrame(lopsided), 0.35)["by_year"] == {
+        2019: {"V_X": -0.1, "c_N": 2.0, "F": 0.2},  # the means: 0.0333, 3.0, 0.3
+        2020: {"V_X": 0.2, "c_N": 4.0, "F": 0.4},
+    }
     assert K.describe([]) == {"n": 0, "p10": None, "median": None, "p90": None, "share_above_0": None}
     spans = pd.DataFrame([{"w": 0.1, "s": 0.5, "f": 0.5, "label": K.CANT_TELL}])
     d = K.d3(pd.DataFrame(rows), spans, 0.1, 0.35)

@@ -396,6 +396,51 @@ def test_an_a0_record_needs_the_pinned_phrase_and_an_alarm_needs_an_owner_decisi
         ),
         ("- **A0** (2026-11-26): A0 alarms: A0-3.\n", "reports an alarm ('alarms: A0-3')"),
         ("- **A0** (2026-11-26): A0 alarms: none (A0-3 FIRED on the rerun).\n", "reports an alarm ('FIRED')"),
+        # 'fired' anywhere, inside a longer word too (#77, the fix checkers)
+        ("- **A0** (2026-11-26): A0 alarms: none; A0-3 misfired once.\n", "reports an alarm ('fired')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; nothing unfired.\n", "reports an alarm ('fired')"),
+        (
+            "- **A0** (2026-11-26): xA0 alarms: none.\n",
+            no_alarm,
+        ),  # the phrase as whole words, on its left too
+        # an alarm reported in other words next to the pinned phrase (the fix checkers' paraphrases)
+        (
+            "- **A0** (2026-11-26): A0 alarms: none, except A0-3 triggered on 14 of 100 NC panels.\n",
+            "reports an alarm ('A0-3 triggered')",
+        ),
+        (
+            "- **A0** (2026-11-26): A0 alarms: none; A0-3 fires at 14 of 100.\n",
+            "reports an alarm ('A0-3 fires')",
+        ),
+        ("- **A0** (2026-11-26): A0 alarms: none; A0-3 exceeded its limit.\n", "('A0-3 exceeded')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; alarm on A0-3.\n", "('alarm on A0-3')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; alarm for A0-3.\n", "('alarm for A0-3')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; alarm (A0-3).\n", "('alarm (A0-3')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; alarm `A0-3`.\n", "('alarm `A0-3')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; alarm **A0-3**.\n", "('alarm **A0-3')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; alarm-A0-3.\n", "('alarm-A0-3')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; A0 3 alarm.\n", "('A0 3 alarm')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; A0-4 tripped.\n", "('A0-4 tripped')"),
+        ("- **A0** (2026-11-26): A0 alarms: none; A0-2 breached.\n", "('A0-2 breached')"),
+        (
+            "- **A0** (2026-11-26): A0 alarms: none; A0-3 at 14 of 100, over its limit.\n",
+            "('A0-3 at 14 of 100, over its limit')",
+        ),
+        # every decision named must be on file; a mention that says there is none names no decision
+        (
+            "- **A0** (2026-11-26): A0-3 fired; owner decision: reports/director/a0-answer.md; owner decision: "
+            "reports/director/gone.md\n",
+            "names an owner decision reports/director/gone.md that does not exist",
+        ),
+        (
+            "- **A0** (2026-11-26): alarm A0-3 fired; no owner decision: reports/director/a0-answer.md yet.\n",
+            "stop rule 9: amendment A0 reports an alarm ('fired')",
+        ),
+        (
+            "- **A0** (2026-11-26): A0-3 fired, awaiting the owner decision: reports/director/a0-answer.md\n",
+            "stop rule 9: amendment A0 reports an alarm ('fired')",
+        ),
+        ("- **A0** (2026-11-26): no alarm; not owner decision: reports/director/a0-answer.md\n", no_alarm),
         (
             '- **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner\'s decision).\n',
             "needs exactly one '- **A0' record (not the placeholder)",
@@ -414,6 +459,19 @@ def test_an_a0_record_needs_the_pinned_phrase_and_an_alarm_needs_an_owner_decisi
         ("- **A0** (2026-11-26): A0 alarms: none.\n", None),
         ("- **A0** (2026-11-26): 100 panels a set, 152 CPU-minutes. A0 alarms: none\n", None),
         ("- **A0** (2026-11-26): **A0 alarms: none** (A0-3 at 9 of 100, under its limit).\n", None),
+        (
+            "- **A0** (2026-11-26): A0 alarms: none (A0-1 0 of 100, A0-2 1 of 100, A0-3 9 of 100, A0-4 12 of 400).\n",
+            None,
+        ),
+        ("- **A0** (2026-11-26): A0 (100 panels a set) done in 152.3s. A0 alarms: none\n", None),  # A0's line
+        (
+            "- **A0** (2026-11-26): A0-3 at 9 of 100. A0 alarms: none.\n",
+            None,
+        ),  # the phrase's 'alarms' is not one
+        (
+            "- **A0** (2026-11-26): A0 alarms: none; no owner decision: reports/director/a0-answer.md needed.\n",
+            None,
+        ),
         (REVIEW_A0.replace("tells the owner.", "owner decision: reports/director/a0-answer.md"), "fired"),
         ("- **Amendment A0** alarms A0-1; owner decision: reports/director/a0-answer.md\n", "alarms A0-1"),
     ):
@@ -438,6 +496,125 @@ def test_an_a0_record_needs_the_pinned_phrase_and_an_alarm_needs_an_owner_decisi
         out, cat, here = real_folders(monkeypatch, tmp_path / f"run{i}", rows=a1 + a0)
         _refused(capsys, R.main(real_args(out, cat)), text)
         assert not out.exists() and sorted(p.name for p in here.iterdir()) == ["PLAN.md"]
+
+
+# a stand-in plan with text around the amendments list: stop rules 8 and 9 before it, a paragraph after it
+FRAMED_PLAN = """# keep-risk-steady: stand-in plan
+
+## 13. Protocol, stop rules and amendments
+
+**Stop rules:**
+8. **A real run 0 refuses to start** unless the A0 record says {stop8}
+   or names an owner decision on file.
+9. **A0's alarms stop run 0**: {stop9}.
+
+**Amendments:**
+{rows}
+After the list: {after}
+
+## 14. Allowed range
+"""
+
+
+def framed(rows: str, stop8: str = "it", stop9: str = "nothing else", after: str = "nothing") -> str:
+    return FRAMED_PLAN.format(rows=rows, stop8=stop8, stop9=stop9, after=after)
+
+
+def test_only_the_a0_item_is_read_and_a_wrapped_record_is_read_whole(tmp_path):
+    """Stop rules 8 and 9 read the A0 item only (INTERPRETATIONS["prior_amendments"], #77, the fix checkers): the
+    pinned phrase or an alarm anywhere else in the plan (the stop rules before the list, the A1 item, another
+    amendment row, a paragraph after the list) never decides; and the A0 item is its first line with every indented
+    line after it, so a wrapped record is read whole and the next row is not part of it."""
+    phrase, a1 = R.A0_NO_ALARM, "- **A1** (2026-11-26): run 0 projects 28 CPU-minutes.\n"
+    bare = "- **A0** (2026-11-26): no alarm.\n"
+    ok = f"- **A0** (2026-11-26): {phrase}.\n"
+    (tmp_path / "reports" / "director").mkdir(parents=True)
+    (tmp_path / "reports" / "director" / "a0-answer.md").write_text("the owner's answer to A0")
+    no_alarm = "stop rule 8: amendment A0 says neither 'A0 alarms: none' nor 'owner decision:"
+    m1 = "- **Amendment M1** (2026-11-27): stop rule 8's record now reads '{x}'.\n"
+    # the phrase outside the A0 item never stands for it: a bare "no alarm" (or "no alarms") A0 record is refused
+    for a0 in (bare, "- **A0** (2026-11-26): no alarms.\n"):
+        for plan in (
+            framed(a1 + a0, stop8=f'"{phrase}"'),  # stop rule 8's text, before the list
+            framed(a1 + a0 + m1.format(x=phrase)),  # an amendment row inside the list, right after A0
+            framed(a1 + m1.format(x=phrase) + a0),  # ... and right before it
+            framed(f"- **A1** (2026-11-26): timed; A0 will print '{phrase}'.\n" + a0),  # the A1 item
+            framed(f"- **A1** (2026-11-26): timed;\n  A0 will print '{phrase}'.\n" + a0),  # its wrapped line
+            framed(a1 + a0, after=f"the A0 record says '{phrase}'"),  # a paragraph after the list
+            framed(
+                f"- **A1** {phrase}.\n" + a0 + m1.format(x=phrase),
+                stop8=f'"{phrase}"',
+                after=phrase,
+            ),  # all at once
+        ):
+            with pytest.raises(R.Refusal) as refused:
+                R.prior_amendments(plan, tmp_path)
+            assert no_alarm in str(refused.value), plan
+    # an alarm outside the A0 item never reports one: the A0 record with the pinned phrase passes with no alarm
+    alarm = "alarm A0-3 fired"
+    for plan in (
+        framed(a1 + ok, stop9=f"if {alarm}, the lead tells the owner"),  # stop rule 9's text
+        framed(a1 + ok + m1.format(x=f"if {alarm}, ask the owner")),  # an amendment row after A0
+        framed(a1 + m1.format(x="A0-3 triggered means an owner decision") + ok),  # ... and before it
+        framed(f"- **A1** (2026-11-26): in a dry run {alarm}.\n" + ok),  # the A1 item
+        framed(f"- **A1** (2026-11-26): timed;\n  in a dry run {alarm}.\n" + ok),  # its wrapped line
+        framed(a1 + ok, after=f"{alarm} would need an owner decision"),  # a paragraph after the list
+    ):
+        got = R.prior_amendments(plan, tmp_path)
+        assert got["A0"] == ok.rstrip("\n") and got["alarm"] is None and got["owner_decision"] is None, plan
+    # a wrapped A0 record is read whole: its continuation lines (after a blank line too) hold its alarm, its pinned
+    # phrase or its owner decision
+    for a0, text in (
+        (
+            f"- **A0** (2026-11-26): {phrase}.\n  Then alarm A0-3 fired on the rerun.\n",
+            "reports an alarm ('fired')",
+        ),
+        (f"- **A0** (2026-11-26): {phrase}.\n  On the rerun A0-3 exceeded its limit.\n", "('A0-3 exceeded')"),
+        (f"- **A0** (2026-11-26): {phrase}.\n\n  Later: alarm A0-4 at 31 of 400.\n", "('alarm A0-4')"),
+        (f"- **A0** (2026-11-26): {phrase}.\n\t(alarms: A0-2)\n", "('alarms: A0-2')"),
+        (
+            "- **A0** (2026-11-26): alarm A0-3 fired;\n  owner decision: reports/director/gone.md\n",
+            "names an owner decision reports/director/gone.md that does not exist",
+        ),
+        (
+            "- **A0** (2026-11-26): 100 panels a set,\n  to be written up later.\n",
+            "needs exactly one '- **A0' record (not the placeholder)",
+        ),
+    ):
+        with pytest.raises(R.Refusal) as refused:
+            R.prior_amendments(framed(a1 + a0), tmp_path)
+        assert text in str(refused.value), (a0, str(refused.value))
+    for a0, want_alarm, want_decision in (
+        (f"- **A0** (2026-11-26): 100 panels a set, 152 CPU-minutes;\n  {phrase}.\n", None, None),
+        (f"- **A0** (2026-11-26): 100 panels a set.\n\n  {phrase}.\n", None, None),
+        (
+            "- **A0** (2026-11-26): alarm A0-3 fired on 14 of 100 NC panels;\n"
+            "  owner decision: reports/director/a0-answer.md\n",
+            "fired",
+            "reports/director/a0-answer.md",
+        ),
+    ):
+        got = R.prior_amendments(framed(a1 + a0 + m1.format(x="later"), after="end"), tmp_path)
+        assert got["A0"] == a0.rstrip("\n") and got["alarm"] == want_alarm, a0
+        assert got["owner_decision"] == want_decision
+    # the items themselves: first line plus indented lines; a line at the line's start ends the item
+    section = R.amendments_list(
+        framed(
+            "- **A1** (2026-11-26): run 0 projects\n  28 CPU-minutes.\n"
+            f"- **A0** (2026-11-26): {phrase}\n    - sub-point\n\n  more.\n"
+            "- **Amendment M1** (2026-11-27): unrelated.\n  wrapped.\n"
+        )
+    )
+    assert R.amendment_items(section, "A1") == ["- **A1** (2026-11-26): run 0 projects\n  28 CPU-minutes."]
+    assert R.amendment_items(section, "A0") == [
+        f"- **A0** (2026-11-26): {phrase}\n    - sub-point\n\n  more."
+    ]
+    assert R.amendment_items(section, "A2") == [] and R.amendment_items("  - **A0** indented\n", "A0") == []
+    assert R.owner_decisions(
+        "owner decision: reports/director/a.md; no owner decision: reports/director/b.md; pending an owner "
+        "decision: reports/director/c.md; Not the owner decision: reports/director/d.md; then owner decision: "
+        "`reports/director/e.md`"
+    ) == ["reports/director/a.md", "reports/director/e.md"]
 
 
 def test_the_steady_limits_and_the_grid_s_targets(tmp_path, capsys):
@@ -1040,14 +1217,15 @@ BOOM_SEED = 9
 def boom_run(tmp_path_factory):
     """A --fast dry run (seed 9) with D2's boom minimum lowered to 1 window, so the boom checks run D1 (the fast grid
     keeps at most 3 Kraken windows, under the plan's 12, so the shared dry run's checks are MISSING), on a copy of
-    config/ whose steady budget is written as 35 by key (#55: set up here, whatever the real file holds). Every call
-    of keeprisk.d1 is recorded with its inputs (a spy; the result is d1's own)."""
+    config/ whose steady budget is written as 30 by key (#55: set up here, whatever the real file holds; 30, not the
+    real file's 35, so a budget typed into the code instead of read from the file shows). Every call of keeprisk.d1
+    is recorded with its inputs (a spy; the result is d1's own)."""
     base = tmp_path_factory.mktemp("boom")
     cfg = base / "cfg"
     cfg.mkdir()
     for name in ("costs.yaml", "splits.yaml", "risk_levels.yaml"):
         (cfg / name).write_bytes((R.REPO / "config" / name).read_bytes())
-    set_steady_budget(cfg, "35")
+    set_steady_budget(cfg, "30")
     calls: list[dict] = []
     real_d1 = K.d1
 
@@ -1072,6 +1250,24 @@ def boom_run(tmp_path_factory):
         "calls": calls,
         "cfg": cfg,
     }
+
+
+def _my_year_returns(panel: pd.DataFrame) -> dict[int, float]:
+    """BTC's calendar-year returns by bar day (a bar's day is its close time minus 1 day), written out here: a year's
+    last close over the last close of the year before, or over the year's own first close when the panel has no bar
+    of the year before."""
+    close = panel[("BTC", "close")].tolist()
+    years = [(ts - pd.Timedelta(days=1)).year for ts in panel.index]
+    out = {}
+    for y in sorted(set(years)):
+        rows = [i for i, v in enumerate(years) if v == y]
+        before = [i for i, v in enumerate(years) if v == y - 1]
+        out[y] = close[rows[-1]] / close[before[-1] if before else rows[0]] - 1.0
+    return out
+
+
+def _ranked(returns: dict) -> list[int]:
+    return sorted(returns, key=lambda y: (-returns[y], y))  # ties to the earlier year
 
 
 def _my_overlaps(k: int, year: int) -> bool:
@@ -1139,7 +1335,12 @@ def test_d2_s_boom_checks_run_d1_on_the_kept_windows_with_their_own_rowset(boom_
     assert d["thresholds"]["BOOM_MIN_WINDOWS"] == 1  # lowered on purpose (the plan's 12 is pinned elsewhere)
     returns = {int(y): v for y, v in boom_run["start"]["year_returns"].items()}
     assert sorted(returns) == list(range(2017, 2023))
-    ranked = sorted(returns, key=lambda y: (-returns[y], y))  # ties to the earlier year
+    # the years are ranked on BTC's closes on Kraken, by bar day: recomputed here from the seed's Kraken panel; on
+    # Binance's closes (its 2017 starts 2017-08-18) this seed ranks the best two otherwise, so the source shows
+    bars = panels(BOOM_SEED)
+    assert returns == _my_year_returns(bars["KRAKEN"])
+    ranked = _ranked(returns)
+    assert ranked[:2] == [2018, 2017] and _ranked(_my_year_returns(bars["BINANCE"]))[:2] == [2018, 2020]
     kraken = sorted(
         set(runs[(runs["family"] == "KRAKEN 1x") & (runs["scope"] == "window")]["window"].tolist())
     )
@@ -1187,6 +1388,32 @@ def test_d2_s_boom_checks_run_d1_on_the_kept_windows_with_their_own_rowset(boom_
     missing = [c for c in order if checks[c] == K.MISSING]
     assert not missing and moved  # every check decided, at least one moved
     assert d["D2"]["label"] == "NOT ROBUST (" + ", ".join(moved) + ")" == d["headline"]["label"]
+    # the two removals apart: here 2018 and 2017 both fall in window 0, so both keep [24, 48]. Decide again on the
+    # same tables with 2020 ranked second (its return put between the best two), so the best two fall in different
+    # windows and the second removal keeps fewer windows than the first; each boom check's pool and rowset again
+    patched = {**returns, 2020: (returns[ranked[0]] + returns[ranked[1]]) / 2.0}
+    assert _ranked(patched)[:2] == [2018, 2020]
+    redo: list[dict] = []
+    real_d1 = K.d1
+
+    def spy(windows, labels, **kwargs):
+        out = real_d1(windows, labels, **kwargs)
+        redo.append({"windows": windows.copy(), "labels": labels.copy(), "kwargs": kwargs, "out": out})
+        return out
+
+    monkeypatch.setattr(K, "BOOM_MIN_WINDOWS", 1)  # as in the run
+    monkeypatch.setattr(K, "d1", spy)
+    got = R.decide(runs, spans, {"grid": R.FAST, "year_returns": patched, "budget": d["budget"]})
+    monkeypatch.setattr(K, "d1", real_d1)
+    assert len(redo) == 5
+    kept_by = []
+    for n, (name, call) in enumerate(zip(R.BOOM, redo[1:3], strict=True), start=1):
+        years = _ranked(patched)[:n]
+        kept = [k for k in kraken if not any(_my_overlaps(k, y) for y in years)]
+        assert got["boom"][name] == {"years": years, "windows": kept}
+        assert got["D2"]["checks"][f"boom: {name}"] == same(call, "KRAKEN 1x", name, kept)["default"]
+        kept_by.append(kept)
+    assert kept_by == [[24, 48], [48]]
     # the minimum at its boundary: decide again on the same tables (len(kept) windows decide, one fewer is MISSING)
     ctx = {"grid": R.FAST, "year_returns": returns, "budget": d["budget"]}
     for name in R.BOOM:
@@ -1294,8 +1521,8 @@ def test_d3_is_recomputed_for_every_family_from_its_own_runs_and_the_budget_as_r
     runs and span row (window count, V_X, V_N and their cuts, c_N, c_X, c_eq, x, x_eq, fees, the falls F of the
     rule, N and X with their median, Q, worst and share past the budget as read, the worst week, the over-cap weeks,
     the stepping back, the missed rebound, the orders, the busiest 30 days, the calmer windows, by year), the
-    headline's default marked; on the boom run's config copy at a budget of 35% and on the shared dry run at the
-    real file's budget as read."""
+    headline's default marked; on the boom run's config copy at a budget of 30% and on the shared dry run at the
+    real file's budget as read (two budgets as read, so a budget typed into the code fails one of them)."""
     shared = tables(dry_runs)
     for t, cfg in ((boom_run, boom_run["cfg"]), (shared, None)):
         runs, spans, d = t["runs"], t["spans"], t["decision"]
@@ -1306,8 +1533,15 @@ def test_d3_is_recomputed_for_every_family_from_its_own_runs_and_the_budget_as_r
         for family in R.FAST.families:
             assert d["D3"][family] == _my_d3(runs, spans, family, head, budget), family
     d = boom_run["decision"]
-    assert d["budget"] == 0.35 and isinstance(d["headline"]["default"], float)  # a default to mark
+    assert d["budget"] == 0.30 == boom_run["start"]["risk_limits"]["max_drawdown_budget"]
+    assert isinstance(d["headline"]["default"], float)  # a default to mark
     assert any(c["default"] for c in d["D3"]["KRAKEN 1x"]["cells"])
+    # the budget read moves the numbers: at the real file's 35% this run's D3 would differ (its falls between them)
+    head = d["D1"]["KRAKEN 1x"]["default"]
+    assert any(
+        d["D3"][family] != _my_d3(boom_run["runs"], boom_run["spans"], family, head, 0.35)
+        for family in R.FAST.families
+    )
     # past the budget at its boundary: a budget exactly one window's fall counts only the falls strictly above it
     runs, spans = boom_run["runs"], boom_run["spans"]
     falls = sorted(runs[(runs["scope"] == "window") & (runs["family"] == "KRAKEN 1x")]["F"].tolist())
@@ -1320,6 +1554,31 @@ def test_d3_is_recomputed_for_every_family_from_its_own_runs_and_the_budget_as_r
         assert _plain(got["D3"][family]) == mine, family
         shares += [c["windows"]["F"][k]["past_budget"] for c in mine["cells"] for k in ("rule", "N", "X")]
     assert 0.0 < max(shares) and min(shares) < 1.0
+
+
+def test_a_budget_the_file_leaves_tbd_reaches_d3_as_missing(tmp_path, monkeypatch, clean_git, tiny):
+    """The budget as read (#77, the fix checkers): with the steady budget written as TBD on a copy of config/, the
+    start record and decision.json hold no budget and D3's share of falls past it is None in every cell and kind,
+    while the rest of D3 is still every family's own numbers."""
+    cfg = tmp_path / "cfg"
+    cfg.mkdir()
+    for name in ("costs.yaml", "splits.yaml", "risk_levels.yaml"):
+        (cfg / name).write_bytes((R.REPO / "config" / name).read_bytes())
+    set_steady_budget(cfg, "TBD")
+    assert R.main(dry(tmp_path / "out" / "w1", "--config-dir", str(cfg))) == 0
+    t = tables(tmp_path / "out")
+    d = t["decision"]
+    assert pf.risk_limits("steady", cfg)["max_drawdown_budget"] is None
+    assert d["budget"] is None and t["start"]["risk_limits"]["max_drawdown_budget"] is None
+    assert set(d["D3"]) == set(R.FAST.families) == {"KRAKEN 1x"}
+    shares = []
+    for family in R.FAST.families:
+        assert d["D3"][family] == _my_d3(t["runs"], t["spans"], family, d["D1"]["KRAKEN 1x"]["default"], None)
+        assert d["D3"][family]["budget"] is None and d["D3"][family]["cells"]
+        shares += [
+            c["windows"]["F"][k]["past_budget"] for c in d["D3"][family]["cells"] for k in ("rule", "N", "X")
+        ]
+    assert shares and all(x is None for x in shares)
 
 
 # ------------------------------------------------------------------------------------------------ stops and failures
@@ -1487,6 +1746,38 @@ def test_a0_panels_by_hand():
         C.build_panels("XX", 0)
 
 
+def test_a0_s_panels_draw_from_the_streams_listed_in_both_ranges(monkeypatch):
+    """Every A0 panel, first and second range, draws from exactly the default_rng seeds ``controls.streams`` lists,
+    in order (the streams whose disjointness the next test checks; #77, the fix checkers: only PG's second range was
+    built by hand), and the second range's panels are the first range's generators at seed + 100000."""
+    drawn: list[int] = []
+    real_rng = np.random.default_rng
+
+    def recording(seed=None, *args, **kwargs):
+        drawn.append(seed)
+        return real_rng(seed, *args, **kwargs)
+
+    monkeypatch.setattr(np.random, "default_rng", recording)
+    for second in (False, True):
+        for name in C.SETS:
+            for j in (0, 7):
+                drawn.clear()
+                C.build_panels(name, j, second)
+                assert drawn == C.streams(name, j, second), (name, j, second)
+    monkeypatch.setattr(np.random, "default_rng", real_rng)
+    add = C.SECOND_RANGE
+    assert C.streams("NC", 7, True) == [10_000 + 250_007 + add, 10_000 + 260_007 + add]
+    prices, schedule = C.build_panels("NC", 7, second=True)
+    assert prices.equals(T.garch_panel(350_007)) and schedule.equals(T.garch_panel(360_007))
+    assert C.build_panels("NW", 7, second=True)[0].equals(T.random_walk_panel(330_007))
+    pr, _ = C.build_panels("PR", 7, second=True)
+    want = R.synthetic_market(2190, seed=320_007, start="2017-01-02")["ETH"]
+    assert np.array_equal(pr[("ETH", "close")].to_numpy(), want["close"].to_numpy())
+    ns, _ = C.build_panels("NS", 7, second=True)
+    shuffled = C.shuffled_market(R.synthetic_market(2190, seed=340_007, start="2017-01-02"), seed=341_007)
+    assert np.array_equal(ns[("BTC", "close")].to_numpy(), shuffled["BTC"]["close"].to_numpy())
+
+
 def test_a0_s_seeds_are_disjoint_from_section_2_s_and_from_each_other():
     prior = set(C.PRIOR_STREAMS)
     for second in (False, True):
@@ -1648,7 +1939,7 @@ def test_a0_runs_end_to_end_on_tiny_sizes(tmp_path, monkeypatch, capsys):
     assert not (R.REPO / "a0").exists()
 
 
-def test_a0_s_nc_panel_is_recomputed_by_hand():
+def test_a0_s_nc_panel_is_recomputed_by_hand(monkeypatch):
     """A0's NC set, E1's own null (section 13; it feeds alarm A0-3; #77): one panel recomputed here. The q schedule
     comes from the schedule panel trend.garch_panel(260000 + j) (numpy's sigma, the switch-on decision and the Monday
     checks: ``my_q_path``) and runs on the price panel trend.garch_panel(250000 + j): the rule against X on the full
@@ -1666,7 +1957,19 @@ def test_a0_s_nc_panel_is_recomputed_by_hand():
             "second": False,
         }
     )
+    # E1's inputs (the rule's V and every guarded copy's V, in order), recorded: with 3 copies the rank p takes four
+    # values only, so the copies' V are checked one by one, not only through it (#77, the fix checkers)
+    e1_calls: list[tuple] = []
+    real_e1 = K.e1
+
+    def e1_spy(v0, v_copies):
+        e1_calls.append((v0, list(v_copies)))
+        return real_e1(v0, v_copies)
+
+    monkeypatch.setattr(K, "e1", e1_spy)
     got = C.panel_result("NC", j)
+    monkeypatch.setattr(K, "e1", real_e1)
+    assert len(e1_calls) == len(K.W_VALUES)
     prices, schedule = T.garch_panel(250_000 + j), T.garch_panel(260_000 + j)
     assert prices.index.equals(schedule.index) and len(prices) == 2190
     n = len(prices)
@@ -1708,6 +2011,7 @@ def test_a0_s_nc_panel_is_recomputed_by_hand():
             vu.append(math.log(dd(run(prices, share))) - math.log(dd(mix)))
         rank = (1 + sum(x <= v for x in vu)) / (1 + len(vu))
         assert len(vu) == 3 and mine["e1_rank_p"] == rank and mine["e1_holds"] == (rank < 0.05)
+        assert e1_calls[K.W_VALUES.index(w)] == (v, vu), w
         a, b = rule["ret"].to_numpy()[1:], xr["ret"].to_numpy()[1:]
         da, db = np.minimum(a, 0.0) ** 2, np.minimum(b, 0.0) ** 2
         vs = np.array([0.5 * (np.log(np.mean(da[i])) - np.log(np.mean(db[i]))) for i in idx])

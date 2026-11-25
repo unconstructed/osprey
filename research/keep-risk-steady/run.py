@@ -18,8 +18,8 @@ into results/keep-risk-steady or anywhere in the repo; ``--fast`` is for dry run
 folder and ``--amendment k`` refuses unless 1 <= k <= 2, ``run<k-1>/start.json`` exists, ``run<k>/`` does not, every
 earlier run is the same kind of run and (real data) PLAN.md section 13's amendments list holds ``- **Amendment run k``;
 the RUNLOG must not hold this run number; a real run refuses a dirty git tree, a plan without exactly one A1 and one A0
-record (stop rule 8; the A0 record holding the pinned phrase "A0 alarms: none" or naming an owner decision on file,
-and an A0 record that reports an alarm refused unless it names an owner decision on file: stop rule 9) and a catalog
+record (stop rule 8; the A0 item holding the pinned phrase "A0 alarms: none" or naming an owner decision on file,
+and an A0 item that reports an alarm refused unless it names an owner decision on file: stop rule 9) and a catalog
 whose bars hash is not the pinned one; ``risk_limits("steady")`` must give exactly min_cash 0.20 and max_coin 0.60
 (section 4) and every target of the grid must pass ``check_targets`` with them and h = 0.02; a real run whose
 projection (the A1 timing, made again at start) is above 240 CPU-minutes does not start (stop rule 7).
@@ -104,10 +104,20 @@ BOOK_CHECK_EVERY = 9  # section 11
 SIGMA_RTOL = 1e-12  # section 11: the numpy recompute of sigma
 LABEL = K.LABEL
 OWNER_DECISION_RE = re.compile(r"owner decision: `?(?P<path>reports/director/[\w.-]+\.md)")
+# a mention of an owner decision that says there is none ('no owner decision: ...', 'awaiting the owner decision: ...')
+OWNER_DECISION_NEGATED_RE = re.compile(
+    r"\b(?:no|not|without|pending|awaiting)\W+(?:(?:an?|the|any)\W+)?$", re.IGNORECASE
+)
 A0_NO_ALARM = "A0 alarms: none"  # stop rule 8: the pinned phrase of an A0 record with no alarm
 A0_NO_ALARM_RE = re.compile(rf"(?<!\w){re.escape(A0_NO_ALARM)}(?!\w)")
 A0_FIRED_RE = re.compile(r"fired", re.IGNORECASE)  # stop rule 9: an A0 record that reports an alarm ...
-A0_ALARM_RE = re.compile(r"\balarms?[\s:]+A0-\d", re.IGNORECASE)  # ... or names one outside the pinned phrase
+_A0_NAME = r"A0\W?\d(?!\d)"  # an alarm's name: A0-3, A0 3, A0–3
+A0_ALARM_RE = re.compile(  # ... or names one outside the pinned phrase (INTERPRETATIONS["prior_amendments"])
+    rf"\balarms?\b\W{{0,4}}(?:(?:on|for|at|in|from|of|by)\W{{1,4}})?{_A0_NAME}"
+    rf"|{_A0_NAME}(?:\W{{1,4}}\w+){{0,6}}?\W{{1,4}}(?:alarms?|fire|fires|firing|trigger\w*|trip|trips|tripped|"
+    r"tripping|exceed\w*|breach\w*|raised|(?:over|above|past|beyond)\W+(?:its|the)\W+limit)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -180,12 +190,21 @@ INTERPRETATIONS = {
     "runlog": "A run number the RUNLOG already holds for the same data (any line) is refused. Besides the start "
     "line, an event line is appended when a run completes, stops or crashes",
     "prior_amendments": "Stop rule 8: section 13's amendments list (from '**Amendments:**' to '## 14.') must hold "
-    "exactly one line starting '- **A1' or '- **Amendment A1' and one for A0, neither holding 'to be written' (the "
-    "committed placeholders). The A0 line must hold the pinned phrase 'A0 alarms: none' (exactly, as whole words; "
-    "'no alarm' alone is not it) or 'owner decision: reports/director/<file>.md' naming a file that exists. Stop rule "
-    "9: an A0 line that reports an alarm (the word 'fired' anywhere in the line, any case, or 'alarm A0-<n>' / "
-    "'alarms A0-<n>' / 'alarms: A0-<n>' outside the pinned phrase) is refused unless it names an owner decision on "
-    "file, whatever else the line says. Real runs only",
+    "exactly one item starting '- **A1' or '- **Amendment A1' at a line's start and one for A0. An item is its first "
+    "line and every indented line after it (blank lines inside it included) up to the next line that starts at the "
+    "line's start; only the A0 item is read, never the plan's other text. Neither item may hold 'to be written' (the "
+    "committed placeholders). The A0 item must hold the pinned phrase 'A0 alarms: none' (exactly, case included, as "
+    "whole words, on one line; 'no alarm' alone is not it) or name an owner decision, 'owner decision: "
+    "reports/director/<file>.md'; every decision it names must exist, and a mention that says there is none ('no', "
+    "'not', 'without', 'pending' or 'awaiting', optionally with 'a', 'an', 'the' or 'any', just before it) names no "
+    "decision. Stop rule 9: an A0 item that reports an alarm is refused unless it names an owner decision on file, "
+    "whatever else it says. It reports one when it holds the word 'fired' anywhere (any case, inside a longer word "
+    "too), or, outside the pinned phrase and in any case, 'alarm' or 'alarms' followed by an alarm's name (A0-<n>, A0 "
+    "<n> or A0<n>) with at most 4 characters other than letters, digits and '_' between them, or with 'on', 'for', "
+    "'at', 'in', 'from', 'of' or 'by' between them ('alarms: A0-3', 'alarm (A0-3)', 'alarm **A0-3**', 'alarm on "
+    "A0-3'), or an alarm's name followed within 6 words (at most 4 such characters between words) by 'alarm(s)', "
+    "'fire(s)', 'firing', 'trigger...', 'trip(s/ped/ping)', 'exceed...', 'breach...', 'raised' or 'over/above/past/"
+    "beyond its/the limit' ('A0-3 triggered', 'A0 3 alarm', 'A0-3 at 14 of 100, over its limit'). Real runs only",
     "snapshot": "Section 3's snapshot id is recorded with the catalog's; the bars hash and the panel hashes decide",
     "limits": "risk_limits('steady') must give min_cash exactly 0.20 and max_coin exactly 0.60 (section 4), and "
     "every target of the grid (s q f, s q (1 - f)) must pass check_targets with them and h = 0.02",
@@ -476,15 +495,29 @@ def amendment_row_present(plan_text: str, k: int) -> bool:
     return section is not None and bool(re.search(rf"^- \*\*Amendment run {k}\b", section, re.MULTILINE))
 
 
+def amendment_items(section: str, name: str) -> list[str]:
+    """The items of the amendments list that record ``name`` (INTERPRETATIONS["prior_amendments"]): each line starting
+    ``- **<name>`` or ``- **Amendment <name>`` at the line's start, with every indented line after it (blank lines
+    inside the item included) up to the next line that starts at the line's start."""
+    lines = section.splitlines()
+    out = []
+    for i, line in enumerate(lines):
+        if re.match(rf"- \*\*(?:Amendment )?{name}\b", line):
+            item = [line]
+            for later in lines[i + 1 :]:
+                if later.strip() and not later[:1].isspace():
+                    break
+                item.append(later)
+            out.append("\n".join(item).rstrip())
+    return out
+
+
 def prior_amendments(plan_text: str, repo: Path = REPO) -> dict:
     """Stop rule 8 (INTERPRETATIONS["prior_amendments"]): exactly one A1 and one A0 record before a real run."""
     section = amendments_list(plan_text)
     if section is None:
         raise Refusal("PLAN.md section 13 has no amendments list ('**Amendments:**' .. '## 14.')")
-    rows = {
-        name: [ln for ln in section.splitlines() if re.match(rf"- \*\*(?:Amendment )?{name}\b", ln)]
-        for name in ("A1", "A0")
-    }
+    rows = {name: amendment_items(section, name) for name in ("A1", "A0")}
     for name in ("A1", "A0"):
         if len(rows[name]) != 1 or "to be written" in rows[name][0]:
             raise Refusal(
@@ -492,9 +525,11 @@ def prior_amendments(plan_text: str, repo: Path = REPO) -> dict:
                 f"a real run; found {len(rows[name])} line(s)"
             )
     a0 = rows["A0"][0]
-    decision = OWNER_DECISION_RE.search(a0)
-    if decision is not None and not (Path(repo) / decision["path"]).is_file():
-        raise Refusal(f"amendment A0 names an owner decision {decision['path']} that does not exist")
+    decisions = owner_decisions(a0)
+    for path in decisions:
+        if not (Path(repo) / path).is_file():
+            raise Refusal(f"amendment A0 names an owner decision {path} that does not exist")
+    decision = decisions[0] if decisions else None
     alarm = a0_alarm(a0)
     if decision is None and alarm is not None:
         raise Refusal(
@@ -506,21 +541,26 @@ def prior_amendments(plan_text: str, repo: Path = REPO) -> dict:
             f"stop rule 8: amendment A0 says neither '{A0_NO_ALARM}' nor 'owner decision: "
             "reports/director/<file>.md'"
         )
-    return {
-        "A1": rows["A1"][0],
-        "A0": a0,
-        "alarm": alarm,
-        "owner_decision": None if decision is None else decision["path"],
-    }
+    return {"A1": rows["A1"][0], "A0": a0, "alarm": alarm, "owner_decision": decision}
 
 
-def a0_alarm(line: str) -> str | None:
+def owner_decisions(record: str) -> list[str]:
+    """Every owner decision an A0 record names, in order; a mention that says there is none is not one
+    (INTERPRETATIONS["prior_amendments"])."""
+    return [
+        m["path"]
+        for m in OWNER_DECISION_RE.finditer(record)
+        if OWNER_DECISION_NEGATED_RE.search(record[: m.start()]) is None
+    ]
+
+
+def a0_alarm(record: str) -> str | None:
     """The text by which an A0 record reports an alarm (INTERPRETATIONS["prior_amendments"]), or None: the word
-    'fired' anywhere, or 'alarm A0-<n>' outside the pinned phrase."""
-    fired = A0_FIRED_RE.search(line)
+    'fired' anywhere, or an alarm named next to 'alarm' or an alarm word outside the pinned phrase."""
+    fired = A0_FIRED_RE.search(record)
     if fired is not None:
         return fired.group(0)
-    named = A0_ALARM_RE.search(A0_NO_ALARM_RE.sub(" ", line))
+    named = A0_ALARM_RE.search(A0_NO_ALARM_RE.sub(" ", record))
     return None if named is None else named.group(0)
 
 
