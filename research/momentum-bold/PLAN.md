@@ -193,6 +193,7 @@ All at 1x costs through the same engine.
 Amendments (dated rows, appended; none yet):
 
 - D1 (before run 0): the data snapshot id and hash, written into `run.py`'s `SNAPSHOT` and here.
+- **D1** (2026-11-25, written after the plan and build were committed at `7846abd`): snapshot id `81b2116f5f4b562a`, content hash `496a690f362633a4c2c44d59deaf4bba31854664516edada94ccaf06b2dff6f2` (`data/catalog_bold/`, built by `lab/data/bold.py`; 507 symbols, closes 2017-08-18 .. 2024-07-01; report `reports/data/2026-11-25-bold-81b2116f5f4b562a.md`). Looks: the data agent built the catalog and checked that the train loader returns a 1963-row panel of 418 symbols; it computed no rule, ranking or return. The S3 listing host is used for the symbol list only (owner, item 6 of the decision file).
 
 ## 13. Order of work and outputs
 

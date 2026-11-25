@@ -47,7 +47,10 @@ DEFAULT_CATALOG = REPO / "data" / "catalog_bold"
 LAST_CLOSE = pd.Timestamp("2023-01-01", tz="UTC")  # section 3: the last train close
 DATA_END = pd.Timestamp("2024-07-01", tz="UTC")  # the loader's own refusal point
 FIRST_CLOSE = pd.Timestamp("2017-08-18", tz="UTC")  # synthetic stand-in for BTCUSDT's first close
-SNAPSHOT: dict | None = None  # section 3: written by amendment D1 (the data agent's snapshot) before run 0
+SNAPSHOT: dict | None = {  # section 3: amendment D1 (2026-11-25), the data agent's snapshot
+    "snapshot_id": "81b2116f5f4b562a",
+    "sha256": "496a690f362633a4c2c44d59deaf4bba31854664516edada94ccaf06b2dff6f2",
+}
 CPU_MINUTES_MAX = 120.0  # stop rule 7
 N_FOLDS, TEST_SIZE = 4, 365  # section 10
 SEED = 0
