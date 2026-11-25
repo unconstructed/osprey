@@ -798,7 +798,9 @@ def test_real_runs_use_the_pinned_folders_only(tmp_path, clean_git, monkeypatch,
     out, catalog_dir = real_folders(monkeypatch, tmp_path)
     cheap = copy_config(tmp_path / "cheap")
     path = cheap / "costs.yaml"
-    path.write_text(path.read_text().replace("pool_fee_bps: 5", "pool_fee_bps: 0", 1))
+    text = path.read_text()
+    path.write_text(re.sub(r"^aggregator_fee_bps: \S+", "aggregator_fee_bps: 0", text, count=1, flags=re.M))
+    assert path.read_text() != text  # a cheaper copy, whatever the real file holds (#64)
     elsewhere = tmp_path / "elsewhere"
     for main in (RT.main, RV.main):
         for args, flag in (
@@ -1082,7 +1084,7 @@ def test_the_plain_bundle_s_comparators_match_s_and_its_checks_stop(walk, monkey
 
     def other_orders(params, bars, *, limits, costs, **kw):
         res = original_bt(params, bars, limits=limits, costs=costs, **kw)
-        if costs.pool_fee_bps > Costs.from_yaml().pool_fee_bps:
+        if costs.gas_usd_per_trade > Costs.from_yaml().gas_usd_per_trade:  # the 2x model (#64)
             res.attrs["order_hash"] = "another"
         return res
 
@@ -3035,7 +3037,7 @@ def _orders_differ_when(condition):
     [
         (
             lambda p, bars, c: (
-                c.pool_fee_bps > 5
+                c.gas_usd_per_trade > Costs.from_yaml().gas_usd_per_trade
                 and len(bars) == 2190
                 and p["crypto_share"] in T.ALLOWED_S
                 and "stop" not in p

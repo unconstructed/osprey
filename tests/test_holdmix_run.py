@@ -802,7 +802,7 @@ def _stopped(out: Path, *, runs_logged: bool = False) -> dict:
 
 def test_a_path_that_moves_with_the_cost_setting_stops_the_run(tmp_path, monkeypatch):
     def change(params, costs, res):
-        if costs.pool_fee_bps > 5.0:  # the 2x setting
+        if costs.gas_usd_per_trade > Costs.from_yaml().gas_usd_per_trade:  # the 2x setting (#64: by gas, not the pool fee)
             col = res.columns.get_loc("w_BTC")
             res.iloc[-1, col] = np.nextafter(res.iloc[-1, col], 2.0)
 
@@ -903,7 +903,7 @@ def test_a_hashed_file_that_changes_during_the_run_stops_it(tmp_path, monkeypatc
 
 def test_a_failed_run_is_logged_with_its_error_and_the_grid_goes_on(tmp_path, monkeypatch):
     def change(params, costs, res):
-        if params["w_btc"] == 0.39 and params["band"] == 0.3 and params["wait_days"] == 15 and costs.pool_fee_bps > 5:
+        if params["w_btc"] == 0.39 and params["band"] == 0.3 and params["wait_days"] == 15 and costs.gas_usd_per_trade > Costs.from_yaml().gas_usd_per_trade:
             raise ValueError("a synthetic refusal: the fill would cost the whole wallet")
 
     _wrap_hold_mix(monkeypatch, change)
@@ -951,7 +951,7 @@ def test_a_failed_run_makes_decision_json_missing_and_fills_rule_e(tmp_path, mon
 
     def change(params, costs, res):
         if res.index[0] == kraken_0 and params["band"] == 0.2 and params["wait_days"] == 30:
-            if costs.capital_usd == 5000.0 and costs.pool_fee_bps == 5.0:
+            if costs.capital_usd == 5000.0 and costs.gas_usd_per_trade == Costs.from_yaml().gas_usd_per_trade:
                 raise ValueError("a synthetic refusal")
 
     _wrap_hold_mix(monkeypatch, change)
