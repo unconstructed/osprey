@@ -15,3 +15,8 @@ read. Each answer was the recommended option.
    `small_coin_cost_multiplier: 2.0`.
 5. **Process:** the owner asked to keep token use low: one short plan, one builder, no separate code-review round,
    one audit after the run.
+6. **The coin list's host** (asked after the data agent found that data.binance.vision cannot list its own files):
+   "Allow the listing host (Recommended)". `s3-ap-northeast-1.amazonaws.com` may be used for read-only S3 ListObjects
+   on bucket `data.binance.vision`, prefix `data/spot/monthly/klines/`, to list Binance spot symbols, delisted ones
+   included. Every price file and checksum still comes from data.binance.vision. Not chosen: a hand-made list (risks
+   missing delisted coins) and pausing the study.
