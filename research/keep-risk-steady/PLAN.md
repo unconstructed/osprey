@@ -674,35 +674,82 @@ look and that validate is known to be a rising market. Otherwise there is no loo
 - **A1** (to be written after the tiers pass on the build's commit; synthetic bars only).
 - **A0** (to be written after A1; synthetic only; it says "no alarm" or names the owner's decision).
 
-## 14. Allowed range (`risk-officer` to confirm before run 0, config only)
+## 14. Allowed range (`risk-officer` confirmed 2026-11-25, before run 0, config only)
 
 The app offers these values only:
 - w, the swing level: 8%, 10%, 12% or 15% of the mix's typical weekly move;
-- on mixes with s ∈ {30%, 40%, 50%, 60%} crypto and f ∈ {50%, 75%} BTC. Any other mix is untested: the app labels it
-  so, or does not offer the tool on it (`risk-officer`'s call).
+- on mixes with s ∈ {30%, 40%, 50%, 60%} crypto and f ∈ {50%, 75%} BTC. Any other mix is untested, and **the app does
+  not offer the tool on it** (`risk-officer`, 2026-11-25; not "offered and labelled untested"). While the tool is on,
+  the app does not let the user change to an untested mix; they switch the tool off first.
 
-**Inside the Steady limits.** Every target is at most the user's mix, so every target of every order passes
-`check_targets` with h = 0.02: at most 60% crypto, each coin at most 45%, cash at least 40%. Between checks, prices can
-carry a coin up; a limit fix brings it back to the targets at the next close (section 5.7).
+**Inside the Steady limits.** Every target of the tool is at most the user's mix, so every target of every order
+passes `check_targets` with h = 0.02: at most 60% crypto, each coin at most 45%, cash at least 40%. Between checks,
+prices can carry a coin up; a limit fix is ordered at the close that breaks a limit and fills at the next open
+(section 5.7).
 
-**App wording notes (to confirm):**
+**What `risk-officer` checked (2026-11-25; config only, no market data, no catalog loader called, nothing under
+`data/` or `results/` read).** A scratch script (`krs/risk/check_grid.py` in the session scratchpad, not kept):
+- `portfolio.risk_limits("steady")` on `config/risk_levels.yaml` (SHA-256 `d3f58253dfc2dbbe…`): coins BTC, ETH, USDC;
+  min_cash 0.20; max_coin 0.60; budget 0.35 (raw 35). The hold-this-mix key `hold_mix_max_rebalances_per_30d` is not
+  among the values it returns, so the run cannot read it as one of its limits.
+- All 40 targets of the grid (s 0.30/0.40/0.50/0.60 × f 0.50/0.75 × q 1, 0.75, 0.5, 0.25, 0), built through
+  `trend.in_force` and equal to (s q f, s q (1 − f)) exactly, pass `check_targets` with h = 0.02. The smallest margin
+  is 0.13 (s 0.60, f 0.75, q 1: BTC 0.45 against 0.58; cash 0.40 against 0.22).
+- Every crypto share from 0 to 0.60 (step 0.001) passes at both f, so X's target does too. The largest share that
+  passes with h is 0.78 at f 0.50 and 0.7733 at f 0.75. X_eq (a description, section 6) can exceed s when the rule is
+  rougher than X (V > 0); its λ clip then keeps it inside the limits. It is never offered to users.
+- τ is 0.5777, 0.7221, 0.8665 and 1.0832 for the four w, as section 5.3 says.
+- A limit fix from the busiest targets (60% crypto, 75% BTC) needs BTC alone up ×1.83, or both coins up ×2.67, with
+  no Monday order in between. The Monday drift trigger for BTC (above 56.25%) comes before the 60% cap.
+
+The plan's numbers stand. No number in this section was wrong. Two wording notes below are corrected (it "only ever
+holds less crypto", and the one-tool rule).
+
+**`risk-officer`'s decisions on the open risk points (2026-11-25):**
+- **Mixes:** the 8 tested mixes only (above).
+- **Trades: not under the hold-this-mix limit.** `config/risk_levels.yaml` scopes `hold_mix_max_rebalances_per_30d:
+  2` to "the self-directed hold-this-mix tool only". This tool is a separate tool, and leaving that limit off it
+  loosens nothing approved. Its own cap is built into the rule: at most one step or drift order per Monday, so at most
+  5 in any 30 days, plus limit fixes at any close (exempt, as in the hold-this-mix limit). Section 17 Q2's pinned
+  answer stands. Whether up to 5 weekly orders in a wild month fits Steady's "a few trades a month" is the owner's
+  call, because that phrase is product wording and not a config limit. The card's "up to {t_max} in a busy month"
+  counts every order after the first buy, limit fixes included. A cap would be a rule amendment before run 0 and an
+  owner-approved config entry (hard rule 10).
+- **One tool per wallet:** the app allows exactly one of "keep my risk steady", "hold this mix", buy-the-dip and
+  protect-gains on a wallet. Combinations are not offered (not "labelled untested"). This tool keeps the mix itself,
+  so it takes the place of "hold this mix" on that wallet.
+- **The 35% budget is shown, not enforced,** under the owner's tool rules (2026-11-25). This applies to self-directed
+  tools only. A managed strategy still needs it as a gate.
+
+**App wording notes (confirmed 2026-11-25, with corrections):**
 - **w is a crypto number, the wallet follows.** w is the typical weekly move of the user's BTC/ETH mix. The wallet's
-  weekly swing stays under about s × w at each check, not always: a crash can beat it for a week (the over-cap weeks
-  of D3 say how often).
-- **It only ever holds less crypto than the user's mix,** never more. It does not try to earn more.
+  weekly swing, measured over the last two weeks, stays under about s × w at each check, but not always: a crash can
+  beat it for a week (the over-cap weeks of D3 say how often).
+- **It never aims for more crypto than the user's mix** (corrected from "only ever holds less"). At the full step it
+  holds the mix. Between Mondays prices can carry a coin up to a quarter above its target, and higher only until a
+  limit fix. It does not try to earn more.
 - **It sells in wild weeks and buys back as things calm down**, a quarter of the mix's crypto at a time. After a crash
   it can buy back after part of the rebound (the missed-rebound measure).
 - **It trades back to its level** when a coin drifts more than a quarter of its target away, at a Monday.
-- **It is one tool per wallet.** With "hold this mix", buy-the-dip or protect-gains on the same wallet (not simulated),
-  their trades would fight. The app allows one or labels the combination untested.
+- **It is one tool per wallet** (corrected). With "hold this mix", buy-the-dip or protect-gains on the same wallet (not
+  simulated), their trades would fight, so the app does not allow it.
 - **The 35% budget is shown, not enforced** (D3).
 
 **Production must ship what was tested** (the app enforces these): the 14-return look-back of the user's own split;
 the Monday 00:00 UTC check and the switch-on decision; quarter steps with the floor of section 5.4; the relative band
 0.25 at Mondays; limit fixes at any daily close; one order per close, filled at the next open; BTC, ETH and USDC only.
 
-**No owner-approved limit is loosened.** The tool cannot raise crypto above the user's own mix. Whether Steady's "a few
-trades a month" caps it is an owner question (section 17).
+**Matching production controls** (for the app to enforce; `risk-officer` cannot set them):
+- **Trade router:** spot swaps between BTC or ETH and USDC only (no other coin, no leverage, no short); at most one
+  order per daily close for this tool, filled at the next open; the tool is offered only on the 8 tested mixes and the
+  4 w values.
+- **Auto-trading permission:** coins BTC, ETH and USDC. No order may target more than the user's mix (s f in BTC,
+  s (1 − f) in ETH). Holdings stay within Steady's limits as read from `config/risk_levels.yaml` at the time (each coin
+  at most 60%, cash at least 20%), restored by the limit fix. One tool per wallet.
+
+**No owner-approved limit is loosened.** The tool cannot aim above the user's own mix. Steady's limits and its 35%
+budget are read from the file, unchanged, and the hold-this-mix limit keeps its scope. Whether Steady's "a few trades a
+month" should cap this tool is the owner's call (section 17 Q2; the pinned answer stands until then).
 
 ## 15. Outputs
 
@@ -761,6 +808,7 @@ trades a month" caps it is an owner question (section 17).
 | P1-P13 | before this plan | section 2 | Prior looks, disclosed |
 | Plan | 2026-11-25 | this plan's author | **No market data**: no catalog loader called, nothing under `data/` or `results/` read. Read: P12's list. Accidental: P13. Synthetic experiments: appendix A (about 16 CPU-minutes) |
 | Other proposals | 2026-11-25 | two more proposal authors | **No market data.** The statistics-first and reuse-first proposals (not adopted; the reuse-first one was stopped unfinished). The statistics-first author ran about 18 CPU-minutes of synthetic experiments (scratch only) |
+| Range check | 2026-11-25 | `risk-officer` | **No market data**: no catalog loader called, nothing under `data/` or `results/` read. Read: this plan, the owner record of 2026-11-25, `config/risk_levels.yaml` through `portfolio.risk_limits`, the code of `portfolio.risk_limits`, `_breach_test`, `check_targets` and `trend.in_force`. A config-only scratch check of section 14 (under a second). Confirmed section 14 |
 
 **Validate-window looks used for keep-risk-steady: 0.**
 
