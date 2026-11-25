@@ -1,11 +1,19 @@
 """Diagnostic on A0's FIRST seed range only (already looked at): boundary counts by mean block length."""
-import math, sys, json, time
+import json
+import math
 import multiprocessing as mp
+import sys
+import time
 from concurrent.futures import ProcessPoolExecutor
+
 import numpy as np
-sys.path.insert(0, "/home/user/osprey"); sys.path.insert(0, "/home/user/osprey/research/keep-risk-steady")
-import controls as C
-from lab.runner import keeprisk as K
+
+sys.path.insert(0, "/home/user/osprey")
+sys.path.insert(0, "/home/user/osprey/research/keep-risk-steady")
+import controls as C  # noqa: E402
+
+from lab.runner import keeprisk as K  # noqa: E402
+
 R = C.R
 BLOCKS = (60, 120, 250, 500)
 _IDX = {}
@@ -54,7 +62,8 @@ if __name__ == "__main__":
                     tests += 1
                     up += (1 + int((star >= vbar).sum())) / 10001 < 0.05
                     lo += (1 + int((star <= vbar).sum())) / 10001 < 0.05
-                    calm += pc < 0.05; eq += pe < 0.05
+                    calm += pc < 0.05
+                    eq += pe < 0.05
                     sds.append(np.std(star))
             out[f"{s} block {m}"] = dict(upper=up, lower=lo, tests=tests, p_calm_lt_05=calm, p_eq_lt_05=eq,
                                          boot_sd_median=round(float(np.median(sds)), 4))
