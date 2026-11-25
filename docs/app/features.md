@@ -42,10 +42,13 @@ Customers choose how much risk they want; each level has its own strategies, all
 
 | Risk level | For someone who… | Launch strategy | Add later |
 |---|---|---|---|
+| **Cash-first** (working name; owner, 2026-11-25) | Is new and nervous: mostly cash (USDC) with small slices of BTC and ETH | Presets of "hold this mix" and starter templates; limits and budget TBD | — |
 | **Steady** | Wants smaller swings | Rebalancing: BTC, ETH and a slice of cash; trades only when the mix drifts | Trend following that moves to cash in downtrends (tested 2026-11-23: no edge; [what the trend study taught](#what-the-trend-study-taught)) |
 | **Balanced** | Is OK with normal crypto swings | Dip buying: buys BTC or ETH after a set drop, capped | A second dip strategy with different timing |
 | **Bold** | Accepts big drops for bigger upside | Momentum: holds the strongest few of the most liquid tokens on Base, rotates weekly | Mean reversion, grid trading |
+| **Explorer** (working name; owner, 2026-11-25) | Wants a wider choice of tokens and accepts the biggest swings | Limits, coin list and budget TBD | — |
 
+- **Five levels (owner, 2026-11-25):** Cash-first, Steady, Balanced, Bold and Explorer. Each level gets recommended starting points (our strategies, "hold this mix" presets and rule templates), which customers then adjust within that level's limits. The two new levels' limits, coin lists and drawdown budgets are to be set in `config/risk_levels.yaml` by `risk-officer`, with the owner's approval; the names are working names.
 - **Customers choose, we label.** The app doesn't recommend a level or strategy for a specific person; going above your level means a warning and a confirm.
 - **Levels are measured.** A strategy whose live results leave its level's range is halted automatically and reviewed.
 - **Guardrails per level** (allowed coins, max per coin, cash floor) are enforced by the trade router, and the coin list is also locked into each auto-trading permission.
