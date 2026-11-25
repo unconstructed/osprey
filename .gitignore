@@ -13,4 +13,5 @@ __pycache__/
 .hypothesis/
 mutants/
 .coverage
+.coverage.*
 htmlcov/
