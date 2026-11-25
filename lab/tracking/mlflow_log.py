@@ -1,7 +1,8 @@
 """Every search trial as an MLflow run (AGENTS.md "Running many simulations", rule 4).
 
 The Optuna journal and the Parquet files ``lab.search.study`` writes stay the record that DSR and PBO read. This
-module copies a study into MLflow afterwards, so every trial can be browsed (``uv run mlflow ui``): one parent run
+module copies a study into MLflow afterwards, so every trial can be browsed
+(``uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db``; a plain ``mlflow ui`` opens another store): one parent run
 per study, holding the search config, and one child run per finished trial (complete, failed or pruned), with
 
 - **params**: the trial's parameters;
