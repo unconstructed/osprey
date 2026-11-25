@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from lab.runner import reference
+from lab.runner import nautilus, reference
 from lab.runner.interface import validate_bars
 from lab.runner.reference import Costs
 
@@ -140,6 +140,26 @@ RUNNERS: tuple[Runner, ...] = (
         bad_params=({"n_trades": 3}, {"n_trades": -1, "hold": 3}, {"n_trades": 50, "hold": 30}),
     ),
 )
+
+
+REFERENCE_RUNNERS = RUNNERS
+
+# Milestone 2: every reference entry again, on NautilusTrader (lab/runner/nautilus.py). Same rule code, same
+# params and bad params; the book, the orders, the fills and the fees are Nautilus's. Its tolerance is the
+# runner's written-down fixed-point round-off (nautilus.TOL).
+NAUTILUS_RUNNERS = tuple(
+    Runner(
+        r.name.replace("ref_", "nautilus_", 1),
+        nautilus.wrap(r.fn),
+        r.params,
+        supports_costs=r.supports_costs,
+        tol=nautilus.TOL,
+        bad_params=r.bad_params,
+    )
+    for r in REFERENCE_RUNNERS
+)
+
+RUNNERS = REFERENCE_RUNNERS + NAUTILUS_RUNNERS
 
 
 @pytest.fixture(scope="session", params=RUNNERS, ids=[r.name for r in RUNNERS])

@@ -77,8 +77,8 @@ Then **start with [TESTING.md section 5](TESTING.md#5-open-work-in-order). It is
 | `lab/data/loaders.py`, `lab/data/synthetic.py` | Kraken and Binance loaders; synthetic bars for tests and demos | Built (starter code) |
 | `scripts/demo.py` | End-to-end demo on synthetic data | Built (starter code) |
 | `lab/data/build.py` | Downloaders, quality checks, catalog writer, `SNAPSHOT.json` | To build (milestone 1) |
-| `lab/costs/` | Nautilus fee and fill models for Base DEX trading | To build (milestone 2) |
-| `lab/runner/nautilus.py` | `BacktestFn` on a NautilusTrader v2 `BacktestNode` | To build (milestone 2) |
+| `lab/costs/` | Nautilus fee model for Base DEX trading (`fees.py`: pool + aggregator + size-based slippage + gas, from `config/costs.yaml`; slippage charged as a fee, so no fill model is needed) | Built (milestone 2, 2026-11-25) |
+| `lab/runner/nautilus.py` | `BacktestFn` on a NautilusTrader v2 `BacktestEngine` (one engine per run, disposed after use), running the reference rules' own decision code; passes the contract suite and the parity test; throughput in `scripts/nautilus_throughput.py` | Built (milestone 2, 2026-11-25); bars come from `lab.data.catalog.load_bars`; MLflow logging still to do |
 | MLflow logging | Each trial (milestone 2) and each model version (AGENTS.md states no milestone) | To build |
 | `strategies/` | The three launch strategies as Nautilus strategies | To build (milestone 3) |
 | Audits on real data | Search and validation with the Nautilus runner; first audit reports | To build (milestone 4) |
