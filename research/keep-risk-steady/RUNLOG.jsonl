@@ -1,1 +1,2 @@
 {"commit": "2a43cc49759ce5f527443335b3218b65b8ff315a", "config_hash": "de32565d501286b90cf30ae9fec866061a52e1672f41867e54cec173c3ca5bb2", "data": "real", "dirty": false, "out_dir": "/home/user/osprey/results/keep-risk-steady", "run": 0, "script": "run.py", "snapshot_id": "1746a21b75683e76", "utc": "2026-11-25T20:03:17.448420+00:00"}
+{"data": "real", "event": "complete", "run": 0, "script": "run.py", "utc": "2026-11-25T20:11:38.148604+00:00"}
