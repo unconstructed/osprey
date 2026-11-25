@@ -67,7 +67,8 @@ TOL = 1e-9  # contract tolerance: fixed-point round-off of 1e-12 units and price
 # A leg smaller than this share of the book is fixed-point round-off, not a trade: the book's weight after a fill
 # is off its target by up to ~1e-12 x price / book, and a rule that keeps a weight (constant_mix, band 0) would
 # otherwise send that difference back as an order and pay gas for it. The reference runner trades such legs in
-# float arithmetic (TESTING.md bug #36: documented, reachable only on flat prices); this runner never does.
+# float arithmetic (TESTING.md bugs #36 and #61): mostly on flat prices, and rarely when a moving price comes back
+# to within ~1e-9 of the last fill's weight (once in 1,750 hourly 50/50 rebalances, 2017-2022). This runner never does.
 MIN_LEG = 1e-9
 _STEP = Decimal(1).scaleb(-PRECISION)
 USDX = Currency("USDX", PRECISION, 0, "lab dollar (USDC)", CurrencyType.CRYPTO)

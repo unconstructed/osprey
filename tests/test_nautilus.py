@@ -62,7 +62,8 @@ COST_MODELS = (
     n=st.integers(20, 300),
     seed=st.integers(0, 2**32 - 1),
     # Moving prices only: on a flat path the reference trades round-off legs that this runner does not
-    # (test_round_off_legs_are_not_traded pins that difference); every other path must agree.
+    # (test_round_off_legs_are_not_traded pins that difference; on moving prices it is rare enough that these
+    # draws never reach it, and scripts/nautilus_parity_real.py checks it on real hourly bars); every path must agree.
     vol=st.sampled_from([0.01, 0.04, 0.1]),
     gap=st.sampled_from([0.0, 0.005, 0.03]),
     costs=st.sampled_from(COST_MODELS),
