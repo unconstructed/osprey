@@ -381,7 +381,7 @@ No jargon without a plain explanation, no long tables, nothing the owner has to 
 Tokens cost the owner money. Keep every task lean, and warn before spending:
 
 1. **Estimate before you start.** Before launching an agent, a workflow, a background job or any task likely to
-   write more than about 50,000 tokens or run longer than about 15 minutes, tell the owner the rough token cost (tokens
+   write more than about 500,000 tokens or run longer than about 15 minutes, tell the owner the rough token cost (tokens
    written, and tokens re-read from cache as the context grows) and wait for an OK. The same goes for adding scope to
    a running job (more rounds, more analysis).
 2. **Pick the cheapest way that does the job.** Do small things directly instead of through an agent; use a lower
