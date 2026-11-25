@@ -26,6 +26,10 @@ from nautilus_trader.model import Currency, Money
 from lab.runner.reference import Costs
 
 INTENDED_TAG = "intended_usd="
+# A re-cut is not a swap: the multi-asset runner (lab/runner/nautilus_portfolio.py) moves a coin that sits at its target
+# (to round-off) by its share of the other legs' fees, as the lab's contract shares a fill's cost pro rata. It pays
+# nothing; the fill's fees are charged on the legs that trade.
+RECUT_TAG = "recut"
 
 
 def intended_tag(notional_usd: float) -> str:
@@ -60,4 +64,6 @@ class DexFeeModel(FeeModel):
         return float(fill_quantity) * float(fill_px)
 
     def get_commission(self, order, fill_quantity, fill_px, instrument) -> Money:
+        if RECUT_TAG in (order.tags or []):
+            return Money(0, self.currency)
         return Money(fee_usd(self.costs, self.notional(order, fill_quantity, fill_px)), self.currency)
