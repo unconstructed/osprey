@@ -272,3 +272,11 @@ running:
 7. **The label rule for five levels:** the lowest level whose limits allow the mix and whose budget its fall fits?
 8. **The Explorer vetting thresholds** (100 bps at 10,000 USD, 1M USD daily volume, 3 years of history): set now, or
    after `data-engineer`'s measurements?
+
+## 7. Owner answers (2026-11-25)
+
+1. **Cash-first: about 8% crypto.** Read as: the limits stay 90% cash and at most 5% per coin, and the lab's margin at this level is 1 point instead of 2, so targets go up to 4% BTC + 4% ETH. Derived worst falls at 8% crypto (the method of section 3): about 12-16% historical, and about 15-25% with the Monte Carlo factor of 1.2-1.6. The deep end reaches the 25% budget, so a measured run at the 8% mixes should come before any Cash-first default is shown.
+2. **Interim budgets approved:** 25% (Cash-first) and 90% (Explorer), to be replaced as section 3 describes.
+3. **Stop-loss: required at Explorer only.** Bold stays as it is today.
+
+Questions 3 and 5-8 of section 6 are still open. `config/risk_levels.yaml` is still unchanged: writing it, with the test updates of section 5, waits until the TESTING.md 5.4 work is finished.
