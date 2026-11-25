@@ -21,6 +21,10 @@ that costs, and it picks a suggested default by rules fixed in advance.
   ([A0's outputs](a0_first_range/)). Longer resampling blocks did not fix it (a recount at 120-500: 94-109). The
   owner decided ([the decision](../../reports/director/2026-11-25-owner-answer-keeprisk-a0-alarm.md), amendment M3):
   every decision rule stays as pinned (the error only makes D1 more cautious), and a setting labelled NO NOTICEABLE
-  DIFFERENCE, SMALLER BUT BELOW NOTICE or ROUGHER is shown to users with the CAN'T TELL sentence. Next: the tiers on
-  M3's commit, then run 0. No market bar read for this study yet. Validate-window looks used: 0 (none planned). The test window is never read.
+  DIFFERENCE, SMALLER BUT BELOW NOTICE or ROUGHER is shown to users with the CAN'T TELL sentence. The tiers passed
+  on `2a43cc4` (after a lint fix in A0's diagnostic). **Run 0** (train window, 117,760 runs, 0 failed): **NO DEFAULT**,
+  label MISSING (boom: without the best 2). Against holding the same average crypto steadily the tool's down days were
+  a median 0-4% smaller, a 10% cut ruled out at 31 of 32 cells (NO NOTICEABLE DIFFERENCE), its falls about the same or
+  deeper; a plain lower crypto share with the same calm returned 1-9 points a year more ([RESULTS.md](RESULTS.md)).
+  Next: one audit. Validate-window looks used: 0 (none planned). The test window is never read.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.
