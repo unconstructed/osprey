@@ -1,0 +1,175 @@
+{
+ "failures": [],
+ "runtime_s": 4056.1616377830505,
+ "summary": {
+  "alarms": [
+   "A0-4"
+  ],
+  "boundary": {
+   "NC": {
+    "lower": 20,
+    "tests": 400,
+    "upper": 17
+   },
+   "NW": {
+    "lower": 16,
+    "tests": 400,
+    "upper": 13
+   },
+   "PG": {
+    "lower": 96,
+    "tests": 400,
+    "upper": 0
+   }
+  },
+  "e1_size": {
+   "0.08": 6,
+   "0.1": 1,
+   "0.12": 4,
+   "0.15": 6
+  },
+  "failed": {
+   "NC": 0,
+   "NS": 0,
+   "NW": 0,
+   "PG": 0,
+   "PR": 0
+  },
+  "false_calmer": {
+   "NC": 0,
+   "NS": 0,
+   "NW": 0
+  },
+  "false_default": {
+   "NC": 1,
+   "NS": 1,
+   "NW": 0
+  },
+  "limits": {
+   "boundary": 30,
+   "count": 10
+  },
+  "low_power": false,
+  "panels": 100,
+  "power": {
+   "PG": {
+    "calmer_any": 10,
+    "default": {
+     "0.08": 11,
+     "0.1": 15,
+     "0.12": 12,
+     "0.15": 22
+    },
+    "e1": {
+     "0.08": 99,
+     "0.1": 100,
+     "0.12": 95,
+     "0.15": 87
+    },
+    "holm": {
+     "0.08": 5,
+     "0.1": 10,
+     "0.12": 7,
+     "0.15": 6
+    },
+    "labels": {
+     "0.08": {
+      "CALMER THAN HOLDING LESS": 5,
+      "CAN'T TELL": 84,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 11,
+      "ROUGHER THAN HOLDING LESS": 0,
+      "SMALLER, BUT BELOW NOTICE": 0
+     },
+     "0.1": {
+      "CALMER THAN HOLDING LESS": 10,
+      "CAN'T TELL": 67,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 23,
+      "ROUGHER THAN HOLDING LESS": 0,
+      "SMALLER, BUT BELOW NOTICE": 0
+     },
+     "0.12": {
+      "CALMER THAN HOLDING LESS": 6,
+      "CAN'T TELL": 51,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 42,
+      "ROUGHER THAN HOLDING LESS": 0,
+      "SMALLER, BUT BELOW NOTICE": 1
+     },
+     "0.15": {
+      "CALMER THAN HOLDING LESS": 3,
+      "CAN'T TELL": 37,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 57,
+      "ROUGHER THAN HOLDING LESS": 0,
+      "SMALLER, BUT BELOW NOTICE": 3
+     }
+    }
+   },
+   "PR": {
+    "calmer_any": 21,
+    "default": {
+     "0.08": 14,
+     "0.1": 22,
+     "0.12": 16,
+     "0.15": 24
+    },
+    "e1": {
+     "0.08": 100,
+     "0.1": 95,
+     "0.12": 87,
+     "0.15": 71
+    },
+    "holm": {
+     "0.08": 17,
+     "0.1": 15,
+     "0.12": 13,
+     "0.15": 10
+    },
+    "labels": {
+     "0.08": {
+      "CALMER THAN HOLDING LESS": 17,
+      "CAN'T TELL": 73,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 10,
+      "ROUGHER THAN HOLDING LESS": 0,
+      "SMALLER, BUT BELOW NOTICE": 0
+     },
+     "0.1": {
+      "CALMER THAN HOLDING LESS": 14,
+      "CAN'T TELL": 59,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 26,
+      "ROUGHER THAN HOLDING LESS": 0,
+      "SMALLER, BUT BELOW NOTICE": 1
+     },
+     "0.12": {
+      "CALMER THAN HOLDING LESS": 10,
+      "CAN'T TELL": 41,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 46,
+      "ROUGHER THAN HOLDING LESS": 1,
+      "SMALLER, BUT BELOW NOTICE": 2
+     },
+     "0.15": {
+      "CALMER THAN HOLDING LESS": 7,
+      "CAN'T TELL": 22,
+      "DOES NOT STEP BACK": 0,
+      "MISSING": 0,
+      "NO NOTICEABLE DIFFERENCE": 68,
+      "ROUGHER THAN HOLDING LESS": 1,
+      "SMALLER, BUT BELOW NOTICE": 2
+     }
+    }
+   }
+  }
+ }
+}

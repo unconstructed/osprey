@@ -14,6 +14,10 @@ that costs, and it picks a suggested default by rules fixed in advance.
   reviewed and fixed (`lab/runner/keeprisk.py`, `run.py`, `controls.py`; TESTING.md #75-#77; amendment M1), synthetic
   data only. The three tiers passed on `6f91f46`. A1 (synthetic timing) projected A0 above its 300 CPU-minute limit;
   the owner raised the limit to 600 ([the decision](../../reports/director/2026-11-25-owner-answer-keeprisk-a0-budget.md),
-  amendment M2). Next: the tiers on the amendment's commit, A0, then run 0. No run, and no market bar read for this
-  study yet. Validate-window looks used: 0 (none planned). The test window is never read.
+  amendment M2). The tiers passed on `71697da` (2750 passed, 100% branch coverage; the deep profile 2732 passed).
+  **A0 ran on `71697da` (synthetic only, 100 panels a set, 4,056 s) and raised alarm A0-4**: on PG (volatility
+  clusters with a real effect) the resampling was too confident in its lower tail, 96 of 400 boundary tests against
+  a limit of 30 (NC 20, NW 16; the upper tail 0, 17 and 13). A0-1, A0-2 and A0-3 did not fire. Stop rule 9: run 0
+  does not start; the owner decides the fix ([A0's outputs](a0_first_range/)). No market bar read for this study
+  yet. Validate-window looks used: 0 (none planned). The test window is never read.
 - Every number it will produce is SCOUTING (the reference engine, placeholder costs), not NautilusTrader.

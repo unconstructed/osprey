@@ -1,0 +1,111 @@
+{
+ "fast": false,
+ "git": {
+  "changes": [],
+  "commit": "71697da413eb8664ea782e1f26726e1d6e558739",
+  "dirty": false
+ },
+ "label": "SCOUTING, placeholder costs, train years 2017-2022, reference engine; claims no return edge",
+ "readings": {
+  "alarm_limits": "'more than 10 of 100' and 'more than 30 of 400' as more than n // 10 and more than 3 n // 10 (80 panels: 8 and 24)",
+  "boundary": "V-bar is the mean (math.fsum) of the other panels' finite V at that w; a panel with a MISSING V is not tested; each tail's count is pooled over the four w",
+  "copies": "The guarded copies' and their mixes' runs are measured by DD only (no fee check): A0 is a check of the statistics, not of the accounting, which run 0 checks on every run",
+  "exit": "An alarm prints ALARM and exits 3 after writing a0.json; no alarm exits 0. The last line names the alarms ('A0 alarms: A0-<n>, ...') or prints run.py's pinned phrase 'A0 alarms: none' (stop rule 8's record)",
+  "fallback": "100 panels a set when the projection at 100 is at most 600 CPU-minutes (the owner's limit, raised from 300 by amendment M2); else 80 when the projection at 80 is; else refused (stop rule 7)",
+  "nc_windows": "On NC the q of each window (its switch-on decision included) is computed on the schedule panel and run on the price panel's window",
+  "resampling_seed": "Each panel's RISK-X uses run 0's procedure, one index set from default_rng(0) (section 9.2) over the 2189 return rows of the train grid, shared by every panel; the disjointness of section 13 is the panels' market streams'"
+ },
+ "script": "controls.py",
+ "second_range": false,
+ "seeds": {
+  "NC": 250000,
+  "NC_schedule": 260000,
+  "NS": 240000,
+  "NS_shuffle": 241000,
+  "NW": 230000,
+  "PG": 200000,
+  "PR": 220000
+ },
+ "sizes": {
+  "copy_stride": 1,
+  "panels": 100,
+  "resamples": 10000,
+  "windows": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30,
+   31,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48
+  ]
+ },
+ "timing": {
+  "a0_cpu_minutes": {
+   "100": 366.8176946056539,
+   "80": 293.45614812495313
+  },
+  "a0_limit_cpu_minutes": 600.0,
+  "counts": {
+   "copy_pairs": 40192,
+   "index_sets": 10,
+   "resamplings": 448,
+   "span_runs": 768,
+   "window_runs": 36608
+  },
+  "cpu_minutes": 31.78528041204648,
+  "limit_cpu_minutes": 240.0,
+  "reps": 3,
+  "seconds": {
+   "a0_copy": 0.03261239400035265,
+   "copy": 0.029841894000128377,
+   "index_set": 0.5977321290001782,
+   "risk_x": 0.28223771100056183,
+   "span": 0.024975946999802545,
+   "window": 0.015190944000096351
+  }
+ },
+ "utc": "2026-11-25T14:30:47.090826+00:00"
+}
