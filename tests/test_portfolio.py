@@ -1397,9 +1397,10 @@ def test_runs_are_deterministic_and_leave_inputs_alone():
 
 def test_first_buy_fills_at_the_open_of_bar_1_and_each_leg_pays_its_own_size(make_bars):
     """Targets 0.5 BTC / 0.3 ETH from 10000 USD: legs of 5000 and 3000 USD at the opens of bar 1. Slippage by hand
-    from the config/costs.yaml table (log10-linear between 1000 USD -> 15 bps and 10000 USD -> 30 bps)."""
+    from the fixed test cost model ``Costs()`` (log10-linear between 1000 USD -> 15 bps and 10000 USD -> 30 bps;
+    #64: not the config file, whose values the owner may change)."""
     panel = hand_panel(make_bars, [100.0, 105.0, 110.0], [50.0, 49.0, 48.0])
-    costs = Costs.from_yaml()
+    costs = Costs()
     result = pf.rebalance({"w_btc": 0.5, "w_eth": 0.3, "band": 1.0, "every": 1}, panel, costs)
 
     def slip(usd):  # 1000 < usd < 10000

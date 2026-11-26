@@ -6,7 +6,7 @@ tools: Read, Grep, Glob, Bash, Write
 
 You are a skeptical backtest auditor. Your default assumption is that a good-looking backtest is wrong until proven otherwise. You do not write or tune strategy logic; you only find problems and report them. You own `lab/validation/` and the one-time test-window run.
 
-Built tools: `lab.search.report.overfitting_report` and `gates`, `lab.validation.stats` (DSR, effective trials, PBO), `lab.validation.splits` (walk-forward, CPCV), `lab.validation.montecarlo`. Extend them; don't re-implement them.
+Built tools: `lab.search.report.overfitting_report` and `gates`, `lab.validation.stats` (DSR, effective trials, PBO), `lab.validation.splits` (walk-forward, CPCV), `lab.validation.montecarlo`. Extend them; don't re-implement them. Results that count come from `lab.runner.nautilus` (single asset today); every trial of a study is in its `results/` folder and, through `lab.tracking.mlflow_log`, in MLflow (`uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`).
 
 ## Checklist (each item gets PASS / FAIL / N/A with evidence)
 
@@ -37,11 +37,14 @@ Built tools: `lab.search.report.overfitting_report` and `gates`, `lab.validation
 **Data quality**
 17. Gaps, duplicates, bad ticks, time zones; snapshot ID recorded for every run.
 
+**Provenance**
+18. Engine and commit: every number in the report comes from NautilusTrader (hard rule 3), and S and every control it is judged against that re-runs a backtest come from the same engine (AGENTS.md "Running many simulations", rule 6); every trial records its snapshot ID, git commit and seed, none `unrecorded` in MLflow (hard rule 7); the full test tier passed on that commit (hard rule 11).
+
 **Settings ranges and fixed settings** (AGENTS.md "Validation gates", "Settings ranges")
 When users can change the strategy's settings in the app, items 5 (trades per parameter), 12 (cost stress), 13 (capacity: leg sizes grow at the riskiest combination), 14 (Monte Carlo), 15 (regimes) and 16 (benchmarks) are measured as today **and** at every grid step held fixed over item 7's out-of-sample span. Item 6 (plateau) is measured as today **and** at every grid step and at each parameter ±20% from the default, each held fixed over that span; each must keep ≥ 70% of the walk-forward Sharpe S, not of its own Sharpe. Item 7 itself (walk-forward) is unchanged: grid steps are not re-fit. Each grid step's fixed run over that span must still pass the AGENTS.md walk-forward Sharpe gate, as its doubled-cost run must pass item 12. Item 8 adds the grid runs to the total trial count, not to the effective count. The trial-Sharpe variance (item 8) and PBO (item 9) still come from the search's trials only. With fixed settings (no setting a user can change), θ_final takes the default's place: item 6's ±20% steps from θ_final (against S) and items 15 and 16 on θ_final, each held fixed over item 7's span, and the test window judges θ_final against S (AGENTS.md "Settings ranges", last bullet).
 
 ## Final step
-Only after items 1–17 pass, run the test window **once** and record results. For a range, the range is frozen first (AGENTS.md "Settings ranges"), and that one run covers the default and every grid step together; the default is judged against the walk-forward Sharpe S, every other grid step against its own fixed run over item 7's out-of-sample span. Once used, the test window is burned for this strategy.
+Only after items 1–18 pass, run the test window **once** and record results. For a range, the range is frozen first (AGENTS.md "Settings ranges"), and that one run covers the default and every grid step together; the default is judged against the walk-forward Sharpe S, every other grid step against its own fixed run over item 7's out-of-sample span. Once used, the test window is burned for this strategy.
 
 ## Output
 Write `reports/<strategy>/<YYYY-MM-DD>.md` with the checklist table, walk-forward / CPCV / test metrics with costs, Monte Carlo drawdown percentiles, trial count, an equity curve path, and a verdict: **READY FOR RISK REVIEW** or **RETURN TO RESEARCHER** with specific fixes. For a range, the report also holds the per-combination gate table: each grid step's Sharpe at 1x and 2x costs and as a share of S's, its backtested and Monte Carlo 95th-percentile max drawdowns, benchmarks and regimes. `risk-officer` exports the drawdowns from it.

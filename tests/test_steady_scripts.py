@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -1333,7 +1334,9 @@ def test_real_runs_use_the_pinned_folders_only(tmp_path, clean_git, monkeypatch,
     out, catalog_dir = real_folders(monkeypatch, tmp_path)
     cheap = copy_config(tmp_path / "cheap")
     path = cheap / "costs.yaml"
-    path.write_text(path.read_text().replace("pool_fee_bps: 5", "pool_fee_bps: 0", 1))
+    text = path.read_text()
+    path.write_text(re.sub(r"^aggregator_fee_bps: \S+", "aggregator_fee_bps: 0", text, count=1, flags=re.M))
+    assert path.read_text() != text  # a cheaper copy, whatever the real file holds (#64)
     elsewhere = tmp_path / "elsewhere"
     for main in (RT.main, RV.main):
         for args, flag in (
@@ -1614,7 +1617,7 @@ def _another_snapshot(original):
 
 def _b4_2x_differs(original):
     def static_b4(panel, window, params, costs, book, *, like=None):
-        if costs.pool_fee_bps > Costs.from_yaml().pool_fee_bps:  # the 2x model
+        if costs.gas_usd_per_trade > Costs.from_yaml().gas_usd_per_trade:  # the 2x model (#64)
             params = {**params, "coin_share": params["coin_share"] * 0.99}
         return original(panel, window, params, costs, book, like=like)
 

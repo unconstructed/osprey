@@ -85,6 +85,7 @@ __pycache__/
 /data/          # leading slash: ignore only the top-level folder, not lab/data/
 /results/
 /mlruns/
+/mlflow.db      # the empty store a plain `mlflow ui` creates; ours is mlruns/mlflow.db
 *.parquet
 .hypothesis/
 mutants/
@@ -106,20 +107,22 @@ osprey/
 │   ├── costs.yaml               # DEX cost model assumptions
 │   └── risk_levels.yaml         # drawdown budgets and coin lists per risk level
 ├── lab/
-│   ├── data/                    # loaders (built), synthetic test data (built); downloaders + catalog writer (to build)
-│   ├── costs/                   # Nautilus fee and fill model subclasses for Base DEX trading (to build)
-│   ├── runner/                  # BacktestFn interface + reference backtester (built); Nautilus runner (to build)
+│   ├── data/                    # loaders, downloaders, quality checks, catalog writer, panels, synthetic test data (built)
+│   ├── costs/                   # Nautilus fee model for Base DEX trading (built, milestone 2)
+│   ├── runner/                  # BacktestFn interface, reference engines, single-asset Nautilus runner (built)
+│   ├── tracking/                # MLflow logging of search trials (built, milestone 2)
 │   ├── search/                  # Optuna studies, walk-forward optimization, stable regions, reports (built)
 │   ├── validation/              # purged splits, CPCV, DSR, PBO, Monte Carlo (built)
 │   ├── models/                  # features, labels, baselines, training, artifacts, live parity (built)
 │   └── reports/                 # audit reports and tearsheets
-├── scripts/demo.py              # end-to-end demo on synthetic data (built)
+├── scripts/                     # demo.py (end-to-end demo on synthetic data); Nautilus throughput and real-data parity checks
 ├── strategies/<name>/           # strategy.py, params.yaml, README.md
 ├── research/                    # notebooks and scratch; never imported by lab/ or strategies/
 ├── exports/<name>/              # approved, pinned configs for production
 ├── reports/<name>/<date>.md     # audit reports (committed); director reviews in reports/director/
 ├── data/                        # git-ignored: raw downloads and the Nautilus catalog
 ├── results/                     # git-ignored: trial results (Parquet), Optuna journals
+├── mlruns/                      # git-ignored: the MLflow store, mlruns/mlflow.db (SQLite)
 └── tests/                       # property, leakage, known-answer, calibration and contract tests
 ```
 
@@ -130,6 +133,8 @@ osprey/
 | Kraken downloadable OHLCVT | Full candle history for every pair, plus quarterly updates | Free | Primary daily and hourly bars for BTC and ETH |
 | Binance public data (data.binance.vision) | Zipped candle and trade files; BTC/USDT daily from August 2017 | Free | Second source; wider token coverage for the Bold list |
 | Coinbase public REST candles | Recent candles | Free | Cross-check, and the closest match to Base prices |
+| 0x Swap API price quotes (`api.0x.org`; approved, owner, 2026-11-25) | Indicative prices for swaps on Base at several trade sizes; read only, no order is ever sent | Free API key, in `.env` or the environment's secure store, never in code, chat or logs | Measuring the pool fee, aggregator fee and slippage for `config/costs.yaml` |
+| A public Base RPC (read only; approved, owner, 2026-11-25) | Gas prices and cbBTC/USDC pool prices on Base | Free | Measuring gas and the gap between cbBTC on Base and BTC on Coinbase |
 | Tardis (Nautilus integration) | Tick and order book data | Paid | Later, only if a strategy needs intraday detail |
 | CoinAPI (Nautilus adapter, flat files) | Normalized multi-exchange data | Paid | Later, same |
 
@@ -148,18 +153,19 @@ Every backtest runs with the cost model on. A zero-cost backtest is not a result
 
 Production trades are swaps on Base through the 0x aggregator. Costs per trade = pool fee + aggregator fee (if any) + slippage (grows with trade size) + gas (we sponsor it, so it's our cost). Implement these as Nautilus v2 fee and fill model subclasses in `lab/costs/`.
 
-Start with pessimistic placeholders, then replace them with measured values (`data-engineer` samples 0x price quotes on Base at several trade sizes):
+Measured values (owner-approved 2026-11-25; [reports/costs/2026-11-25.md](reports/costs/2026-11-25.md), one evening of read-only 0x quotes on Base). Re-measure before launch; the routing (0x, direct pools, or 0x without the bad "LunarBase" source) is still open, and the report gives the costs for each:
 
 ```yaml
-# config/costs.yaml — PLACEHOLDERS until measured. Pessimistic on purpose.
+# config/costs.yaml — MEASURED 2026-11-25. 90th percentiles, rounded up.
 venue: base_via_0x
-pool_fee_bps: 5            # major-pair pool fee tiers seen at 1–5 bps
-aggregator_fee_bps: 0      # confirm with 0x
+pool_fee_bps: 0            # inside 0x's price; counted in slippage_bps
+aggregator_fee_bps: 15     # 0x volume fee, measured on every sample
 slippage_bps:              # by trade size in USD
-  "100": 10
-  "1000": 15
-  "10000": 30
-gas_usd_per_trade: 0.10    # sponsored by us; replace with measured Base gas
+  "100": 30
+  "1000": 54
+  "10000": 26
+  "50000": 5
+gas_usd_per_trade: 0.15    # sponsored by us; worst measured $0.12, plus margin
 stress_multiplier: 2.0     # every finalist is re-run with all costs doubled
 ```
 
@@ -176,13 +182,16 @@ Walk-forward and cross-validation happen inside train + validate. The test windo
 
 ## Risk levels
 
+The owner set **five levels** on 2026-11-25, from least to most risk: Cash-first, Steady, Balanced, Bold and Explorer (working names; [docs/app/features.md](docs/app/features.md), "Strategies by risk level"). The file below still holds three. Cash-first and Explorer, with the owner's answers so far (Cash-first at about 8% crypto; interim budgets of 25% and 90%; a stop-loss required at Explorer only), are drafted in [reports/risk-officer/2026-11-25-new-risk-levels.md](reports/risk-officer/2026-11-25-new-risk-levels.md). `risk-officer` writes them into the file, with the test updates that proposal lists, once the TESTING.md 5.4 work is finished. The lab's code reads levels only from the file, so no study can use the new levels before then.
+
 ```yaml
-# config/risk_levels.yaml — owned by risk-officer. Budgets are TBD from the first backtests.
+# config/risk_levels.yaml — owned by risk-officer. Steady's budget is set (owner-approved); the others are TBD.
 steady:
   coins: [BTC, ETH, USDC]
   min_cash_pct: 20
   max_coin_pct: 60
-  max_drawdown_budget_pct: TBD   # set from Monte Carlo 95th-percentile drawdown
+  max_drawdown_budget_pct: 35   # owner-approved 2026-11-21 (Monte Carlo 95th-percentile max drawdown)
+  hold_mix_max_rebalances_per_30d: 2   # owner-approved 2026-11-22: the hold-this-mix tool only, not our strategies
 balanced:
   coins: [BTC, ETH, USDC]        # plus vetted large tokens on Base, once listed
   stop_loss_required: true
@@ -202,14 +211,16 @@ bold:
 
 Benchmarks every strategy must be compared against: buy-and-hold BTC, a 50/50 BTC/USDC monthly rebalance, and random-entry strategies with the same number of trades.
 
+Cash-first and Explorer have no launch strategy yet. Like Bold, Explorer needs an engine that holds tokens other than BTC and ETH: `lab/runner/portfolio.py` and `risk_limits` accept BTC, ETH and USDC only.
+
 ## Starter code (already built and tested)
 
-The smart search, validation statistics and prediction pipeline already exist, with 159 tests (100% branch coverage) and an end-to-end demo. Build on them; don't rewrite them. Testing found and fixed 7 bugs, including three in the reference backtester's accounting; two more findings are open. **Start with [TESTING.md](TESTING.md) section 5**, then run `uv run pytest -n auto` and `uv run python scripts/demo.py`.
+The smart search, validation statistics and prediction pipeline came as tested starter code (159 tests) and were merged with this repo on 2026-11-19 ([TESTING.md](TESTING.md) section 4a). Build on them; don't rewrite them. The current test count, coverage and bug log are in TESTING.md sections 3 and 4. **Start with [TESTING.md](TESTING.md) section 5**, then run `uv run pytest -n auto` and `uv run python scripts/demo.py`.
 
 | Module | What it does |
 |---|---|
-| `lab/runner/interface.py` | **The contract.** `backtest_fn(params, bars) -> DataFrame` with columns `ret` (net per-period return after all costs), `position`, `turnover`, plus `attrs["trade_returns"]` |
-| `lab/runner/reference.py` | Small pure-Python dip-buy, buy-and-hold and constant-mix backtests with a `Costs` model (reads `config/costs.yaml`). Positions are held as coin units between trades (weights drift); only trading bars pay costs. **Tests and demos only**; never in reports |
+| `lab/runner/interface.py` | **The contract.** `backtest_fn(params, bars) -> DataFrame` on exactly `bars.index`, with columns `ret` (net per-bar return after all costs; `ret[0] = 0`), `position`, `turnover` and `cost`, plus `attrs["trade_returns"]` and `attrs["n_trades"]`. A decision at the close of bar t fills at the open of bar t+1 ([TESTING.md 4a.5](TESTING.md#4a5-the-backtest-contract)). `validate_bars` and `validate_result` check both sides |
+| `lab/runner/reference.py` | Small pure-Python dip-buy, buy-and-hold, constant-mix, random-entry and scheduled-target backtests with a `Costs` model (reads `config/costs.yaml`). Fills at the next open; positions are held as coin units between trades (weights drift); only trading bars pay costs. **Tests, demos and scouting only**; never in reports |
 | `lab/search/space.py` | Parameter specs (`Param`) shared by Optuna and the stable-region finder |
 | `lab/search/objective.py` | Score = mean annualized Sharpe across time blocks minus 0.5 × their spread, after costs; too few trades scores −10 |
 | `lab/search/study.py` | Optuna TPE studies in parallel processes on a journal file; logs every trial's params, metrics and full return series to `results/<study>/` |
@@ -236,16 +247,29 @@ The smart search, validation statistics and prediction pipeline already exist, w
 - **The luck control works.** Shuffled data with no pattern still produced an in-sample Sharpe of 1.30; out of sample it was -0.75, with DSR 0.00 and PBO 0.70, so the checks rejected it.
 - **Parallel searches aren't bit-reproducible.** Every trial is logged, and re-running logged parameters is exact. Run important searches twice with different seeds; a large difference flags a fragile strategy.
 
+### Built since the starter code
+
+| Module | What it does |
+|---|---|
+| `lab/runner/nautilus.py` | `BacktestFn` on NautilusTrader v2 (milestone 2): one `BacktestEngine` per run, disposed after use. A Nautilus strategy calls the reference rule's own decision function, so both runners decide with one piece of code; Nautilus holds the balances and books every fill and fee. Equal to the reference to `TOL` = 1e-9 (contract suite and parity test). **Single asset only.** `wrap(rule)` gives a picklable `BacktestFn` for parallel searches |
+| `lab/costs/fees.py` | `DexFeeModel`: `config/costs.yaml` as a Nautilus fee model (pool + aggregator + size-based slippage + gas). Slippage is charged as a fee at the quoted price, so no fill model is needed |
+| `lab/tracking/mlflow_log.py` | Copies a finished Optuna study into MLflow (SQLite store `mlruns/mlflow.db`): one parent run per study, one run per finished trial. The journal and Parquet files stay the record that DSR and PBO read |
+| `lab/runner/portfolio.py` | Multi-asset reference engine (BTC, ETH and USDC cash), same costs and execution model; `risk_limits` reads `config/risk_levels.yaml`. **Scouting only: it has no Nautilus counterpart yet** |
+| `lab/runner/steady.py`, `holdmix.py`, `trend.py` | The rebalance-steady, hold-mix-cap and trend-steady studies' harnesses on `portfolio.py` (scouting only) |
+| `lab/data/` (`build.py`, `sources.py`, `catalog.py`, `quality.py`, `report.py`, `panel.py`, `futures.py`, `external.py`) | Milestone 1: downloads from the allow-listed sources, quality checks, the Nautilus catalog and `SNAPSHOT.json`, the data reports, the BTC + ETH panel, and Binance futures positioning data stored point in time |
+| `lab/models/dips.py` | The dip-timing study's events, features, labels and event-level validation |
+
 ### What's left to build
 
-1. **`lab/runner/nautilus.py`:** implements `BacktestFn` on a NautilusTrader v2 `BacktestNode` (one run config per node, disposed after use), reading bars from the catalog. Same columns and `trade_returns` as the reference. It must pass the backtest contract suite ([TESTING.md 5.6](TESTING.md#56-turn-the-backtester-tests-into-a-contract-every-runner-must-pass)), and a parity test must show the reference and Nautilus runners agree closely on a simple strategy with identical costs.
-2. **`lab/costs/`:** Nautilus fee and fill model subclasses implementing `config/costs.yaml` (pool fee, aggregator fee, size-based slippage, gas).
-3. **`lab/data/build.py`:** downloaders, quality checks, catalog writer and `SNAPSHOT.json` (milestone 1).
-4. **MLflow logging** of each trial and model version (trials are already logged to Parquet).
-5. **Strategies** in `strategies/` as Nautilus strategies; model-using strategies keep a `FeatureBuffer` and a `ModelPredictor`:
+1. **Done (milestone 2): `lab/runner/nautilus.py`.** It implements `BacktestFn` on a NautilusTrader v2 `BacktestEngine`, one engine per run, disposed after use; the caller passes the bars (from the catalog through `lab.data.catalog.load_bars`). It passes the backtest contract suite ([TESTING.md 5.6](TESTING.md#56-turn-the-backtester-tests-into-a-contract-every-runner-must-pass)) and the parity test, and agrees with the reference on Kraken BTC train bars ([reports/milestone2/2026-11-25.md](reports/milestone2/2026-11-25.md)). This item first named a `BacktestNode`, which builds the same engine from a run config and reads the catalog itself. The results are the same, and the owner kept `BacktestEngine` (owner, 2026-11-25).
+2. **Done (milestone 2): `lab/costs/fees.py`**, the fee model above.
+3. **Done (milestone 1): `lab/data/build.py`** and the rest of `lab/data/`.
+4. **MLflow logging:** search trials done (milestone 2); model versions still to build (no milestone names them).
+5. **A multi-asset Nautilus runner** (milestone 3). The launch strategies hold BTC, ETH and USDC, or K tokens, so it needs one instrument per coin. It passes the guarantees `tests/test_portfolio.py` pins for `portfolio.py` (no look-ahead, accounting against an independent book, costs), a parity test against `portfolio.py`, and a real-data parity check ("Milestones", closing a milestone).
+6. **Strategies** in `strategies/`. Under the owner's option B (2026-11-25; [docs/app/technical.md](docs/app/technical.md), "Strategy settings"), each strategy's decision logic is written once, as a plain-Python decision function with no Nautilus import. A thin Nautilus strategy calls it (as `lab/runner/nautilus.py` calls the reference rules' decisions), the app's per-customer check runs the same function, and a decision-parity test pins the two together. Model-using strategies keep a `FeatureBuffer` and a `ModelPredictor`:
 
 ```python
-# inside a Nautilus Strategy (v2 API: check python/examples/ in the reference clone)
+# inside the Nautilus strategy that calls the decision function (v2 API: check python/examples/ in the reference clone)
 def on_start(self):
     self.features = FeatureBuffer()
     self.vol_model = ModelPredictor("models/vol_20d")
@@ -255,20 +279,23 @@ def on_bar(self, bar):
     feats = self.features.latest()
     if feats is None:
         return  # still warming up
-    forecast_vol = self.vol_model.predict(feats)
+    # Forecasts are per bar (TESTING.md 4a.3) and vol_target is annual: annualise first
+    # (bars_per_year = 365 for daily bars, 8760 for hourly bars).
+    forecast_vol = self.vol_model.predict(feats) * math.sqrt(self.bars_per_year)
     size = min(self.max_weight, self.vol_target / forecast_vol)
-    ...  # signal logic, then submit orders through Nautilus
+    ...  # the decision function, then orders through Nautilus
 ```
 
 ## Running many simulations
 
 Full method in [research-methods.md](research-methods.md). Implementation rules:
 
-1. **One run = one config.** In Nautilus v2, a `BacktestNode` takes one run config; create and dispose one node per run. `lab/runner/nautilus.py` wraps this behind the `BacktestFn` interface, so the existing search and validation code runs unchanged.
+1. **One run = one engine.** `lab/runner/nautilus.py` builds one NautilusTrader v2 `BacktestEngine` per run and disposes of it after use, behind the `BacktestFn` interface, so the existing search and validation code runs unchanged. (A `BacktestNode` builds the same engine from one run config and reads the catalog itself; the results are the same, and the owner kept the engine, owner, 2026-11-25.)
 2. **Parallel by process.** A worker pool runs many `run_one` calls at once, one per CPU core. Each trial is independent, so runs can be killed and resumed.
 3. **Search smart, not exhaustive.** Optuna studies (TPE sampler) in `lab/search/`. Local runs use Optuna's journal file storage; multi-machine runs use a Postgres storage. The objective is a **walk-forward out-of-sample** score after costs, never in-sample return.
-4. **Log every trial.** Each trial writes one row to `results/trials/*.parquet` and one MLflow run: strategy, params, window, data snapshot ID, git commit, seed, all metrics, and failures. The total trial count per strategy feeds the Deflated Sharpe Ratio.
-5. **Measure throughput first.** Before any big sweep, time a single full-history backtest and report trials per hour per core. Size sweeps from that number.
+4. **Log every trial.** `lab.search.study` writes each trial's row and return series to the study's folder under `results/`, and `lab.tracking.mlflow_log` copies each finished study into MLflow, one run per trial: strategy, params, window, data snapshot ID, git commit, seed, all metrics, and failures. Pass the strategy, snapshot ID and git commit to `run_study` as `context`; MLflow tags anything missing `unrecorded`, and such a trial does not meet hard rule 7. The total trial count per strategy feeds the Deflated Sharpe Ratio.
+5. **Measure throughput first.** Before any big sweep, time a single full-history backtest and report trials per hour per core. Size sweeps from that number. Measured for the single-asset Nautilus runner on 2026-11-25 (`scripts/nautilus_throughput.py`): about 60,000 daily runs (2017-2026; 12,000 with a fill on every bar) and 6,000-8,000 hourly runs (six train years) per hour per core, 10-25x slower than the reference engine.
+6. **A result and its luck controls run on one engine.** S (the walk-forward result) and every control it is judged against that re-runs a backtest (random entries, shifted or placebo schedules, plateau steps, grid steps, doubled costs) run on NautilusTrader (hard rule 3). The reference engines are for scouting. Counted controls run on NautilusTrader only; a reference engine may not stand in for one, even with a parity test (owner, 2026-11-25). Bootstraps that only resample S's own returns are not re-runs and are unaffected.
 
 ## Validation gates
 
@@ -317,6 +344,54 @@ Owned by `ml-researcher`. Full approach in [research-methods.md: Prediction mode
 - Every model is compared against naive baselines (last value, rolling average) and judged by **strategy profit after costs in Nautilus**, not by forecast error alone.
 - Models are trained offline, versioned in MLflow, and loaded read-only by a Nautilus strategy. No retraining inside a backtest window; walk-forward retraining copies the production schedule.
 
+## Self-directed tool studies
+
+Added by the owner, owner, 2026-11-25. Some studies are about tools customers set up themselves, not about our strategies:
+"hold this mix" (`research/hold-mix-cap/`), "protect my gains" (`research/protect-gains/`), the buy-the-dip
+template and the starting values of rule templates. They claim no edge and approve nothing. They pick
+recommended starting values and describe what a setting did in the past (worst falls, trades a month, fees).
+
+- **Same discipline as a strategy study:** pre-registered before any result, costs on, no look-ahead, every run
+  logged, the full tier passed on the commit (hard rules 4, 6, 7, 8 and 11).
+- **Train data only,** unless the plan says otherwise and `backtest-auditor` agrees before the run. A look at the
+  validate or test years would spend them for any later strategy of ours on the same idea (hard rule 5).
+- **No validation gates:** nothing is approved, so the gates of "Validation gates" don't apply. The decision rules are
+  the plan's own, fixed before the run, and `backtest-auditor` audits that the plan was followed.
+- **Numbers a customer will see** (a default, a worst fall) are rerun on NautilusTrader before the app shows them
+  (hard rule 3), with measured costs once they exist.
+- The owner decides what the app offers; the record goes to `docs/app/`.
+
+## Reporting back to the owner (all agents)
+
+Owner's instruction, 2026-11-25. Every agent and session ends a task with this report, in plain English, short
+enough to read on a phone. Details stay in the files; the report links to them.
+
+```
+**Tasks run:** one line per task.
+**What was done:** results, with the key numbers. Say plainly what failed or was skipped.
+**Why:** one or two lines: the reason for the work, or the rule or decision it follows.
+**Token cost:** tokens written and re-read from cache for this task, and the estimate given before it.
+**Questions for you:** numbered, each answerable in a line; put a recommendation first. "None" if none.
+**What's next:** the next one to three steps, and whether each waits on an answer above.
+```
+
+No jargon without a plain explanation, no long tables, nothing the owner has to scroll back to understand.
+
+### Token cost: warn first (owner, 2026-11-25)
+
+Tokens cost the owner money. Keep every task lean, and warn before spending:
+
+1. **Estimate before you start.** Before launching an agent, a workflow, a background job or any task likely to
+   write more than about 500,000 tokens or run longer than about 15 minutes, tell the owner the rough token cost (tokens
+   written, and tokens re-read from cache as the context grows) and wait for an OK. The same goes for adding scope to
+   a running job (more rounds, more analysis).
+2. **Pick the cheapest way that does the job.** Do small things directly instead of through an agent; use a lower
+   effort setting unless the work needs more; brief agents to wait with one long wait instead of frequent checks, to
+   skip analysis the task does not need, and to read only the parts of files they need. Long agent runs cost most in
+   re-reading their own growing context on every step.
+3. **Report what it cost** in the "Token cost" line above, next to the estimate. If a task is going well past its
+   estimate, stop and tell the owner before going on.
+
 ## Hard rules (all agents)
 
 1. **No secrets in code or chat.** Keys load from env vars or a git-ignored `.env`. Never print or log a key.
@@ -328,7 +403,7 @@ Owned by `ml-researcher`. Full approach in [research-methods.md: Prediction mode
 7. **Deterministic and traceable.** Seed all randomness; every trial records data snapshot ID, git commit and seed.
 8. **Every trial is logged**, including failures and abandoned variants. Hiding trials inflates results.
 9. **Spot only.** No leverage, shorting, market making or arbitrage; only coins on the risk level's list.
-10. **Ask the owner before** adding a dependency, changing `config/splits.yaml`, `config/costs.yaml` or `config/risk_levels.yaml`, or running anything that will cost money (cloud machines, paid data).
+10. **Ask the owner before** adding a dependency, changing `config/splits.yaml`, `config/costs.yaml` or `config/risk_levels.yaml`, or running anything that will cost money (cloud machines, paid data, or a large token spend: see "Token cost: warn first").
 11. **No result from failing code.** A backtest, search or audit only counts if the full test tier passed on that commit. New features, models, strategies and runners ship with the tests [TESTING.md](TESTING.md) section 7 describes, including a tamper-the-future test.
 
 ## Desk roles
@@ -339,6 +414,7 @@ Owned by `ml-researcher`. Full approach in [research-methods.md: Prediction mode
 | `quant-researcher` | Strategy hypotheses, `strategies/`, search spaces | Touch `config/`, open the test window, write audit reports |
 | `ml-researcher` | `lab/models/`, features, labels, model training and evaluation | Put a model in a strategy without an audit; use future data |
 | `backtest-auditor` | `lab/validation/`, audit reports, the one-time test-window run | Write or tune strategy logic |
+| `lab-engineer` (added, owner, 2026-11-25) | The engines: `lab/runner/` (`interface.py`, `reference.py`, `portfolio.py`, `nautilus.py`; a study's harness stays with its researcher), `lab/costs/`, `lab/tracking/`, the contract and parity tests, throughput and real-data parity checks | Write strategy decision logic; change `config/`, gates or test tolerances |
 | `risk-officer` | `config/risk_levels.yaml`, drawdown budgets, each setting's allowed range (set before any result, inside the level's limits), exports | Loosen a limit or widen an approved range without the owner's written approval |
 | `director` | Reviewing how the desk works; researching better methods and tools; proposing improvements to agent files and docs on a branch for the owner | Change gates, `config/` or test tolerances to make things pass; approve strategies; merge its own changes |
 
@@ -353,9 +429,14 @@ The `director` reviews the desk after every milestone and after any failed audit
 | 0 | Starter code verified | [TESTING.md](TESTING.md) definition of done met: full, deep and slow tiers pass; mutation targets met; demo rerun with the report and figures updated |
 | 1 | Setup and data | Environment builds; BTC and ETH daily and hourly bars from Kraken and Binance in the catalog; `SNAPSHOT.json` written; data quality report committed |
 | 2 | Costs and Nautilus runner | Fee and fill models in `lab/costs/` with tests; `lab/runner/nautilus.py` implements `BacktestFn` and passes the backtest contract suite; parity test against the reference passes; trials also logged to MLflow; throughput (trials per hour per core) measured |
-| 3 | Launch strategies | The three strategies as Nautilus strategies, backtested on the train window with costs on, plus all benchmarks |
+| 3 | Launch strategies | A multi-asset Nautilus runner with its parity test against `lab/runner/portfolio.py`; the three strategies as Nautilus strategies, backtested on the train window with costs on, plus all benchmarks |
 | 4 | Search and validation on real data | The demo pipeline rerun on real data with the Nautilus runner: walk-forward studies, CPCV, DSR, PBO, Monte Carlo; first audit reports written |
 | 5 | Prediction track on real data | Volatility (5- and 20-day), regime and Bold-list ranking models vs. baselines with CPCV on real data; at least one model-sized strategy variant audited |
+
+**Closing a milestone.**
+1. The full tier, and the deep tier if `lab/` changed, passed on the commit that closes it (hard rule 11). The milestone report names that commit, and the commit each of its scripts ran on.
+2. A milestone that adds or changes an engine (a runner, a cost model) also runs it against the reference on real catalog bars, train window only (closes up to 2023-01-01): Kraken and Binance, BTC and ETH, daily and hourly, costs at 1x and 2x. Every case the real data finds becomes a hand-built regression test (TESTING.md rule 3).
+3. README.md "Status", HOWTO.md's status lines and `dashboard/status.json` are updated in the same commit. Then the `director` reviews the desk.
 
 ## Commands
 
@@ -367,10 +448,14 @@ HYPOTHESIS_PROFILE=deep uv run pytest -m "not slow" -n auto  # deep tier (change
 uv run mutmut run                                          # mutation testing (see TESTING.md)
 uv run python scripts/demo.py --trials 150 --workers 4     # end-to-end demo on synthetic data
 
-# to build in milestones 1–4
-uv run python -m lab.data.build --sources kraken,binance   # download + build catalog
+uv run python -m lab.data.build --sources kraken,binance   # download + build catalog (milestone 1)
+uv run python scripts/nautilus_throughput.py              # trials per hour per core, Nautilus and reference
+uv run python scripts/nautilus_parity_real.py --interval 1h  # Nautilus vs reference on real train bars
+uv run python -m lab.tracking.mlflow_log results <study>  # copy a finished study's trials into MLflow
+uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db  # browse them; run from the repo root
+
+# planned, not built yet (milestones 3–4)
 uv run python -m lab.runner.run_one --strategy dip-buy-balanced --window train
 uv run python -m lab.search.study --strategy dip-buy-balanced --trials 2000 --workers 8
 uv run python -m lab.validation.audit --strategy dip-buy-balanced
-uv run mlflow ui                                           # browse every trial
 ```

@@ -95,7 +95,7 @@ The app loads the export read-only. Only the owner approves a new or wider range
 
 Anything else is refused, with no override. The risk engine checks again before each trade and fails closed.
 
-**Who decides what (proposed; needs an owner decision).** The strategy's Nautilus node runs the default settings on its model account, and that is the strategy's live record. For a customer on other settings, the decisions would follow that customer's own wallet:
+**Who decides what (decided: owner, 2026-11-25, option B).** Each strategy's decision logic is written once, as a small shared library. Nautilus wraps it for backtests and the strategy's model account; the rules service runs the same library for each customer, from that customer's own wallet; a decision-parity test pins the two together (as `lab/runner/holdmix.py` does for "hold this mix"). The reasoning behind it, as first proposed: The strategy's Nautilus node runs the default settings on its model account, and that is the strategy's live record. For a customer on other settings, the decisions would follow that customer's own wallet:
 - the crypto share and split set that customer's targets;
 - the drift band and check frequency decide when their wallet is brought back to target, from their on-chain holdings.
 
@@ -128,7 +128,7 @@ Its worst fall is a Nautilus backtest on past prices with swap fees, slippage an
 
 These backtests need a Nautilus rebalancing backtest with the lab's cost model. Both wait on the lab's milestone 2 (the Nautilus runner and the fee and fill models), and the costs are placeholders until measured. Rule backtests on our servers only arrive in Phase 2, so for a Phase 1 launch the table is computed ahead of time; who computes it is not decided yet. As with rules, the live check and the backtests should use the same rebalancing logic, so a mix behaves the same in both.
 
-*Open:* the owner's decision above. If the per-customer check is accepted, does it run in the rules service or in the trade router? Before production, AGENTS.md now requires at least 4 weeks on paper model accounts at the default and at the riskiest combination in the approved range. It doesn't say whether the second account keeps running afterwards for the live record. The owner can still drop that second account (director report, decision 2).
+*Decided (owner, 2026-11-25):* the per-customer check (option B above), written in Python in the rules service, importing the lab's decision functions from its published package (owner, 2026-11-25). *Open:* does it run in the rules service or in the trade router? Before production, AGENTS.md now requires at least 4 weeks on paper model accounts at the default and at the riskiest combination in the approved range. It doesn't say whether the second account keeps running afterwards for the live record. The owner can still drop that second account (director report, decision 2).
 
 ### Customer rules and advanced mode
 

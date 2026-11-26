@@ -54,11 +54,11 @@ The lab builds strategies, simulates them at scale, validates them against overf
 |---|---|
 | `README.md`, `HOWTO.md`, `AGENTS.md`, `TESTING.md`, `.gitignore` | This repo |
 | The dashboard: `dashboard/`, `scripts/build_dashboard.py`, `tests/test_dashboard.py` | This repo |
-| `lab/` (the built modules), the starter tests, `scripts/demo.py`, `pyproject.toml` | The starter code. The owner has it; copy it in ([Set up the project](#set-up-the-project)) |
-| `lab/data/build.py`, `lab/costs/`, `lab/runner/nautilus.py`, MLflow logging, `strategies/` | Not written yet (milestones 1 to 3) |
+| `lab/`, `tests/`, `scripts/`, `pyproject.toml`, `uv.lock` | This repo: the starter code merged on 2026-11-19 ([TESTING.md 4a](TESTING.md#4a-merge-with-the-starter-code-2026-11-19)), then `lab/data/build.py` (milestone 1) and `lab/costs/`, `lab/runner/nautilus.py` and MLflow trial logging (milestone 2) |
+| A multi-asset Nautilus runner, `strategies/`, MLflow model versions | Not written yet (milestone 3 onward) |
 | Real-data searches, audits, prediction models, exports | Not done yet (milestone 4 onward) |
-| `research-methods.md` | Missing. AGENTS.md links to it, but it is not in this repo. Ask the owner |
-| The app docs (`../caas-app/README.md`) | In the app's repo, not here |
+| `research-methods.md`, `.claude/agents/` | This repo |
+| The app docs | This repo: [docs/app/](docs/app/README.md) |
 
 ### Read in this order
 
@@ -255,7 +255,7 @@ Parallel searches aren't bit-reproducible, so a rerun won't match the old number
 
 ## Build the data catalog
 
-Status: to build (milestone 1).
+Status: built (milestone 1).
 
 Owner: `data-engineer`.
 
@@ -303,19 +303,19 @@ Done when (milestone 1): environment builds; BTC and ETH daily and hourly bars f
 
 ## Run one backtest
 
-Status: to build (milestone 2).
+Status: built (milestone 2, 2026-11-25; [report](reports/milestone2/2026-11-25.md)). Single asset only: the multi-asset runner is milestone 3.
 
 Every result that counts comes from NautilusTrader. The reference backtester (`lab/runner/reference.py`) is for tests and demos only, never for reports.
 
 ### The contract
 
-`lab/runner/interface.py` (built) defines it: `backtest_fn(params, bars) -> DataFrame` with columns `ret` (net per-period return after all costs), `position`, `turnover`, plus `attrs["trade_returns"]`. A runner that meets it plugs into the existing search and validation code unchanged.
+`lab/runner/interface.py` (built) defines it: `backtest_fn(params, bars) -> DataFrame` on exactly `bars.index`, with columns `ret` (net per-bar return after all costs), `position`, `turnover` and `cost`, plus `attrs["trade_returns"]` and `attrs["n_trades"]`. A decision at the close of bar t fills at the open of bar t+1 ([TESTING.md 4a.5](TESTING.md#4a5-the-backtest-contract)). A runner that meets it plugs into the existing search and validation code unchanged.
 
-### What to build
+### What was built
 
-1. `lab/costs/`: Nautilus v2 fee and fill model subclasses implementing `config/costs.yaml`: pool fee, aggregator fee, size-based slippage and gas.
-2. `lab/runner/nautilus.py`: implements `BacktestFn` on a NautilusTrader v2 `BacktestNode`, reading bars from the catalog. One run config per node; dispose the node after use. Same columns and `trade_returns` as the reference.
-3. MLflow logging of each trial and model version. Trials are already logged to Parquet.
+1. `lab/costs/fees.py`: `config/costs.yaml` as a Nautilus v2 fee model: pool fee, aggregator fee, size-based slippage and gas. Slippage is charged as a fee at the quoted price, so no fill model is needed.
+2. `lab/runner/nautilus.py`: `BacktestFn` on a NautilusTrader v2 `BacktestEngine`, one engine per run, disposed after use; the caller passes the bars (from `lab.data.catalog.load_bars`). Same columns and `attrs` as the reference. AGENTS.md first named a `BacktestNode`, which builds the same engine from a run config; the owner can ask for it.
+3. `lab/tracking/mlflow_log.py`: each finished search study copied into MLflow, one run per trial. Model versions are still to build.
 
 ### Costs
 
@@ -331,7 +331,7 @@ Production trades are swaps on Base through the 0x aggregator. Cost per trade = 
 
 ### Measure throughput
 
-Before any big sweep, time a single full-history backtest and report trials per hour per core. Size sweeps from that number.
+Before any big sweep, time a single full-history backtest and report trials per hour per core. Size sweeps from that number. For the single-asset Nautilus runner: `uv run python scripts/nautilus_throughput.py` (2026-11-25 numbers in the milestone report).
 
 ### Planned command
 
@@ -341,7 +341,7 @@ AGENTS.md lists it under "to build in milestones 1–4"; it does not exist yet. 
 uv run python -m lab.runner.run_one --strategy dip-buy-balanced --window train
 ```
 
-Once MLflow logging exists, browse every trial with `uv run mlflow ui`.
+Copy a finished study into MLflow with `uv run python -m lab.tracking.mlflow_log results <study>`, then browse it with `uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`, from the repo root (plain `uv run mlflow ui` opens an empty store).
 
 Done when (milestone 2): fee and fill models in `lab/costs/` with tests; `lab/runner/nautilus.py` implements `BacktestFn` and passes the backtest contract suite; parity test against the reference passes; trials also logged to MLflow; throughput (trials per hour per core) measured.
 
@@ -373,7 +373,7 @@ Walk-forward and cross-validation happen inside train + validate. **Nobody tunes
 
 **Every trial is logged, including failures and abandoned variants. Hiding trials inflates results.** Each trial records strategy, params, window, data snapshot ID, git commit, seed, all metrics and failures. The total trial count per strategy feeds the Deflated Sharpe Ratio.
 
-`lab/search/study.py` (built) logs every trial's params, metrics and full return series to `results/<study>/`. AGENTS.md's logging rule also names `results/trials/*.parquet` and one MLflow run per trial. `results/` is git-ignored. The dashboard lists each folder in `results/`, except `results/tests/`, as a local search run.
+`lab/search/study.py` (built) logs every trial's params, metrics and full return series to `results/<study>/`. `lab/tracking/mlflow_log.py` copies each finished study into MLflow, one run per trial. `results/` is git-ignored. The dashboard lists each folder in `results/`, except `results/tests/`, as a local search run.
 
 ### Run important searches twice
 
@@ -508,7 +508,7 @@ These come from synthetic data, and the figures behind them predate the backtest
 Model-using strategies keep a `FeatureBuffer` and a `ModelPredictor`. From AGENTS.md:
 
 ```python
-# inside a Nautilus Strategy (v2 API: check python/examples/ in the reference clone)
+# inside the Nautilus strategy that calls the decision function (v2 API: check python/examples/ in the reference clone)
 def on_start(self):
     self.features = FeatureBuffer()
     self.vol_model = ModelPredictor("models/vol_20d")
@@ -518,9 +518,11 @@ def on_bar(self, bar):
     feats = self.features.latest()
     if feats is None:
         return  # still warming up
-    forecast_vol = self.vol_model.predict(feats)
+    # Forecasts are per bar (TESTING.md 4a.3) and vol_target is annual: annualise first
+    # (bars_per_year = 365 for daily bars, 8760 for hourly bars).
+    forecast_vol = self.vol_model.predict(feats) * math.sqrt(self.bars_per_year)
     size = min(self.max_weight, self.vol_target / forecast_vol)
-    ...  # signal logic, then submit orders through Nautilus
+    ...  # the decision function, then orders through Nautilus
 ```
 
 `FeatureBuffer` gives live features identical to the backtest features; the starter tests check this on every bar.
@@ -847,11 +849,11 @@ These are also the owner's alone:
 
 Handoff for any new strategy: `quant-researcher` (or `ml-researcher`) → `backtest-auditor` → `risk-officer` → paper model account → owner → export.
 
-AGENTS.md puts role files in `.claude/agents/`. They are not in this repo.
+The role files are in `.claude/agents/`.
 
 ## Troubleshooting
 
-Status: available now (this repo). Most rows apply once the starter code is in.
+Status: available now (this repo).
 
 | Problem | Cause | Fix |
 |---|---|---|

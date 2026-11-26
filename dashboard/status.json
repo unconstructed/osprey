@@ -1,18 +1,18 @@
 {
-  "updated": "2026-11-20",
-  "note": "Milestone, open-work and paper status below is edited by hand. Real BTC/ETH data is in the catalog (milestone 1); no strategy has been built or audited yet.",
+  "updated": "2026-11-25",
+  "note": "Milestone, open-work and paper status below is edited by hand. Real BTC/ETH data is in the catalog (milestone 1); the single-asset Nautilus runner and the DEX fee model are built (milestone 2). Four scouting studies have run on the reference engine (research/); no launch strategy is built or audited yet.",
   "milestones": {
     "0": {
       "status": "in_progress",
-      "note": "Starter code merged (TESTING.md 4a); 1003+ tests, 100% branch coverage; demo rerun. Open: mutation testing for runner, search, models, data (5.4)."
+      "note": "Starter code merged (TESTING.md 4a); 2,400+ tests, 100% branch coverage (TESTING.md section 3). Open: mutation testing for runner, search, models, data (5.4); the full demo rerun (5.5)."
     },
     "1": {
       "status": "done",
       "note": "Kraken, Binance and Coinbase BTC/ETH daily+hourly in data/catalog; snapshot b08377c310126e3f; report reports/data/2026-11-20.md."
     },
     "2": {
-      "status": "not_started",
-      "note": ""
+      "status": "done",
+      "note": "2026-11-25, reports/milestone2/2026-11-25.md: lab/runner/nautilus.py (one BacktestEngine per run, single asset) and lab/costs/fees.py; 198 Nautilus contract cases; parity with the reference to 1e-9, also on Kraken BTC train bars (1d, 1h); MLflow trial logging (mlruns/mlflow.db); throughput measured. Full tier passed on the closing commit 6d78801: 2412 tests, 100% branch coverage (hard rule 11)."
     },
     "3": {
       "status": "not_started",
@@ -28,13 +28,13 @@
     }
   },
   "open_work": {
-    "5.1": "not_started",
-    "5.2": "not_started",
-    "5.3": "not_started",
-    "5.4": "not_started",
-    "5.5": "not_started",
-    "5.6": "not_started",
-    "5.7": "not_started"
+    "5.1": "done",
+    "5.2": "done",
+    "5.3": "done",
+    "5.4": "in_progress",
+    "5.5": "in_progress",
+    "5.6": "done",
+    "5.7": "done"
   },
   "strategies": {
     "rebalance-steady": {

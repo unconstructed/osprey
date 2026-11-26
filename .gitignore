@@ -8,8 +8,10 @@ __pycache__/
 /data/
 /results/
 /mlruns/
+/mlflow.db
 *.parquet
 .hypothesis/
 mutants/
 .coverage
+.coverage.*
 htmlcov/
