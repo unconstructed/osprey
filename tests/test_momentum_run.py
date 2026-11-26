@@ -168,12 +168,22 @@ def test_the_dry_run_never_runs_twice_and_amendments_need_their_record(dry, tmp_
 # ------------------------------------------------------------------------------------------------ guards
 
 
+def _tree(path):
+    """Every file and folder under ``path`` with its size and modification time, or None when it does not exist."""
+    if not path.exists():
+        return None
+    return sorted((str(p), p.stat().st_size, p.stat().st_mtime_ns) for p in path.rglob("*"))
+
+
 def test_dry_runs_never_write_into_the_repo_or_the_study_folder(capsys):
+    # results/momentum-bold/ exists once real run 0 has run (#82): nothing may be added or changed in it, and a
+    # folder that did not exist must not be created
     for out in (R.REPO / "scratch", R.DEFAULT_OUT, R.DEFAULT_OUT / "dry"):
+        before = _tree(out)
         assert R.main(["--synthetic", "1", "--fast", "--out-dir", str(out)]) == 2
         assert "never writes into" in capsys.readouterr().err
         assert R.main(["--time", "--fast", "--out-dir", str(out)]) == 2
-        assert not out.exists()
+        assert _tree(out) == before
     assert R.main(["--fast"]) == 2
     assert "--fast is for synthetic dry runs only" in capsys.readouterr().err
 
