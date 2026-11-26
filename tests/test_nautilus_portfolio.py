@@ -70,6 +70,10 @@ def targets(draw) -> tuple[float, float]:
     w_btc = draw(weight)
     w_eth = draw(st.one_of(st.just(0.0), st.just(1.0 - w_btc), st.floats(0.001, 1.0)))
     assume(w_btc + w_eth <= 1.0 and (w_eth == 0.0 or w_eth >= 0.001))
+    # The cash target too (#66): one of round-off size (w_eth one ulp under 1) leaves no room to drift, so every
+    # rebalance leg is round-off (test_a_cash_target_of_round_off_size_trades_only_round_off_legs).
+    cash = 1.0 - (w_btc + w_eth)
+    assume(cash == 0.0 or cash >= 0.001)
     return w_btc, w_eth
 
 
@@ -170,6 +174,28 @@ def test_nautilus_equals_portfolio_on_drawn_panels(case, costs):
     assert_parity(ref, nt)
     if rule is pf.random_rebalance:
         np.testing.assert_array_equal(nt.attrs["rebalance_closes"], ref.attrs["rebalance_closes"])
+
+
+def test_a_cash_target_of_round_off_size_trades_only_round_off_legs():
+    """#66, found by the deep profile: w_eth one ulp under 1 (a cash target of 1.1e-16), w_btc 0 and one random
+    rebalance on moving prices. The book has no room to drift, so the rebalance's ETH leg is round-off (1.1e-12 USD,
+    1e-16 of the book): portfolio.py trades it and pays 0.10 USD of gas, and this runner does not send it (MIN_LEG,
+    #61 (b), #65 (b)). Every bar before that fill agrees to TOL; after it the books differ by that fill's cost alone."""
+    panel = random_panel(20, 1, (0.01, 0.01), (0.0, 0.0))
+    params = {"w_btc": 0.0, "w_eth": float(np.nextafter(1.0, 0.0)), "n_rebalances": 1, "seed": 0}
+    ref = pf.random_rebalance(params, panel, Costs())
+    nt = npf.run(pf.random_rebalance, params, panel, Costs())
+    assert (ref.attrs["n_trades"], nt.attrs["n_trades"]) == (2, 1)
+    f = ref.attrs["fills"]
+    assert list(f["bar"]) == [1, 17] and list(nt.attrs["fills"]["bar"]) == [1]
+    v_open = f["usd"].iloc[0] * (1 + 1e-9)  # the book is about the first buy's size
+    assert 0.0 < f["usd"].iloc[1] <= npf.MIN_LEG * v_open
+    np.testing.assert_allclose(
+        nt[ALL_COLUMNS].iloc[:17].to_numpy(), ref[ALL_COLUMNS].iloc[:17].to_numpy(), rtol=0, atol=TOL
+    )
+    assert nt["cost"].iloc[17] == 0.0 and ref["cost"].iloc[17] > 0.0
+    growth = np.prod(1.0 + ref["ret"].to_numpy()) / np.prod(1.0 + nt["ret"].to_numpy())
+    assert growth == pytest.approx(1.0 - ref["cost"].iloc[17], rel=0, abs=TOL)
 
 
 @pytest.mark.parametrize(
