@@ -1,0 +1,107 @@
+{
+ "budget": 0.6,
+ "config_hash": "c7e711f56cff6cfac4c3793b6c2aa578c7bb8983741f39ec559c8c89505123a6",
+ "costs": {
+  "major": {
+   "aggregator_fee_bps": 0.0,
+   "capital_usd": 10000.0,
+   "gas_usd_per_trade": 0.1,
+   "pool_fee_bps": 5.0,
+   "slippage_bps": [
+    [
+     100.0,
+     10.0
+    ],
+    [
+     1000.0,
+     15.0
+    ],
+    [
+     10000.0,
+     30.0
+    ]
+   ],
+   "stress_multiplier": 2.0
+  },
+  "minor": {
+   "aggregator_fee_bps": 0.0,
+   "capital_usd": 10000.0,
+   "gas_usd_per_trade": 0.1,
+   "pool_fee_bps": 10.0,
+   "slippage_bps": [
+    [
+     100.0,
+     20.0
+    ],
+    [
+     1000.0,
+     30.0
+    ],
+    [
+     10000.0,
+     60.0
+    ]
+   ],
+   "stress_multiplier": 2.0
+  }
+ },
+ "data": "real",
+ "fast": false,
+ "files": {
+  "config/costs.yaml": "55cd2b56330ef9fd8e0fc2d5feb6c3fe5accdfc75ce251de7f3c964c3286af18",
+  "config/risk_levels.yaml": "9cbf8f6dd8fc68c0987750aeec2ad051c40f2f6c9d4a5724b84a9daded4b2b71",
+  "config/splits.yaml": "a31ccc1477dc8292b38d67e9d6874f0c049dea98d53b24cfceee749c9a454f4c",
+  "lab/config.py": "41b15617cbb5bec9c253e4d626772924358b5d721272b7bfdb80b362703f3f26",
+  "lab/data/bold.py": "229df3994d96d4b6668c957fa4629138d671b6b1c3a875b679fbef65007d09e3",
+  "lab/data/external.py": "958f5b72624a96567e86ba7acaa6c04cc0b3e40b1c80fda508cdf935e8889b0e",
+  "lab/runner/interface.py": "cf93f1b1a2ee5a01741a762277c7ced9528fd3fc874d62f64dd9a5c2cff0a3b6",
+  "lab/runner/momentum.py": "5eec6df79fa31269f54dfafbebed15a2558bfaa69047125f848284ee789256cf",
+  "lab/runner/portfolio.py": "3f8088a9729586753b000dd911437336ef3cdfd2f14e24b9102d67cccd6fc597",
+  "lab/runner/reference.py": "c5387cc22820573641f3df4dea7c0bc0b2be475733614544b1356d324e5745ee",
+  "lab/runner/steady.py": "df859668ee7d23a8960bcf660b63b8acb41ac5c80d2431c52272ac7d0196c264",
+  "lab/search/__init__.py": "818739b1504a4ff3c24d61da9cc3d5c10aeb5a0936a7058a9484d59c587ed0a2",
+  "lab/search/objective.py": "226aebfd6176db1e814d40f4d6d6d99daa8adee004f4c2b9ac1748cabcbe4b8d",
+  "lab/search/report.py": "712571c6a12a77a7c2335f66696791fb3806c3deecaa29d37a703a53e710ba90",
+  "lab/search/space.py": "76219289b17167ae42a04bcdbb7898c77ed4586a20e2013cd8a15ddd568c0f14",
+  "lab/search/stability.py": "3c9ff17adb4dda507dc3f6e1c92c3fb88cb67b27dab1d829b55b54fa71ab31f8",
+  "lab/search/study.py": "8ff29e0b09a21468d8f3d0793a8cc6ae402462ead79283a48ae2f5a619cdc90a",
+  "lab/search/walkforward.py": "b0c6b3202410b9d275ebd9faa940ad08dafae328bbd6897e43e015d2cc719ddc",
+  "lab/validation/__init__.py": "b93cae4be9adcf12237c75198586b8e3b6eaabfa4cc379eba05692d79c47c5a1",
+  "lab/validation/montecarlo.py": "f1d596fede61e42e49d1e64b8ae720b934d76a8323489709a81cc9dd199d0a76",
+  "lab/validation/splits.py": "d1eff9d4caa9fe35c2f918dadbeea33fa8743a63f5751210989acee773864856",
+  "lab/validation/stats.py": "725602bd575fec438d58967d1b024dcbb1f321e659ac92936a214398610b0ab9",
+  "research/momentum-bold/PLAN.md": "7872e0188b05be642e112c3b3f6a2cb8722b3b810ed62b2170a8afd573b10598",
+  "research/momentum-bold/run.py": "bc0c2896b0900d9cf564210b0bcb2a7eaa4d99098ee00334216c8d259b8eeb61"
+ },
+ "git": {
+  "changes": [],
+  "commit": "f6be3aa243da6e4ac9ac9aeb79ed9b79f9e26a10",
+  "dirty": false
+ },
+ "interpretations": {
+  "e1": "rank p = (1 + #{draw Sharpe >= Sharpe(S)}) / (draws + 1); holds at p <= 0.05",
+  "null_seed": "draw j of fold i uses seed 10000 (i + 1) + j",
+  "panel": "the daily grid from the first close of any symbol to 2023-01-01 00:00 UTC; missing days stay NaN",
+  "projection": "every backtest priced as one rule run on the timing panel",
+  "strict_count": "every search trial + 4 plateau steps + 1 run at 2x costs"
+ },
+ "projection": {
+  "backtests": 1084,
+  "cpu_minutes": 1.540155769622225,
+  "seconds_each": 0.08524847433333349
+ },
+ "run": 0,
+ "seed": null,
+ "sizes": {
+  "coins": 40,
+  "n_draws": 200,
+  "n_trials": 60,
+  "timing_coins": 400
+ },
+ "snapshot": {
+  "sha256": "496a690f362633a4c2c44d59deaf4bba31854664516edada94ccaf06b2dff6f2",
+  "snapshot_id": "81b2116f5f4b562a"
+ },
+ "study": "momentum-bold",
+ "utc": "2026-11-26T01:57:09.849663+00:00"
+}
