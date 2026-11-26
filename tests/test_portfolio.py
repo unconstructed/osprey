@@ -690,10 +690,11 @@ HOLD_MIX_CAP_KEY = "hold_mix_max_rebalances_per_30d"
 
 
 def test_the_real_file_caps_the_hold_this_mix_tool_at_2_rebalances_in_30_days_in_steady_only():
-    """``config/risk_levels.yaml`` as committed: Steady's hard limit for the self-directed hold-this-mix tool, at
-    most 2 rebalances in any 30 days (owner-approved 2026-11-22). The app's rule engine reads it; no ``lab/`` code
-    does, and it is not a cap on our own strategies. The key is in the steady entry only, written once, and its
-    value is the integer 2 (not a bool, a float or a string)."""
+    """``config/risk_levels.yaml`` as committed: the highest cap the app sets on its own for the self-directed
+    hold-this-mix tool, 2 rebalances in any 30 days (owner-approved 2026-11-22; since 2026-11-26 the customer may
+    raise it, ``test_the_real_file_lets_the_customer_pick_1_2_4_8_or_no_cap_for_the_hold_this_mix_tool``). The
+    app's rule engine reads it; no ``lab/`` code does, and it is not a cap on our own strategies. The key is in the
+    steady entry only, written once, and its value is the integer 2 (not a bool, a float or a string)."""
     raw = load_yaml("risk_levels")
     assert sorted(raw) == ["balanced", "bold", "steady"]
     value = raw["steady"][HOLD_MIX_CAP_KEY]
@@ -704,6 +705,36 @@ def test_the_real_file_caps_the_hold_this_mix_tool_at_2_rebalances_in_30_days_in
     hits = [i for i, x in enumerate(lines) if HOLD_MIX_CAP_KEY in x]
     assert len(hits) == 1 and hits[0] in steady_lines(lines)
     assert lines[hits[0]].strip() == f"{HOLD_MIX_CAP_KEY}: 2"
+
+
+HOLD_MIX_CHOICES_KEY = "hold_mix_rebalances_per_30d_choices"
+
+
+def test_the_real_file_lets_the_customer_pick_1_2_4_8_or_no_cap_for_the_hold_this_mix_tool(tmp_path):
+    """``config/risk_levels.yaml`` as committed: the caps the customer may pick for the hold-this-mix tool
+    (owner-approved 2026-11-26): 1, 2, 4 or 8 rebalances in any 30 days, or none (no cap). The list is in the steady
+    entry only, written once; its numbers are integers in rising order, the default cap (2) is among them, and each
+    gives the engine's wait: 30, 15, 8 and 4 days, and 1 day (a daily check) for none. ``risk_limits("steady")`` is
+    the same with and without the list, but for the file's hash and path."""
+    raw = load_yaml("risk_levels")
+    choices = raw["steady"][HOLD_MIX_CHOICES_KEY]
+    assert choices == [1, 2, 4, 8, "none"]
+    assert all(type(c) is int for c in choices[:-1]) and choices[:-1] == sorted(choices[:-1])
+    assert raw["steady"][HOLD_MIX_CAP_KEY] in choices
+    assert HOLD_MIX_CHOICES_KEY not in raw["balanced"] and HOLD_MIX_CHOICES_KEY not in raw["bold"]
+    lines = (CONFIG_DIR / "risk_levels.yaml").read_text().splitlines()
+    hits = [i for i, x in enumerate(lines) if HOLD_MIX_CHOICES_KEY in x]
+    assert len(hits) == 1 and hits[0] in steady_lines(lines)
+    waits = [holdmix.wait_days(None if c == "none" else c) for c in choices]
+    assert waits == [30, 15, 8, 4, 1]
+    lim = pf.risk_limits("steady")
+    shutil.copy(CONFIG_DIR / "risk_levels.yaml", tmp_path / "risk_levels.yaml")
+    edit_steady_entry(tmp_path, f"  {HOLD_MIX_CHOICES_KEY}: [1, 2, 4, 8, none]\n", "")
+    without = pf.risk_limits("steady", tmp_path)
+    assert HOLD_MIX_CHOICES_KEY not in load_yaml("risk_levels", tmp_path)["steady"]
+    for key in ("sha256", "path"):
+        del without[key], lim[key]
+    assert without == lim
 
 
 def test_the_hold_this_mix_cap_is_a_15_day_wait_in_the_engine():

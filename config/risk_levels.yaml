@@ -7,8 +7,13 @@ steady:
   # Owner-approved 2026-11-22. The self-directed hold-this-mix tool only, not our strategies: at most this many
   # band and reset trades back to the mix in any 30 days, enforced as at least ceil(30 / value) days between
   # trades back to the mix (15 at 2). Limit fixes are exempt: the wait never holds them back, they are not among
-  # this many, and they restart the wait.
+  # this many, and they restart the wait. Since 2026-11-26 (owner) this is the highest cap the app sets on its
+  # own, not a ceiling for the customer: the customer may pick any cap in the list below.
   hold_mix_max_rebalances_per_30d: 2
+  # Owner-approved 2026-11-26. The caps the customer may pick for the hold-this-mix tool, in band and reset trades
+  # back to the mix in any 30 days (each a wait of ceil(30 / value) days: 30, 15, 8 and 4); none = no cap (the
+  # mix is checked daily). The trade-limit study measured each of them, so the app can show its fees.
+  hold_mix_rebalances_per_30d_choices: [1, 2, 4, 8, none]
 balanced:
   coins: [BTC, ETH, USDC]        # plus vetted large tokens on Base, once listed
   stop_loss_required: true
