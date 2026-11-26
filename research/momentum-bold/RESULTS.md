@@ -5,9 +5,9 @@
 Run 0 started on commit `f6be3aa`, after the full, deep, ruff and dashboard tiers passed with a clean tree. It used:
 - config hash `c7e711f5…`;
 - snapshot `81b2116f5f4b562a`;
-- the train window only, closes 2017-08-18 to 2023-01-01, a panel of 1963 rows and 418 symbols.
+- the train window only, closes 2017-08-18 to 2023-01-01, a panel of 1963 rows and 418 symbols. The out-of-sample years are 2019-2022.
 
-No validate or test bar was read. The record is `results/momentum-bold/run0/`, with copies of `summary.json`, `start.json` and `folds.csv` in `run0/`; the RUNLOG is `RUNLOG.jsonl`. Every number below is taken from `summary.json`.
+No validate or test bar was read. The record is `results/momentum-bold/run0/`, with copies of `summary.json`, `start.json` and `folds.csv` in `run0/`; the RUNLOG is `RUNLOG.jsonl`. Every number below is taken from `summary.json`, except the by-year returns (`oos.parquet`) and the by-year choices (`folds.csv`). The audit is `AUDIT.md` (the run PASS, the numbers PASS).
 
 ## In plain words
 
@@ -19,7 +19,7 @@ Simpler choices all did better:
 - an equal share of all 20 coins, every Monday: 0.51;
 - the rule itself: **0.39**.
 
-Picking coins at random with the same amount of trading did better than the rule in most draws. 169 of 200 random draws had a Sharpe at or above the rule's; the median draw was 0.54. So the rule's choice of coins added nothing. It also traded about 25 times its wallet a year, and its costs, summed day by day, came to about 60% of the wallet over the four years.
+Picking coins at random with about the same amount of trading did as well or better in most draws: 169 of 200 random draws had a Sharpe at or above the rule's, and the median draw was 0.54. The rule's choice of coins showed no skill, and its shortfall against the random picks is itself within luck. It traded about 25 times its wallet a year. Compounded, its costs cut the wallet by about 46% against the same trades at no cost (the audit's figure; the day-by-day sum of cost fractions is 0.60, which includes the LEND haircut below).
 
 ## The record
 
@@ -40,19 +40,21 @@ Other readings:
 - **Out-of-sample max drawdown:** 85.3%, against BTC hold's 77.4% over the same span.
 - **Regimes, in log growth:** bull months +3.88, bear months -2.64, sideways months -1.78.
 - **Correlation of daily returns:** 0.66 with BTC hold, 0.85 with the equal-weight 20.
-- **Turnover a year:** the rule 25.3, the random picks 25.5. The null's turnover matches the rule's, as the plan requires.
+- **Turnover a year:** the rule 25.3, the random picks 25.5. The random picks' turnover is about equal to the rule's, by design (PLAN.md section 8).
 
 ## By year (each fold's choice, then its next year)
 
-| Test year | Chosen (lookback days, K, filter) | Sharpe that year |
-|---|---|---|
-| 2019 | 91, 3, none | 1.12 |
-| 2020 | 91, 3, none | 0.06 |
-| 2021 | 56, 10, abs_mom | 1.62 |
-| 2022 | 56, 10, abs_mom | -2.25 |
+| Test year | Chosen (lookback days, K, filter) | Sharpe that year | Rule's return (calendar year) | BTC hold's return |
+|---|---|---|---|---|
+| 2019 | 91, 3, none | 1.12 | +87% | +88% |
+| 2020 | 91, 3, none | 0.06 | -54% | +312% |
+| 2021 | 56, 10, abs_mom | 1.62 | +248% | +61% |
+| 2022 | 56, 10, abs_mom | -2.25 | -81% | -66% |
 
-The choice moved between folds, and two good years were wiped out by 2022. In 2020, a strong year for crypto, the rule earned almost nothing.
+The choice moved between folds. The rule swung hard: it lost 54% in 2020 while BTC gained 312%, more than tripled in 2021, and lost 81% in 2022.
+
+**The one forced sale.** S's only forced sale was LENDUSDT on 2020-10-14, while it held 3 coins; the pinned 30% haircut for a coin with no further bar cost about 10% of the wallet that day (-11.0% on the day). LEND most likely moved to AAVE rather than failing (public history, not the data). Without the haircut, the audit puts Sharpe at about 0.41 and the total return at about -35%; no gate moves. Later Bold plans should say in advance how coin migrations and renames are handled.
 
 ## What this means
 
-The plan's verdict rule gives NOT A CANDIDATE: weekly momentum across the top-20 coins shows no edge on 2017-2022 after costs. The rule was beaten by random coin picks with the same turnover, by holding BTC, and by an equal mix of the same coins. Nothing goes to the app from this study. No amendment run is planned: the result is not close on any gate. As the plan says, one independent audit follows.
+The plan's verdict rule gives NOT A CANDIDATE: weekly momentum across the top-20 coins shows no edge on 2017-2022 after costs. The rule was beaten by random coin picks with the same turnover, by holding BTC, and by an equal mix of the same coins. Nothing goes to the app from this study. No amendment run is planned: every gate fails, and only the plateau gate (G5) is near its line (0.261 against 0.272). As the plan says, one independent audit follows.
