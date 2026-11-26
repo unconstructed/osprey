@@ -465,6 +465,11 @@ def test_the_branch_line_and_the_branch_guard(tmp_path):
         with pytest.raises(S.Refusal, match="no '- Branch: ' line"):
             S.plan_branch(bad)
     cfg = copy_config(tmp_path / "config")
+    real = S.check_branch(sd.steady_limits(cfg), plan)  # today's file: the steady values as quoted (#81)
+    assert real["branch"] == "R"
+    assert real["sha256_as_quoted"] is (S.sha256_file(cfg / "risk_levels.yaml") == S.RISK_SHA256_QUOTED)
+    # the bytes the plan quoted (config/risk_levels.yaml as of 2026-11-22, frozen as a fixture)
+    (cfg / "risk_levels.yaml").write_bytes((Path(__file__).parent / "fixtures" / "risk_levels_2026-11-22.yaml").read_bytes())
     ok = S.check_branch(sd.steady_limits(cfg), plan)
     assert ok["branch"] == "R" and ok["sha256_as_quoted"] is True
     with pytest.raises(S.Refusal, match="runs Branch R only"):

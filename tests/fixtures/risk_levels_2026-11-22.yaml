@@ -1,0 +1,18 @@
+# config/risk_levels.yaml — owned by risk-officer. Steady's budget is set (owner-approved); the others are TBD.
+steady:
+  coins: [BTC, ETH, USDC]
+  min_cash_pct: 20
+  max_coin_pct: 60
+  max_drawdown_budget_pct: 35   # owner-approved 2026-11-21: Monte Carlo 95th-percentile max drawdown budget
+  # Owner-approved 2026-11-22. The self-directed hold-this-mix tool only, not our strategies: at most this many
+  # band and reset trades back to the mix in any 30 days, enforced as at least ceil(30 / value) days between
+  # trades back to the mix (15 at 2). Limit fixes are exempt: the wait never holds them back, they are not among
+  # this many, and they restart the wait.
+  hold_mix_max_rebalances_per_30d: 2
+balanced:
+  coins: [BTC, ETH, USDC]        # plus vetted large tokens on Base, once listed
+  stop_loss_required: true
+  max_drawdown_budget_pct: TBD
+bold:
+  coins: []                      # vetted list of the most liquid tokens on Base
+  max_drawdown_budget_pct: TBD
